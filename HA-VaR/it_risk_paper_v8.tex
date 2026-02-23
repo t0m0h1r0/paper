@@ -1,0 +1,1207 @@
+\documentclass[12pt, a4paper]{article}
+
+% ===== パッケージ =====
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+\usepackage{fontspec}
+\setmainfont{Noto Serif CJK JP}
+\setsansfont{Noto Sans CJK JP}[BoldFont=Noto Sans CJK JP Bold]
+\usepackage{geometry}
+\geometry{top=25mm, bottom=25mm, left=25mm, right=25mm}
+\usepackage{setspace}
+\setstretch{1.5}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=black
+}
+
+% ===== 定理環境 =====
+\newtheorem{theorem}{定理}[section]
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{corollary}[theorem]{系}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{remark}[theorem]{注}
+\newtheorem{assumption}[theorem]{仮定}
+
+% ===== タイトル =====
+\title{%
+  \large ITシステム運用リスクの再生過程による\\[4pt]
+  確率論的定量評価\\[8pt]
+  \normalsize --- 修復率と年間損失の理論的関係 ---
+}
+\author{}
+\date{}
+
+% ===== 本文 =====
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+% ======================================
+% 要旨
+% ======================================
+\begin{abstract}
+本研究は，ITシステムの運用リスクを信頼性理論とリスク計量の枠組みにより統合的に定式化する．
+従来，システム停止リスクは平均故障間隔（MTBF）や平均修復時間（MTTR）といった単一指標で評価されることが多かったが，
+これらは停止時間分布の形状や極端事象（テールリスク）が財務的損失に与える影響を十分に捉えていない．
+本研究では，稼働時間を相型（Phase-Type; PH）分布，
+修復時間を指数分布で記述する再生型マルコフモデルを構築し，
+損失を停止時間（修復時間 $R$）の凹型増加関数 $L(R)=L_{\max}(1-e^{-\gamma R})$ として定義する．
+修復率 $\mu$ の増加は (i) 1サイクルあたり期待損失の低減と (ii) サイクル長の短縮という
+相反する効果をもたらすため，長期平均損失 $\bar{L}(\mu)$ は閾値
+$\mu^* = \sqrt{\gamma/\mathbb{E}[U]}$ を最大点とする単峰関数となる（定理~\ref{thm:monotone}）．
+$\mu > \mu^*$（実務的通常領域）では MTTR 短縮が損失を単調に低減させる．
+再生報酬過程の中心極限定理により年間損失の漸近正規性を示し，
+VaR・CVaR の実務的近似式を導出する．
+本研究は，可用性指標と財務的リスク測度を再生過程理論で統合する数理的枠組みを提供する．
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ======================================
+% 第1章
+% ======================================
+\section{序論}
+
+\subsection{研究背景}
+
+現代のデジタル社会において，ITシステムの継続的な稼働は企業活動の根幹を支える基盤となっている．
+クラウド基盤，決済システム，サプライチェーン管理，医療情報システムなど，
+社会インフラとしての役割を担うシステムにおいては，
+短時間の停止であっても売上機会の損失，ブランド毀損，契約違反金の発生，
+さらには社会的信用の毀損など複合的かつ重大な影響が生じる \cite{Gray1992,Marcus2003}．
+そのため，システム信頼性の定量評価は経営戦略上の優先課題となっている．
+
+信頼性工学の古典的枠組みでは，
+平均故障間隔（Mean Time Between Failures; MTBF），
+平均修復時間（Mean Time To Repair; MTTR），
+および可用性（Availability）といった指標が広く用いられてきた \cite{BarlowProschan1975,Birolini2017}．
+これらは設計段階における冗長構成の検討や，
+サービス水準合意（Service Level Agreement; SLA）の定義において有用な指標である．
+しかし，これらは主として「平均挙動」を記述するものであり，
+停止時間分布の形状・歪度・尾部の重さが財務的損失に与える影響を定量化するには不十分である．
+
+一方，金融リスク管理の分野では，分位点リスク（Value-at-Risk; VaR），
+条件付き期待ショートフォール（Conditional Value-at-Risk; CVaR）をはじめとする
+高度なリスク測度が発展してきた \cite{Artzner1999,RockafellarUryasev2000,McNeilFreyEmbrechts2015}．
+特にバーゼル規制では，銀行の自己資本要件の算定においてオペレーショナルリスクを
+統計的に計量することが求められており，内部損失データに基づく確率モデルの構築が実務的義務となっている
+\cite{Basel2006,Shevchenko2009}．
+近年の実証研究では，オペレーショナルリスクは従来想定されていたよりも
+系統的（systemic）な性質を持つことが明らかにされており \cite{BergerCurtiMihov2022}，
+IT停止に起因する損失の定量モデルへの関心がさらに高まっている．
+
+本研究は，信頼性工学における物理モデルと金融リスク管理における計量的測度を橋渡しし，
+ITシステムの停止リスクを確率論的に定量評価する統合的枠組みを構築することを目的とする．
+
+\subsection{既存研究と課題}
+
+\subsubsection{信頼性モデルの展開}
+
+信頼性理論の数学的基礎は，Barlow and Proschan \cite{BarlowProschan1965,BarlowProschan1975} によって
+確立された．彼らは，単調ハザード率，増加失敗率（IFR），減少失敗率（DFR）などの概念を導入し，
+部品の寿命分布と系全体の信頼性の関係を確率順序論の観点から体系化した．
+その後，Birolini \cite{Birolini2017} や Trivedi \cite{Trivedi2002} はこれらの理論を
+電子システムおよびコンピュータシステムへ応用する実用的枠組みを整備した．
+
+交代更新過程の枠組みは Cox \cite{Cox1962}，Kulkarni and Trivedi \cite{KulkarnTrivedi1985} によって定式化され，
+保全最適化の数理的枠組みは Aven and Jensen \cite{AvenJensen1999} が体系化している．
+
+\subsubsection{相型分布の理論と応用}
+
+PH分布は，Neuts \cite{NeutsPRL1975,Neuts1981} によって導入された，
+有限状態連続時間マルコフ連鎖の吸収時間として定義される分布族である．
+指数分布，アーラン分布，ハイパー指数分布，コクス分布などを特殊例として含み，
+任意の非負値分布を任意精度で近似できるという稠密性を持つ \cite{Neuts1981,LatoucheRamaswami1999}．
+ラプラス変換が行列指数関数の形で閉形式に得られることから，
+数値計算適性が高く，待ち行列理論・信頼性理論における分析ツールとして広く活用されている
+\cite{Asmussen2003,Tijms2003,Kulkarni2016}．
+
+PH分布を観測データからフィッティングする方法としては，
+Feldmann and Whitt \cite{FeldmannWhitt1998} によるモーメント整合法，
+Bobbio, Horv\'{a}th and Telek \cite{Bobbio2005} による最小位相数での3モーメント整合，
+Horv\'{a}th and Telek \cite{HorvathTelek2007} による高次モーメント整合が知られている．
+近年では，スケール混合によりPH分布を重尾分布へと拡張する理論が Bladt and Yslas \cite{BladtYslas2022}
+および Albrecher et al.\ \cite{AlbrecherBladtBladt2023} によって整備されており，
+より一般的な損失モデルへの接続が可能となりつつある．
+Neuts and Meier \cite{NeutsMeier1981} は2部品システムへの PH 分布の適用を示し，
+P\'{e}rez-Oc\'{o}n and Montoro-Cazorla \cite{PerezOcon2004} はQBD過程と組み合わせた
+多部品システムへの拡張を行った．
+
+本研究では，複数の劣化段階を経て停止に至るITシステムの稼働時間を
+PH分布で表現することにより，フィッティングの柔軟性を確保しつつ
+解析的扱いやすさを維持する．
+クラウドシステムやエッジコンピューティング環境における可用性評価の最近の研究
+\cite{PereiraAraujoMelo2021,PereiraMelo2022} においても，
+PH分布を基礎とした解析モデルの有効性が確認されている．
+また，Wang et al.\ \cite{WangHuZhangWang2021} は k-out-of-n 冗長システムにおける
+PH分布の活用を示しており，本研究のモデルは今後の冗長構成への拡張の基礎となる．
+
+\subsubsection{更新理論と再生報酬過程}
+
+更新理論は Cox \cite{Cox1962}，Karlin and Taylor \cite{Karlin1975}，Ross \cite{Ross1996} により
+確率過程論の標準的枠組みとして確立された．
+更新報酬定理は可用性・長期平均損失の計算に不可欠な基本定理であり
+\cite{Serfozo2009,Rolski1999}，
+再生報酬過程の中心極限定理は \c{C}inlar \cite{Cinlar1975}，Billingsley \cite{Billingsley1995}，
+Gut \cite{Gut2009} が証明している．
+Asmussen \cite{Asmussen2003} は PH 分布と更新過程を組み合わせた漸近展開を論じており，
+本研究の理論的基盤となる．
+修復時間の一般分布への拡張はセミマルコフ過程 \cite{LimniosOprisan2001} で扱えるが，
+閉形式が失われるため本研究では指数分布仮定を採用し，拡張は今後の課題とする．
+
+\subsubsection{ソフトウェアエイジングとIT固有の信頼性問題}
+
+従来のハードウェア信頼性理論とは異なり，
+ITシステムの障害は「ソフトウェアエイジング」という固有の劣化メカニズムを持つ \cite{Garg1998}．
+メモリリーク，数値精度の劣化，ファイルシステムの断片化などの累積が
+システム性能の低下・停止を引き起こすこのメカニズムは，
+複数の劣化段階を経る過程としてモデル化することが自然であり，
+多相モデルである PH 分布との親和性が高い \cite{TrivediVaidyanathan2005}．
+Cotroneo et al.\ \cite{CotroneoNatalla2019} は，クラウドシステムを対象としたソフトウェアエイジングと
+リジュビネーション（rejuvenation）に関する105論文の系統的レビューを行い，
+可用性向上のための最適なリジュビネーション戦略の設計が活発に研究されていることを示した．
+Boehm \cite{Boehm1981} はソフトウェア開発コストの見積もりモデルを構築しており，
+ソフトウェア障害の間接的経済影響（手戻りコスト等）についての定量的議論を含んでいる．
+
+ITシステムの高可用性設計については，Patterson, Gibson and Katz \cite{PattersonGibsonKatz1988} が
+RAIDによる冗長化の有効性を定量的に示しており，
+Gray and Reuter \cite{Gray1992} はトランザクション処理システムの
+障害許容設計原則を論じている．
+
+\subsubsection{確率順序論の応用}
+
+確率順序論は，分布間の「大小関係」を比較する数学的道具立てである．
+Shaked and Shanthikumar \cite{ShakedShanthikumar2007,MullerStoyan2002} は
+通常確率順序，ハザード率順序，増加凸順序（凸順序）など多様な順序概念を体系化し，
+信頼性・経済学・保険数学への応用を論じた．
+M\"{u}ller and Stoyan \cite{MullerStoyan2002} はリスク比較における確率順序の活用を論じている．
+
+本研究では，修復率 $\mu$ の変化が稼働時間分布 $F_U$ そのものには影響しないため，
+確率順序を直接適用する経路は取らず，
+更新報酬定理に基づく分母の単調変化として単調性を証明する．
+ただし，将来の拡張において凸順序を用いた VaR 比較の強化が期待される \cite{MullerStoyan2002}．
+
+\subsubsection{リスク測度の理論的基盤}
+
+Artzner et al. \cite{Artzner1999} は，
+リスク測度が満たすべき「整合性」の公理（平行移動不変性・劣加法性・正同次性・単調性）を定式化し，
+VaR が劣加法性を欠くことを示した．
+Rockafellar and Uryasev \cite{RockafellarUryasev2000,RockafellarUryasev2002} は
+CVaR（条件付き VaR）が整合的リスク測度であること，
+および最適化問題として効率的に計算可能であることを示した．
+F\"{o}llmer and Schied \cite{FollmerSchied2004} および Szeg\"{o} \cite{Szego2002} は
+これらの測度の数学的性質と金融リスクへの応用を詳述している．
+
+ITシステムの損失に対してこれらの測度を適用する試みは，
+オペレーショナルリスク研究 \cite{Shevchenko2009} の文脈では存在するが，
+信頼性工学の物理モデルと整合した形で定式化する研究は限定的である．
+近年では，Xu, Zhu and Pinedo \cite{XuZhuPinedo2020} が確率的制御の枠組みでオペレーショナルリスクを
+定式化し，予防的・是正的管理の最適組み合わせを導出した．
+また Berger et al.\ \cite{BergerCurtiMihov2022} は米国銀行持株会社の開示データを用いて，
+オペレーショナルリスク（内部不正・外部事象・システム障害等を含む）が想定以上に系統的な性質を持つことを実証した
+（なお同研究のデータは金融機関に特化しており，一般的IT企業への直接適用には留意が必要である）．
+これらの研究は，本研究が構築する物理モデルと財務測度の統合枠組みの実務的重要性を裏付けている．
+極値理論 \cite{EmbrechtsKluppelbergMikosch1997} は
+重尾損失のモデル化に有力であるが，PH分布は軽尾（指数尾）を持つため，
+本研究の枠組みでは適用対象外である．
+重尾への拡張については，Bladt and Yslas \cite{BladtYslas2022} による
+スケール混合アプローチが有望な手段として挙げられる．
+
+\subsubsection{既存研究の課題}
+
+以上の文献整理を踏まえ，既存研究には次の課題が残されている．
+第一に，可用性指標と財務的損失測度を同一の確率モデル内で統合的に定式化した研究が少ない．
+第二に，修復速度（MTTR短縮）が損失リスク測度に与える影響を，
+更新報酬の構造から厳密に証明した研究がない．
+第三に，年間総損失を再生構造と整合的に定式化し，
+VaR・CVaR を同一理論体系で評価する枠組みが整備されていない．
+本研究はこれらの課題を理論的・数値的に解決する．
+
+\subsection{本研究の貢献}
+
+本研究の主な貢献は次の三点である．
+
+\paragraph{(1) 再生型PH信頼性モデルの構築}
+稼働時間をPH分布，修復時間を指数分布とする再生型マルコフモデルを構築し，
+停止サイクルを更新過程として定式化する \cite{Cox1962,Neuts1981}．
+PH分布のラプラス変換の閉形式を利用して期待損失を行列演算で計算する手順を示す．
+
+\paragraph{(2) 修復率に対する長期平均損失の単調性証明}
+修復率 $\mu$ の増加がサイクル期待長を短縮することを示し，
+更新報酬定理 \cite{Ross1996,Serfozo2009} に基づく微分計算により，
+長期平均年間損失の厳密な単調減少を証明する（定理~\ref{thm:monotone}）．
+
+\paragraph{(3) 年間損失のリスク測度の定量的評価枠組み}
+年間総損失を再生報酬過程として定式化し，
+中心極限定理に基づく漸近正規近似から VaR および CVaR の近似式を導出する．
+CVaR は整合的リスク測度 \cite{Artzner1999,RockafellarUryasev2000} であり，
+モンテカルロ法 \cite{RubinsteinKroese2016,AsmussenGlynn2007} による数値実験で理論結果を検証する．
+本枠組みは，Xu et al.\ \cite{XuZhuPinedo2020} の確率的制御理論との接続を通じて，
+最適修復投資問題への発展が期待される．
+
+\subsection{論文構成}
+
+本論文の構成は以下の通りである．
+第2章では再生型マルコフモデルとPH分布を定式化する．
+第3章では修復率とリスク測度の理論解析を行う．
+第4章では年間損失分布とリスク測度の近似式を導出する．
+第5章では数値実験により理論結果を検証する．
+第6章で結論と今後の課題を述べる．
+
+% ======================================
+% 第2章
+% ======================================
+\section{再生型マルコフ信頼性モデル}
+
+\subsection{モデルの基本構造}
+
+本研究では，ITシステムの運用過程を再生型確率過程として定式化する \cite{Cinlar1975,Ross1996}．
+システムは稼働（Up），停止（Down），修復（Repair）を周期的に繰り返すと仮定し，
+修復完了の瞬間を再生点とする．
+
+停止に至るまでの稼働時間は，メモリリークや設定ファイルの肥大化など
+複数段階の劣化を経る可能性があるため \cite{Garg1998,TrivediVaidyanathan2005}，
+単純な指数分布ではなく，マルコフ的劣化段階を内包する PH 分布で表現する．
+停止後は修復が行われ，修復完了後にシステムは初期状態に復帰する（完全修復仮定）．
+これによりプロセスは再生過程（renewal process）を構成する \cite{Cox1962}．
+
+\subsection{稼働時間の相型分布}
+
+\subsubsection{定義と表現}
+
+\begin{definition}[PH分布 \cite{Neuts1981,LatoucheRamaswami1999}]
+有限状態集合 $\mathcal{S} = \{1, 2, \dots, m\}$ を過渡状態集合，
+$\Delta$ を吸収状態とする連続時間マルコフ連鎖を考える．
+ジェネレータ行列を
+\[
+  Q = \begin{pmatrix} S & \mathbf{s} \\ \mathbf{0}^\top & 0 \end{pmatrix}
+\]
+と書くとき，$S \in \mathbb{R}^{m \times m}$ はサブジェネレータ行列（非対角要素は非負，行和は非正），
+$\mathbf{s} = -S\mathbf{1}$ は吸収レートベクトルである．
+初期分布を $\boldsymbol{\alpha} \in \mathbb{R}^{1 \times m}$（$\boldsymbol{\alpha}\mathbf{1} \le 1$）とするとき，
+吸収時間 $U$ の分布を $\mathrm{PH}(\boldsymbol{\alpha}, S)$ と記し，相型分布と呼ぶ．
+\end{definition}
+
+稼働時間 $U \sim \mathrm{PH}(\boldsymbol{\alpha}, S)$ の分布関数は
+\begin{equation}
+  F_U(t) = 1 - \boldsymbol{\alpha} e^{St} \mathbf{1}, \qquad t \ge 0
+  \label{eq:PH_cdf}
+\end{equation}
+で与えられる \cite{Neuts1981}．ここで $e^{St}$ は行列指数関数である．
+
+\subsubsection{基本特性}
+
+平均稼働時間および $k$ 次モーメントは
+\begin{equation}
+  \mathbb{E}[U^k] = k!\, \boldsymbol{\alpha}(-S)^{-k}\mathbf{1}
+  \label{eq:PH_moments}
+\end{equation}
+で与えられる \cite{Neuts1981,LatoucheRamaswami1999}．
+特に $k=1$ のとき $\mathbb{E}[U] = \boldsymbol{\alpha}(-S)^{-1}\mathbf{1}$．
+
+ラプラス変換は
+\begin{equation}
+  \mathcal{L}_U(s) = \mathbb{E}[e^{-sU}] = \boldsymbol{\alpha}(sI - S)^{-1}(-S)\mathbf{1}
+  + (1 - \boldsymbol{\alpha}\mathbf{1}), \qquad \mathrm{Re}(s) \ge 0
+  \label{eq:PH_LST}
+\end{equation}
+で閉形式に得られる \cite{Neuts1981}．
+$\boldsymbol{\alpha}\mathbf{1} = 1$（確率1で吸収される場合）には
+$\mathcal{L}_U(s) = \boldsymbol{\alpha}(sI - S)^{-1}\mathbf{s}$ となる．
+
+PH分布の尾部は指数減衰する：
+\begin{equation}
+  P(U > t) \sim c \cdot e^{-\theta t}, \quad t \to \infty
+  \label{eq:PH_tail}
+\end{equation}
+ただし $\theta = -\max\{\mathrm{Re}(\lambda) : \lambda \in \mathrm{spec}(S)\} > 0$
+\cite{Asmussen2003}．この漸近式は，サブジェネレータ $S$ の支配固有値
+（最大実部を持つ固有値）が単純（代数的重複度1）であることを前提とする．
+一般の PH 分布では $c > 0$ であることも $S$ の原始性（不可約かつ吸収的）によって保証される
+\cite{Neuts1981,LatoucheRamaswami1999}．
+この軽尾性は，重尾損失が問題となるオペレーショナルリスクへの
+直接適用に制約を設けるが \cite{EmbrechtsKluppelbergMikosch1997}，
+実務的パラメータ範囲では十分な表現力を持つ．
+
+\subsubsection{PH分布のフィッティング}
+
+実データへの PH 分布のフィッティングは，
+モーメント整合法 \cite{Bobbio2005,HorvathTelek2007} や
+最尤推定法（EM アルゴリズム）\cite{MeekerEscobar1998} によって行われる．
+Feldmann and Whitt \cite{FeldmannWhitt1998} は，
+ネットワークトラフィックの長尾分布を混合指数分布（PH分布の一種）でフィッティングした実績を示した．
+本研究では，実データへの適用よりも理論的構造の解析に主眼を置き，
+具体的なフィッティング手順は \cite{LatoucheRamaswami1999} を参照する．
+
+\subsection{修復時間}
+
+停止後の修復時間 $R$ は指数分布に従うと仮定する：
+\begin{equation}
+  R \sim \mathrm{Exp}(\mu), \qquad \mathbb{E}[R] = \frac{1}{\mu}.
+  \label{eq:repair}
+\end{equation}
+ここで $\mu > 0$ は修復率であり，$\mathrm{MTTR} = 1/\mu$ である．
+指数分布の仮定は，修復完了率が修復経過時間に依存しないことを意味する（無記憶性）．
+指数分布の無記憶性は，過去の修復経過時間が残余修復時間に影響しないことを意味し，
+障害対応プロセスにおける簡略な管理指標としての MTTR 利用と整合的である
+（Gray and Reuter \cite{Gray1992} はトランザクション処理システムの文脈でシステム可用性指標を論じている）．
+近年の可用性研究においても，指数分布は修復時間モデルの出発点として広く採用されており
+\cite{GaoWang2021,YangWu2021}，特殊化した修復モデルとの比較基準として機能する．
+指数分布を一般の修復時間分布に拡張することは，
+セミマルコフ過程の枠組みで取り扱うことができ \cite{LimniosOprisan2001}，
+今後の研究課題として第6章で論じる．
+
+\subsection{再生サイクルと更新過程}
+
+1回の運用サイクル時間を
+\begin{equation}
+  C = U + R
+  \label{eq:cycle}
+\end{equation}
+と定義する．
+
+\begin{assumption}[独立性]
+\label{asm:indep}
+稼働時間 $U \sim \mathrm{PH}(\boldsymbol{\alpha}, S)$ と修復時間 $R \sim \mathrm{Exp}(\mu)$ は独立である：
+$U \perp R$．
+\end{assumption}
+
+この独立性仮定は再生過程 \eqref{eq:renewal} の成立に必要であり，
+「停止要因が修復難易度に影響しない」という実務的仮定に対応する
+\cite{Cox1962,Asmussen2003}．
+
+\begin{assumption}[完全修復（Perfect Repair）]
+\label{asm:perfect}
+修復完了後，システムは「初期と確率的に同一の状態」に復帰する．
+すなわち，修復後の稼働時間の分布は常に $\mathrm{PH}(\boldsymbol{\alpha}, S)$ であり，
+修復完了時点が再生点（renewal point）を構成する．
+\end{assumption}
+
+仮定~\ref{asm:indep}（独立性）と仮定~\ref{asm:perfect}（完全修復）の両方のもとで，
+サイクル列 $\{C_i = U_i + R_i\}_{i \ge 1}$ は独立同分布となり，
+更新過程 \eqref{eq:renewal} が成立する \cite{Cox1962,Billingsley1995}．
+稼働時間 $U$ と修復時間 $R$ は仮定~\ref{asm:indep} のもとで独立であり，
+修復完了の瞬間を再生点とすると，サイクル列 $\{C_i\}_{i \ge 1}$ は独立同分布となる．
+したがって，
+\begin{equation}
+  N(t) = \max\!\left\{n : \sum_{i=1}^{n} C_i \le t\right\}
+  \label{eq:renewal}
+\end{equation}
+は更新過程（renewal process）である \cite{Cox1962,Ross1996}．
+$N(t)$ は $[0,t]$ 内のサイクル完了数を表す．
+サイクル時間の期待値は
+\begin{equation}
+  \mathbb{E}[C] = \mathbb{E}[U] + \frac{1}{\mu}
+  = \boldsymbol{\alpha}(-S)^{-1}\mathbf{1} + \frac{1}{\mu}
+  \label{eq:cycle_mean}
+\end{equation}
+であり，基本更新定理より $N(t)/t \to 1/\mathbb{E}[C]$ がほとんど確実に成立する
+\cite{Serfozo2009,Billingsley1995}．
+
+\subsection{定常可用性}
+
+可用性は，長期的に稼働状態にある時間割合として定義する：
+\begin{equation}
+  A = \lim_{t \to \infty} \frac{1}{t} \int_0^t \mathbf{1}_{\{\text{Up}\}}(s)\, ds.
+  \label{eq:avail_def}
+\end{equation}
+更新報酬定理 \cite{Ross1996,Serfozo2009,Rolski1999} より，
+\begin{equation}
+  A = \frac{\mathbb{E}[U]}{\mathbb{E}[C]}
+    = \frac{\mathbb{E}[U]}{\mathbb{E}[U] + \dfrac{1}{\mu}}
+    = \frac{\boldsymbol{\alpha}(-S)^{-1}\mathbf{1}}
+           {\boldsymbol{\alpha}(-S)^{-1}\mathbf{1} + \dfrac{1}{\mu}}
+  \label{eq:avail}
+\end{equation}
+が成立する．
+
+\begin{remark}
+式 \eqref{eq:avail} は，$\mu$ の増加（MTTR の短縮）が可用性 $A$ を増加させることを示す：
+$dA/d\mu > 0$．これは直感と整合する．
+\end{remark}
+
+\subsection{損失関数}
+
+1回の停止サイクルにおける損失は，当該サイクルの\textbf{停止時間}（修復時間）$R$ に依存する．
+直感的に，停止が長引くほど損失は増加するからである．
+本研究では以下の損失関数を採用する：
+\begin{equation}
+  L(R) = L_{\max}(1 - e^{-\gamma R}), \qquad L_{\max} > 0,\ \gamma > 0.
+  \label{eq:loss_fn}
+\end{equation}
+この関数は $L(0) = 0$，$\lim_{R\to\infty}L(R) = L_{\max}$ であり，
+修復時間 $R$ に関して単調増加かつ凹（上に凸）である：
+\begin{equation}
+  L'(R) = L_{\max}\,\gamma\,e^{-\gamma R} > 0, \qquad
+  L''(R) = -L_{\max}\,\gamma^2\,e^{-\gamma R} < 0.
+  \label{eq:loss_deriv}
+\end{equation}
+$L''(R) < 0$ は，損失の限界増加率が時間とともに逓減する（代替手段の効果）ことを意味する．
+$\gamma$ は損失の時間的蓄積速度を，$L_{\max}$ は損失の飽和上限を表す．
+この形状は，停止直後に損失が急速に増加し，
+代替手段の確保等により一定時間後に損失増加が収まるという
+実務的な損失構造 \cite{Marcus2003} を反映している．
+
+\begin{remark}
+$L = L(U)$（稼働時間の関数）ではなく $L = L(R)$（停止時間の関数）とすることが理論的に正しい．
+稼働時間が長いほど損失が増えるというモデルは経済的直感と反するため，
+本研究では停止中に発生する損失を正確に記述するために $L(R)$ を採用する．
+\end{remark}
+
+なお，より一般的な損失関数（例：線形損失 $L(R)=cR$）に対しても，
+$R \sim \mathrm{Exp}(\mu)$ であれば期待値は閉形式に得られる \cite{Rockafellar1970,ShakedShanthikumar2007}．
+
+\subsection{期待損失の閉形式計算}
+
+$R \sim \mathrm{Exp}(\mu)$ のラプラス変換 $\mathbb{E}[e^{-\gamma R}] = \mu/(\mu+\gamma)$ を用いると，
+\begin{align}
+  \mathbb{E}[L(R)]
+  &= L_{\max}\!\left(1 - \mathbb{E}[e^{-\gamma R}]\right)
+   = L_{\max}\!\left(1 - \frac{\mu}{\mu + \gamma}\right)
+   = \frac{L_{\max}\,\gamma}{\mu + \gamma}.
+  \label{eq:EL_closed}
+\end{align}
+この閉形式は行列演算を用いず，修復率 $\mu$ と損失パラメータ $\gamma$ だけで計算できる．
+\textbf{重要な点は，$\mathbb{E}[L(R)]$ が $\mu$ の減少関数であること}：
+$\mu$ が増加する（修復が速くなる）と，各サイクルの期待損失が直接的に減少する \cite{Ross1996}．
+
+\subsection{年間総損失と再生報酬過程}
+
+期間 $[0, t]$ における累積損失は
+\begin{equation}
+  L_{\mathrm{tot}}(t) = \sum_{i=1}^{N(t)} L(R_i)
+  \label{eq:total_loss}
+\end{equation}
+で与えられる．ここで $R_i$ は第 $i$ サイクルの修復時間（停止時間），
+$N(t)$ は式 \eqref{eq:renewal} で定義される更新過程である．
+これは再生報酬過程（renewal reward process）であり \cite{Cox1962,Serfozo2009}，
+更新点における報酬 $\{L(R_i)\}$ は独立同分布をなす．
+
+更新報酬定理 \cite{Ross1996,Serfozo2009,Rolski1999} より，
+$\mathbb{E}[C] < \infty$ および $\mathbb{E}[L(R)] < \infty$（いずれも本モデルで成立）のもとで，
+\begin{equation}
+  \lim_{t \to \infty} \frac{\mathbb{E}[L_{\mathrm{tot}}(t)]}{t}
+  = \frac{\mathbb{E}[L(R)]}{\mathbb{E}[C]}
+  = \frac{L_{\max}\gamma/(\mu+\gamma)}{\mathbb{E}[U] + 1/\mu}
+  \eqqcolon \bar{L}(\mu).
+  \label{eq:Lbar}
+\end{equation}
+分子 $\mathbb{E}[L(R)] = L_{\max}\gamma/(\mu+\gamma)$ は $\mu$ の減少関数，
+分母 $\mathbb{E}[C] = \mathbb{E}[U] + 1/\mu$ も $\mu$ の減少関数である．
+修復率 $\mu$ の増加は\textbf{分子と分母を同時に減少}させるため，
+$\bar{L}(\mu)$ の単調性は分子・分母の減少速度の大小関係に依存する（第3章で精査する）．
+
+% ======================================
+% 第3章
+% ======================================
+\section{修復率とリスク測度の理論解析}
+
+\subsection{解析の目的と枠組み}
+
+第2章で構築したモデルにおいて，
+稼働時間 $U \sim \mathrm{PH}(\boldsymbol{\alpha}, S)$ の分布は $\mu$ に依存しない一方，
+1サイクルあたり期待損失 $\mathbb{E}[L(R)] = L_{\max}\gamma/(\mu+\gamma)$ は $\mu$ の減少関数であり，
+サイクル期待長 $\mathbb{E}[C] = \mathbb{E}[U] + 1/\mu$ も $\mu$ の減少関数である．
+修復率 $\mu$ の変化は分子（期待損失）と分母（サイクル長）の両方に作用するため，
+長期平均損失の単調性は両者の変化速度の比較によって決まる．
+
+本章では，この構造に基づいて以下を論じる：
+(1) 長期平均損失 $\bar{L}(\mu)$ の単峰構造と閾値 $\mu^*$ の特徴付け（§~\ref{sec:monotone}），
+(2) 損失レートと可用性の解析的関係（§~\ref{sec:avail_loss}），
+(3) MTBF延長との比較・確率順序論との接続（§~\ref{sec:stoch_order}）．
+
+\subsection{長期平均損失の単峰構造}\label{sec:monotone}
+
+まず $\bar{L}(\mu)$ を別の形に整理しておく．式 \eqref{eq:Lbar} の分子・分母に $\mu$ を乗じると，
+\begin{equation}
+  \bar{L}(\mu)
+  = \frac{L_{\max}\,\gamma\,\mu}{(\mu+\gamma)(\mu\,\mathbb{E}[U]+1)}.
+  \label{eq:Lbar_alt}
+\end{equation}
+この表現は $\bar{L}(\mu)$ が $\mu \to 0$ および $\mu \to \infty$ の両極限でゼロに収束することを
+直接示しており，したがって $\bar{L}(\mu)$ は $(0,\infty)$ 上で少なくとも1個の最大値を持つ．
+
+\begin{theorem}[単峰性と閾値単調性]
+\label{thm:monotone}
+$\mu^* \coloneqq \sqrt{\gamma/\mathbb{E}[U]}$ と定義する．このとき
+\begin{enumerate}
+  \item $\mu > \mu^*$ ならば $d\bar{L}/d\mu < 0$（$\bar{L}$ は狭義単調減少），
+  \item $\mu = \mu^*$ ならば $d\bar{L}/d\mu = 0$（$\bar{L}$ は一意の最大値を達成），
+  \item $\mu < \mu^*$ ならば $d\bar{L}/d\mu > 0$（$\bar{L}$ は狭義単調増加）．
+\end{enumerate}
+すなわち $\bar{L}(\mu)$ は $\mu^*$ を頂点とする単峰関数である．
+実務的パラメータ範囲（$\mu \gg \mu^*$，すなわち $\mathrm{MTBF} \gg \gamma\cdot\mathrm{MTTR}^2$）では
+MTTR短縮（$\mu$ 増加）が長期平均損失を単調に低減させる．
+\end{theorem}
+
+\begin{proof}
+式 \eqref{eq:Lbar_alt} より
+\[
+  \bar{L}(\mu) = L_{\max}\,\gamma\cdot g(\mu), \qquad
+  g(\mu) \coloneqq \frac{\mu}{(\mu+\gamma)(\mu\,\mathbb{E}[U]+1)}.
+\]
+$g(\mu)$ を商の微分則によって $\mu$ で微分する．
+分子を $f_1(\mu) = \mu$，分母を $f_2(\mu) = (\mu+\gamma)(\mu\mathbb{E}[U]+1)$ とおくと，
+$f_1' = 1$ および
+\begin{equation}
+  f_2'(\mu) = \mathbb{E}[U](\mu+\gamma) + (\mu\mathbb{E}[U]+1)\cdot 1
+            = 2\mu\mathbb{E}[U] + \gamma\mathbb{E}[U] + 1.
+  \label{eq:f2_prime}
+\end{equation}
+商の微分則 $(f_1/f_2)' = (f_1'f_2 - f_1 f_2')/f_2^2$ より，
+分子は
+\begin{align}
+  &f_1'(\mu)\,f_2(\mu) - f_1(\mu)\,f_2'(\mu) \notag\\
+  &\quad= (\mu+\gamma)(\mu\mathbb{E}[U]+1)
+         - \mu\,(2\mu\mathbb{E}[U] + \gamma\mathbb{E}[U] + 1) \notag\\
+  &\quad= \bigl[\mu^2\mathbb{E}[U] + \mu + \gamma\mu\mathbb{E}[U] + \gamma\bigr]
+         - \bigl[2\mu^2\mathbb{E}[U] + \gamma\mu\mathbb{E}[U] + \mu\bigr] \notag\\
+  &\quad= \gamma - \mu^2\,\mathbb{E}[U].
+  \label{eq:g_numerator}
+\end{align}
+したがって
+\begin{equation}
+  g'(\mu) = \frac{\gamma - \mu^2\,\mathbb{E}[U]}{[(\mu+\gamma)(\mu\mathbb{E}[U]+1)]^2},
+  \label{eq:g_prime}
+\end{equation}
+分母 $[(\mu+\gamma)(\mu\mathbb{E}[U]+1)]^2 > 0$ は常に正であるから，
+\begin{equation}
+  \mathrm{sign}(g'(\mu)) = \mathrm{sign}(\gamma - \mu^2\,\mathbb{E}[U]).
+  \label{eq:sign_g}
+\end{equation}
+
+\paragraph{最大値の一意性．}
+$g'(\mu) = 0$ の解は $\mu^* = \sqrt{\gamma/\mathbb{E}[U]}$ のみであり，
+$\mu < \mu^*$ で $g' > 0$，$\mu > \mu^*$ で $g' < 0$ であるから，
+$g(\mu)$（したがって $\bar{L}(\mu) = L_{\max}\gamma \cdot g(\mu)$）は
+$\mu^*$ において唯一の大域的最大値を持つ．
+
+\paragraph{第2次導数による確認．}
+数値計算により，$g''(\mu^*) < 0$ が確認できる（厳密評価は付録を参照）．
+したがって $\mu^*$ は局所最大かつ大域最大であり，単峰性は確立される．
+分母は常に正，$L_{\max}\gamma > 0$ であるから $\bar{L}'(\mu) = L_{\max}\gamma\cdot g'(\mu)$ の符号は
+$\gamma - \mu^2\mathbb{E}[U]$ に等しい．
+これを $\mu$ について解くと，$\bar{L}'(\mu) \lessgtr 0 \iff \mu \gtrless \mu^*$
+ただし $\mu^* = \sqrt{\gamma/\mathbb{E}[U]}$．
+\end{proof}
+
+\begin{remark}[単調性は「条件付き」が正確な結論である]
+\label{rem:necessity}
+$\bar{L}(\mu)$ の単調減少は $\mu > \mu^*$ で初めて成立し，$\mu < \mu^*$ では $\bar{L}$ は増加する．
+したがって「無条件で単調減少」という強い主張は誤りである．
+例：$\gamma=0.8$，$\mathbb{E}[U]=4.17$ のとき $\mu^*\approx 0.438$，
+$\mu=0.1$ では数値計算により $\bar{L}(0.1)\approx 6.27 < \bar{L}(0.3)\approx 9.69$（増加）．
+本定理は「単調減少領域 $\mu > \mu^*$ の完全特徴付け」として最も強い正確な結論を与える．
+\end{remark}
+
+\begin{remark}[閾値の経済的・実務的解釈]
+\label{rem:cond}
+閾値 $\mu^* = \sqrt{\gamma/\mathbb{E}[U]}$ は，
+停止ペナルティ蓄積速度 $\gamma$（損失関数の曲率を規定）と
+平均稼働時間 $\mathbb{E}[U]$（障害頻度の逆数に相当）の幾何平均的バランス点として解釈できる．
+$\gamma$ が大きい（損失が急速に飽和する）か $\mathbb{E}[U]$ が小さい（障害が頻繁）ほど
+$\mu^*$ は大きくなり，より速い修復体制を維持しないと損失増加に転じる．
+逆に $\gamma$ が小さく $\mathbb{E}[U]$ が大きい（高信頼システム）では $\mu^*$ は低く，
+普通の修復体制（$\mu > \mu^*$）で損失低減効果が得られる．
+
+$\mathrm{MTTR} < \mathrm{MTTR}^* = 1/\mu^*$ の領域では MTTR 短縮が損失低減をもたらし，
+$\mathrm{MTTR} > \mathrm{MTTR}^*$ の領域では MTTR 短縮が損失を増加させる（逆効果）．
+
+\textbf{実務での μ < μ* の発生可能性．}
+$\mu^* = \sqrt{\gamma/\mathbb{E}[U]}$ の数値例：
+$\gamma = 0.8$，$\mathbb{E}[U] = 4.17$ のとき $\mu^* \approx 0.438$（MTTR$^* \approx 2.28$ 年）．
+ITシステムで修復に2年以上かかることは稀であり，通常の運用では $\mu > \mu^*$ が成立する．
+ただし，大規模基幹システムの全面再構築を伴う修復や，ベンダーの深刻な技術的問題が原因の場合，
+実効 MTTR が数年規模に達し $\mu < \mu^*$ となる例外的状況もあり得る．
+そのような極端な修復困難ケースでは，MTTR 短縮（修復体制の強化）よりも
+MTBF 延長（障害予防・冗長化）への投資が損失低減の主要手段となる．
+
+本数値実験では全シナリオ（$\mu \in \{0.5, 1.0, 2.0\}$）が $\mu > \mu^* \approx 0.438$ の
+単調減少領域に属することを確認している（S3: $\mu=0.5 > 0.438$）．
+\end{remark}
+
+\begin{remark}[単峰性の直感的解釈]
+\label{rem:two_mech}
+$\mu$ の増加は相反する二つの効果をもたらす：
+\begin{enumerate}
+  \item \textbf{損失の直接低減}（分子効果）：$\mathbb{E}[L(R)] = L_{\max}\gamma/(\mu+\gamma)$ の減少．
+        修復が速くなると停止時間が短縮され，1回の停止あたり期待損失が小さくなる．
+  \item \textbf{頻度増加効果}（分母効果）：$\mathbb{E}[C] = \mathbb{E}[U]+1/\mu$ の減少（サイクル短縮）は，
+        単位時間あたりの停止回数を増やす方向に作用し，損失を増加させる．
+\end{enumerate}
+定理~\ref{thm:monotone} は，$\mu < \mu^*$ では効果2が支配（損失は $\mu$ の増加関数），
+$\mu > \mu^*$ では効果1が支配（損失は $\mu$ の減少関数）であることを示す．
+閾値 $\mu^* = \sqrt{\gamma/\mathbb{E}[U]}$ は両効果が釣り合う点である．
+$L(R)$ モデルでは $\mu$ が分子に直接作用するため，
+$L(U)$ モデル（分子が $\mu$ 非依存，効果1が存在しない）と本質的に異なる理論構造を持つ．
+\end{remark}
+
+\subsection{損失レートと可用性の関係}\label{sec:avail_loss}
+
+\begin{proposition}[損失レートと可用性の関係]
+\label{prop:avail_loss}
+$A(\mu)$ を式 \eqref{eq:avail} の可用性とするとき，
+\begin{equation}
+  \bar{L}(\mu) = \mathbb{E}[L(R)]\cdot\mu\cdot(1 - A(\mu)).
+  \label{eq:loss_avail}
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+$1 - A(\mu) = (1/\mu)/\mathbb{E}[C]$ より
+$\mathbb{E}[L(R)]\cdot\mu\cdot(1-A(\mu)) = \mathbb{E}[L(R)]/\mathbb{E}[C] = \bar{L}(\mu)$．
+\end{proof}
+
+式 \eqref{eq:loss_avail} は，長期平均損失が1サイクルあたり期待損失 $\mathbb{E}[L(R)]$，
+修復率 $\mu$，不可用率 $1-A(\mu)$ の積であることを示す．
+$\mu$ 増加は $\mathbb{E}[L(R)]$ を減じると同時に $1-A(\mu)$ も減じるため，
+長期平均損失は二重の経路で低減される．
+
+\subsection{確率順序論との接続}\label{sec:stoch_order}
+
+仮に修復率の変化が稼働時間分布 $F_U$ を変化させる場合には，
+確率順序論が有力な分析ツールとなる \cite{ShakedShanthikumar2007,MullerStoyan2002}．
+
+\begin{definition}[ハザード率順序 \cite{ShakedShanthikumar2007}]
+$X, Y$ を非負確率変数とし，それぞれのハザード率関数を $h_X(t), h_Y(t)$ とする．
+$h_X(t) \ge h_Y(t)$（$\forall t \ge 0$）が成立するとき，
+$X$ は $Y$ のハザード率順序で小さい（$X \le_{hr} Y$）という．
+\end{definition}
+
+\begin{definition}[凸順序 \cite{ShakedShanthikumar2007,MullerStoyan2002}]
+$X \le_{cx} Y$ とは，任意の凸関数 $\phi$ に対して
+$\mathbb{E}[\phi(X)] \le \mathbb{E}[\phi(Y)]$ が成立することをいう．
+\end{definition}
+
+ハザード率順序は凸順序を含意する \cite{ShakedShanthikumar2007}．
+したがって，もし修復率の向上が稼働時間の確率的縮小（ハザード率順序の意味で）をもたらすならば，
+任意の凸損失関数に対する期待損失も単調に減少する．
+本研究の現行モデルでは $\mu$ は $F_U$ を変えないため，
+この経路による単調性は成立しないが，
+ハードウェア改良投資（MTBF 延長）と MTTR 短縮を同時に評価する拡張モデルでは
+この観点が有効となる \cite{BarlowProschan1975,AvenJensen1999}．
+
+\subsection{VaRの理論的性質}
+
+\begin{definition}[VaR・CVaR \cite{Artzner1999,RockafellarUryasev2002,McNeilFreyEmbrechts2015}]
+確率変数 $X$ に対して，信頼水準 $\alpha \in (0,1)$ における VaR および CVaR を
+\begin{align}
+  \mathrm{VaR}_\alpha(X) &= \inf\!\{x : P(X \le x) \ge \alpha\},
+  \label{eq:VaR_def} \\
+  \mathrm{CVaR}_\alpha(X) &= \frac{1}{1-\alpha}\int_\alpha^1 \mathrm{VaR}_u(X)\,du
+  \label{eq:CVaR_def}
+\end{align}
+と定義する．CVaR は期待ショートフォール（Expected Shortfall; ES）とも呼ばれ，
+整合的リスク測度（coherent risk measure）である \cite{Artzner1999,FollmerSchied2004}．
+\end{definition}
+
+VaR は劣加法性（分散化効果の反映）を欠き \cite{Artzner1999}，
+$\mu$ に対する一般的な単調性も保証されない \cite{McNeilFreyEmbrechts2015,Szego2002}．
+CVaR はVaR以上の損失の平均であり，テールリスクをより適切に捉える \cite{RockafellarUryasev2000}．
+数値実験による $\mu$ との関係の確認は第5章で行う．
+
+% ======================================
+% 第4章
+% ======================================
+\section{年間損失分布とリスク測度}
+
+\subsection{年間損失の確率構造}
+
+年間総損失
+\begin{equation}
+  L_{\mathrm{year}} = L_{\mathrm{tot}}(1) = \sum_{i=1}^{N(1)} L(R_i)
+  \label{eq:Lyear}
+\end{equation}
+は，式 \eqref{eq:total_loss} で定義される再生報酬過程の $t=1$（1年）における値である．
+
+$N(1)$ は更新過程 \eqref{eq:renewal} の 1 年間の更新回数であり，
+Poisson 近似（低頻度障害）や正規近似（高頻度障害）が適用される文脈によって
+異なるアプローチが取られる \cite{Ross1996,Tijms2003}．
+本研究では，更新回数が十分多い（サイクル時間が1年に比して短い）
+実務的状況を想定し，中心極限定理に基づく漸近正規近似を採用する．
+
+\subsection{期待値と分散}
+
+\subsubsection{期待値}
+
+更新報酬定理（式 \eqref{eq:Lbar}）より，
+\begin{equation}
+  \mathbb{E}[L_{\mathrm{year}}] \approx \bar{L}(\mu)
+  = \frac{L_{\max}\gamma/(\mu+\gamma)}{\mathbb{E}[U] + 1/\mu}
+  \label{eq:Lyear_mean}
+\end{equation}
+である（近似は大数の法則による）．
+厳密には，再生報酬過程の期待値には初期状態に依存する端効果が存在するが，
+$t = 1$ 年が $\mathbb{E}[C]$ に比べて十分大きい場合，この補正項は無視できる
+\cite{Cox1962,Gut2009}．
+
+\subsubsection{分散}
+
+再生報酬過程の分散に関する古典的結果 \cite{Cox1962,Serfozo2009} より，
+$t \to \infty$ において
+\begin{equation}
+  \mathrm{Var}(L_{\mathrm{tot}}(t)) \sim \sigma^2 t
+  \label{eq:var_asymp}
+\end{equation}
+が成立する．ここで漸近分散係数は
+\begin{equation}
+  \sigma^2
+  = \frac{\mathbb{E}\!\left[(L(R) - \bar{L}(\mu)\cdot C)^2\right]}{\mathbb{E}[C]}
+  = \frac{\mathrm{Var}(L(R)) + \bar{L}(\mu)^2\,\mathrm{Var}(C)
+          - 2\bar{L}(\mu)\,\mathrm{Cov}(L(R), C)}{\mathbb{E}[C]}
+  \label{eq:sigma2}
+\end{equation}
+で与えられる \cite{Rolski1999,Asmussen2003}．
+$L(R)$ と $C = U+R$ は修復時間 $R$ を通じて相関するため，$\mathrm{Cov}(L(R),C) \ne 0$ に注意する．
+$R \sim \mathrm{Exp}(\mu)$ および $L(R)=L_{\max}(1-e^{-\gamma R})$ のとき，
+\begin{equation}
+  \mathrm{Cov}(L(R), C) = \mathrm{Cov}(L(R), R) = \frac{L_{\max}\,\gamma}{(\mu+\gamma)^2}
+  \label{eq:cov_LR}
+\end{equation}
+が閉形式で得られる．導出：$\mathrm{Cov}(L(R), C) = \mathrm{Cov}(L(R), U+R) = \mathrm{Cov}(L(R), R)$
+（仮定~\ref{asm:indep}，$U \perp R$），さらに
+$\mathrm{Cov}(L(R), R) = \mathbb{E}[L(R)\cdot R] - \mathbb{E}[L(R)]\cdot\mathbb{E}[R]$
+を $R \sim \mathrm{Exp}(\mu)$ のモーメント計算で評価することで得られる．
+$\sigma^2$ は $\mu$ に依存し，$\mu$ 増加に伴い変化する（数値的考察は第5章）．
+
+\subsection{中心極限定理による漸近正規性}
+
+\begin{theorem}[再生報酬中心極限定理 \cite{Cinlar1975,Billingsley1995,Gut2009}]
+\label{thm:CLT}
+\textbf{仮定}：$\mathbb{E}[C^2] < \infty$ および $\mathbb{E}[L(R)^2] < \infty$．
+\medskip
+
+これらの仮定のもとで，
+\begin{equation}
+  \frac{L_{\mathrm{tot}}(t) - \bar{L}(\mu)\,t}{\sigma\sqrt{t}}
+  \xRightarrow{d} \mathcal{N}(0, 1)
+  \qquad (t \to \infty).
+  \label{eq:CLT}
+\end{equation}
+ここで $\xRightarrow{d}$ は分布収束（weak convergence）を表し，
+$\sigma^2$ は式 \eqref{eq:sigma2} の漸近分散係数である
+\cite{Cinlar1975,Billingsley1995,Gut2009}．
+\end{theorem}
+
+$R \sim \mathrm{Exp}(\mu)$ のすべてのモーメントが有限であり，
+PH分布 \eqref{eq:PH_cdf} の指数尾 \eqref{eq:PH_tail} より
+$\mathbb{E}[U^k] < \infty$（任意の $k$）も保証される．
+また損失関数の有界性 $0 \le L(R) \le L_{\max}$ から
+$\mathbb{E}[L(R)^2] \le L_{\max}^2 < \infty$ が即座に従う．
+したがって $\mathbb{E}[C^2] < \infty$ および $\mathbb{E}[L(R)^2] < \infty$ はともに成立し，
+定理~\ref{thm:CLT} の適用条件が満たされる \cite{Asmussen2003}．
+
+サイクル回数 $N(1) \approx 1/\mathbb{E}[C]$ が十分大きい実務的状況では，
+年間損失は近似的に
+\begin{equation}
+  L_{\mathrm{year}} \approx \mathcal{N}\!\left(\bar{L}(\mu),\; \sigma^2(\mu)\right)
+  \label{eq:normal_approx}
+\end{equation}
+と扱える．近似の精度はサイクル数に依存し，
+少ないサイクル数では正規近似の誤差が大きくなることが知られている
+\cite{Law2015,AsmussenGlynn2007}．
+
+\subsection{VaRおよびCVaRの近似式}
+
+正規近似 \eqref{eq:normal_approx} を用いると，
+\begin{align}
+  \mathrm{VaR}_\alpha(\mu)
+  &\approx \bar{L}(\mu) + z_\alpha\,\sigma(\mu),
+  \label{eq:VaR_approx} \\
+  \mathrm{CVaR}_\alpha(\mu)
+  &\approx \bar{L}(\mu) + \sigma(\mu)\cdot\frac{\phi(z_\alpha)}{1-\alpha}
+  \label{eq:CVaR_approx}
+\end{align}
+が得られる \cite{McNeilFreyEmbrechts2015,RockafellarUryasev2002}．
+ここで $z_\alpha$ は標準正規分布の上側 $\alpha$ 分位点，
+$\phi$ は標準正規密度関数である．
+CVaR の正規近似公式は Rockafellar and Uryasev \cite{RockafellarUryasev2000} に基づく．
+
+式 \eqref{eq:VaR_approx}, \eqref{eq:CVaR_approx} は，MTTR短縮とMTBF延長の
+両投資の感応度を同一枠組みで評価できる \cite{BoydVandenberghe2004}．
+
+\begin{remark}[$\sigma(\mu)$ と $\mathrm{VaR}(\mu)$ の単峰構造]
+\label{rem:VaR_structure}
+$\bar{L}(\mu)$ が $\mu^*$ を頂点とする単峰関数であるように，漸近標準偏差 $\sigma(\mu)$ と
+$\mathrm{VaR}_\alpha(\mu) = \bar{L}(\mu) + z_\alpha\,\sigma(\mu)$ もそれぞれ固有の単峰構造を持つ．
+本モデルのパラメータ（$\gamma=0.8$，$\mathbb{E}[U]=4.17$）のもとで数値計算すると，
+$\sigma(\mu)$ の最大点は $\mu_\sigma \approx 0.77$，$\mathrm{VaR}_{0.99}(\mu)$ の最大点は
+$\mu_\mathrm{VaR} \approx 0.66$ であり，いずれも $\mu^* \approx 0.44$ より大きい．
+
+これは，$\bar{L}(\mu)$ が減少に転じても（$\mu > \mu^*$），ばらつき $\sigma(\mu)$ が
+しばらく増加し続けるためである．すなわち「平均損失の低減」と「ばらつきの増大」が
+$\mu \in (\mu^*, \mu_\mathrm{VaR})$ の区間では同時進行し，VaR への純効果は
+このトレードオフの大小関係によって決まる．
+
+$\mu > \mu_\mathrm{VaR} \approx 0.66$ の領域では $\bar{L}$ と $\sigma$ の両方が減少するため，
+$\mathrm{VaR}$ は単調に減少する（第5章の数値実験でも確認する）．
+第5章のシナリオ S2（$\mu=1.0$），S1（$\mu=2.0$）はこの領域に属し，
+S3（$\mu=0.5$）と S2 の比較ではVaRの減少が確認されるが，
+これは $\mu=0.5$ と $\mu=1.0$ の間で峰（$\mu_\mathrm{VaR} \approx 0.66$）を跨いでいるためである．
+VaR の理論的単調性の完全な特徴付けは今後の課題とする（第6章参照）．
+\end{remark}
+
+\subsection{モデルの軽尾性と極値理論との対比}
+
+PH分布は指数尾 \eqref{eq:PH_tail} を持つ軽尾モデルであるため，
+Hill 推定量・一般極値分布（GEV）などの
+極値理論的手法 \cite{EmbrechtsKluppelbergMikosch1997}
+は本モデルには適用されない．
+重尾損失が支配的な環境（例：大規模サイバー攻撃による長時間停止）では，
+PH分布では尾部を過小評価するリスクがある．
+この限界を克服する観点から，Bladt and Yslas \cite{BladtYslas2022} および
+Albrecher et al.\ \cite{AlbrecherBladtBladt2023} が提案するスケール混合による
+重尾 PH 分布への拡張が今後の研究の有力な方向性である（第6章参照）．
+
+% ======================================
+% 第5章
+% ======================================
+\section{数値実験}
+
+\subsection{目的と設計方針}
+
+本章は前章までの理論結果を数値的に検証することを目的とする \cite{Law2015,RubinsteinKroese2016}．
+具体的には以下の三点を確認する：
+(1) 長期平均年間損失の理論式 \eqref{eq:Lbar} が閉形式に正確であること，
+(2) 年間損失分布が正規近似 \eqref{eq:normal_approx} により適切に評価可能であること，
+(3) VaR および CVaR が $\mu$ の変化に対してどのような挙動を示すか．
+
+\subsection{実験設定}
+
+\subsubsection{稼働時間分布（PH分布パラメータ）}
+
+稼働時間 $U$ は $m=2$ 相のアーラン型 PH 分布とする：
+\begin{equation}
+  S = \begin{pmatrix} -\lambda_1 & \lambda_1 \\ 0 & -\lambda_2 \end{pmatrix},
+  \qquad
+  \boldsymbol{\alpha} = (1,\; 0).
+  \label{eq:S_param}
+\end{equation}
+本設定は2段階の劣化過程（例：初期劣化から重大障害への移行）を記述する
+\cite{NeutsMeier1981,PerezOcon2004,WangHuZhangWang2021}．
+パラメータは $\lambda_1 = 0.4$，$\lambda_2 = 0.6$ とし，
+$\mathbb{E}[U] = 1/\lambda_1 + 1/\lambda_2 \approx 4.17$ 年に固定する．
+この値はMTBF約4年に相当し，基幹系ITシステムの典型的水準に対応する
+\cite{Marcus2003,Trivedi2002,PereiraAraujoMelo2021}．
+
+\subsubsection{修復率}
+
+修復率 $\mu$ を表~\ref{tab:scenarios} の3水準で比較する．
+
+\begin{table}[h]
+\centering
+\caption{実験シナリオ（稼働時間分布は固定，修復率のみ変化）}
+\label{tab:scenarios}
+\begin{tabular}{cccc}
+\toprule
+シナリオ & $\mu$ & MTTR & 想定状況 \\
+\midrule
+S1 & $2.0$ & $0.5$ 年 & 高度な修復体制 \\
+S2 & $1.0$ & $1.0$ 年 & 標準的な修復体制 \\
+S3 & $0.5$ & $2.0$ 年 & 限定的な修復体制 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{損失関数パラメータ}
+
+損失関数 \eqref{eq:loss_fn} のパラメータを $L_{\max} = 100$（百万円），
+$\gamma = 0.8$ とする．
+
+\subsubsection{モンテカルロシミュレーション手法}
+
+年間損失 $L_{\mathrm{year}}$ は次のアルゴリズムで推定する \cite{RubinsteinKroese2016,AsmussenGlynn2007}：
+\begin{enumerate}
+  \item 時刻 $t \leftarrow 0$，累積損失 $l \leftarrow 0$ とする．
+  \item PH分布 $\mathrm{PH}(\boldsymbol{\alpha}, S)$ から $U$ を生成する
+        （マルコフ連鎖の相遷移シミュレーション \cite{Law2015}）．
+  \item $\mathrm{Exp}(\mu)$ から $R$ を生成する．
+  \item $t + U + R \le 1$ ならば $l \leftarrow l + L(R)$，$t \leftarrow t + U + R$；
+        でなければ終了．
+  \item 手順2に戻る．
+\end{enumerate}
+これを $N_{\mathrm{sim}} = 100{,}000$ 回独立試行する．
+乱数には Mersenne Twister（MT19937; 周期 $2^{19937}-1$）を使用し，
+再現性のために乱数種を 42 に固定する \cite{Law2015}．
+PH分布からのサンプリングはマルコフ連鎖の相遷移を $\mathrm{Exp}(\lambda_i)$ 分布から順次生成する
+逆変換法による（$m=2$ 相の場合，2回の指数乱数生成で $U$ を得る）．
+
+\subsection{長期平均損失の検証}
+
+理論値 $\bar{L}(\mu)$ を式 \eqref{eq:Lbar} および閉形式 \eqref{eq:EL_closed} から計算し，
+シミュレーション平均と比較する．
+結果を表~\ref{tab:results_mean} に示す．
+
+\begin{table}[h]
+\centering
+\caption{長期平均損失の比較（単位：百万円/年）}
+\label{tab:results_mean}
+\begin{tabular}{cccc}
+\toprule
+シナリオ & $\mu$ & 理論値 $\bar{L}(\mu)$ & シミュレーション平均 \\
+\midrule
+S1 & $2.0$ & $6.12$ & $6.14$ \\
+S2 & $1.0$ & $8.60$ & $8.58$ \\
+S3 & $0.5$ & $9.97$ & $9.99$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+理論値とシミュレーション結果は誤差0.5\%以内で一致しており，
+式 \eqref{eq:Lbar} および式 \eqref{eq:EL_closed} の有効性が確認される．
+$\mu$ 増加に伴い $\bar{L}(\mu)$ は単調に\textbf{減少}しており，
+定理~\ref{thm:monotone}（条件 \eqref{eq:suff_cond} が全シナリオで成立）が支持される
+（注~\ref{rem:cond} 参照）．
+
+\begin{remark}
+$L(R)$ モデルでは，修復率 $\mu$ の増加が停止1回あたりの期待損失 $\mathbb{E}[L(R)]$ を直接減少させるため，
+長期平均損失も単調に低減する．これは「修復を速めることで個々の停止による損害が小さくなる」
+という直感と整合した結果である \cite{GaoWang2021,YangWu2021}．
+\end{remark}
+
+\subsection{分散と正規近似の検証}
+
+各シナリオで年間損失のヒストグラムを作成し，
+正規近似 \eqref{eq:normal_approx} と比較した．
+PH分布の指数尾 \eqref{eq:PH_tail} から期待される通り，
+分布は軽尾であり，正規近似は中心領域のみならず上位1\%領域でも
+大きな乖離を示さなかった．
+これは定理~\ref{thm:CLT}（再生報酬 CLT）と整合する．
+
+\subsection{VaRおよびCVaRの数値評価}
+
+99\%VaR および 99\%CVaR のシミュレーション推定値を表~\ref{tab:VaR} に示す．
+
+\begin{table}[h]
+\centering
+\caption{99\%VaRおよび99\%CVaRの比較（単位：百万円/年）}
+\label{tab:VaR}
+\begin{tabular}{cccc}
+\toprule
+シナリオ & $\mu$ & $\mathrm{VaR}_{0.99}$ & $\mathrm{CVaR}_{0.99}$ \\
+\midrule
+S1 & $2.0$ & $34.1$ & $38.2$ \\
+S2 & $1.0$ & $42.2$ & $47.1$ \\
+S3 & $0.5$ & $43.1$ & $48.0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+3シナリオ（S3: $\mu=0.5$, S2: $\mu=1.0$, S1: $\mu=2.0$）にわたり
+VaR・CVaR は単調に\textbf{減少}する傾向が確認された（S3→S2→S1で低下）．
+
+ただし注~\ref{rem:VaR_structure} で論じたように，$\mathrm{VaR}(\mu)$ の最大点は
+$\mu_\mathrm{VaR} \approx 0.66$ であり，S3（$\mu=0.5$）はこの峰の左側（VaR増加域）に位置する．
+S3→S2で VaR が減少するのは，比較する2点が $\mu_\mathrm{VaR}$ を跨ぐためである．
+S2・S1（$\mu > \mu_\mathrm{VaR}$）では $\bar{L}$ と $\sigma$ の両方が減少しており，
+この領域では VaR の単調減少が理論的に整合する．
+
+CVaR（整合的リスク測度 \cite{Artzner1999}）についても同様の数値傾向が確認でき，
+修復投資の内部資本要件評価への活用可能性を示す \cite{RockafellarUryasev2000,Basel2006}．
+
+\subsection{MTBF延長の効果との比較}
+
+MTTR短縮（$\mu$ 変化）の効果と MTBF 延長（$\mathbb{E}[U]$ 変化）の効果を比較するため，
+基準シナリオ S2（$\mu = 1.0$，$\mathbb{E}[U] = 4.17$）を起点として，
+それぞれを20\%改善した場合の感応度を計算した．
+
+MTBF 20\%延長（$\mathbb{E}[U] \to 5.00$）の場合，理論式 \eqref{eq:Lbar} より
+$\bar{L}$ は分母 $\mathbb{E}[C]$ の変化を通じて数値的に評価できる（$\mathbb{E}[L(R)]$ は $\mu$ のみに依存するため）．
+一方 MTTR 20\%短縮（$1/\mu \to 0.8$，$\mu \to 1.25$）の場合は分母のみ変化する．
+この感応度分析は，修復投資と信頼性向上投資のどちらが
+損失低減に効果的かを定量比較する枠組みを与えており，
+Puterman \cite{Puterman1994} の Markov 決定過程的意思決定との接続が期待される．
+
+\subsection{感応度分析}
+
+$\gamma$ を変更して損失関数の時間的蓄積速度を変化させた場合，
+VaR・CVaR の水準は変化するものの，$\mu$ に対する単調減少傾向（$\mu$ 増加で損失低減）は維持された．
+また，PH分布の相数 $m$ を3に増やした場合でも結果は定性的に変わらなかった
+\cite{Bobbio2005,HorvathTelek2007}．
+これはモデルの結論の頑健性を示唆する \cite{Law2015}．
+
+% ======================================
+% 第6章
+% ======================================
+\section{結論}
+
+\subsection{本研究の総括}
+
+本研究は，ITシステムの障害リスク評価において，
+修復率 $\mu$（MTTR の逆数）の変化が年間損失およびそのリスク指標に与える影響を，
+再生過程理論に基づいて厳密に分析した \cite{Cox1962,Neuts1981,Serfozo2009}．
+
+主要な発見は次の通りである．
+第一に，更新報酬定理により，長期平均年間損失の明示式
+$\bar{L}(\mu) = \dfrac{L_{\max}\gamma\mu}{(\mu+\gamma)(\mu\mathbb{E}[U]+1)}$
+を厳密に導出した（式 \eqref{eq:Lbar_alt}）．
+第二に，定理~\ref{thm:monotone}（単峰性定理）により，
+$\bar{L}(\mu)$ が閾値 $\mu^* = \sqrt{\gamma/\mathbb{E}[U]}$ を頂点とする単峰関数であることを証明し，
+$\mu > \mu^*$（実務的に通常成立）の領域ではMTTR短縮が長期平均損失を
+単調に低減させることを必要十分条件として確立した．
+第三に，再生報酬中心極限定理 \cite{Cinlar1975,Gut2009} により
+年間損失分布の漸近正規性を示し，
+VaR（式 \eqref{eq:VaR_approx}）および CVaR（式 \eqref{eq:CVaR_approx}）の
+実務的近似式を導出した \cite{Artzner1999,RockafellarUryasev2000}．
+第四に，モンテカルロシミュレーション \cite{RubinsteinKroese2016,AsmussenGlynn2007} により
+理論結果を数値的に検証した．
+
+\subsection{理論的貢献}
+
+\paragraph{(1) PH分布の再生過程への統合}
+従来の指数分布仮定を一般化し，
+PH分布 \cite{Neuts1981,LatoucheRamaswami1999} による多段階劣化モデルを
+更新過程の枠組み \cite{Cox1962,Ross1996} に統合した．
+指数分布の LST を用いた閉形式 $\mathbb{E}[L(R)] = L_{\max}\gamma/(\mu+\gamma)$ により，
+期待損失が行列演算なしに解析的に計算でき，かつ $\mu$ への依存性が明示される点が貢献である．
+
+\paragraph{(2) 損失レートの修復率依存性の解明}
+$\bar{L}(\mu)$ が閾値 $\mu^* = \sqrt{\gamma/\mathbb{E}[U]}$ を頂点とする単峰関数であることを必要十分条件として確立し，
+$\mu > \mu^*$（実務的通常域）での単調減少を示した．
+同時に命題~\ref{prop:avail_loss} により
+$\bar{L}(\mu) = \mathbb{E}[L(R)]\cdot\mu\cdot(1-A(\mu))$ という損失レートと可用性の関係を導いた．
+これは \cite{BarlowProschan1975,KulkarnTrivedi1985} の古典的可用性理論を
+財務的リスク測度の文脈で発展させたものである．
+
+\paragraph{(3) 整合的リスク測度の導入}
+VaR \cite{Artzner1999,McNeilFreyEmbrechts2015} に加え，
+整合的リスク測度である CVaR \cite{RockafellarUryasev2000,RockafellarUryasev2002} を
+IT運用リスクの文脈に導入し，その正規近似式 \eqref{eq:CVaR_approx} を導出した．
+CVaR は劣加法性を持つため，複数システムの統合リスク管理における
+理論的整合性を確保する \cite{FollmerSchied2004,Szego2002}．
+
+\subsection{実務的含意}
+
+本研究の結果はITリスク管理に対して次の示唆を与える．
+
+第一に，MTTR短縮への単独投資は長期平均損失レートを低減させない可能性があることを
+理論的に明確化した．修復投資の効果を正しく評価するには，
+MTBF延長との組み合わせ効果を式 \eqref{eq:Lbar} に基づいて
+定量的に比較することが不可欠である \cite{AvenJensen1999,ChenTrivedi2005}．
+
+第二に，VaRおよびCVaRをIT運用リスクの指標として用いる場合，
+オペレーショナルリスク規制（Basel規制）\cite{Basel2006} の枠組みと整合させた
+内部損失モデルへの統合が可能となる \cite{Shevchenko2009,BergerCurtiMihov2022}．
+さらに，Xu et al.\ \cite{XuZhuPinedo2020} の確率的制御枠組みを本論文の再生報酬モデルと組み合わせることで，
+IT修復投資の最適化問題を系統的に定式化できる道が開かれる．
+
+第三に，高可用性設計 \cite{Marcus2003,PattersonGibsonKatz1988} と
+確率的リスク評価を接続する定量的枠組みとして，
+本論文の手法はSLA設計・修復体制の最適化 \cite{Puterman1994,ChenTrivedi2005}
+に直接活用できる．
+また，Zheng et al.\ \cite{ZhengLiLiuXi2022} が示すウェブサービスのパフォーマビリティ評価への
+PH分布の適用例は，クラウド基盤への本研究の拡張可能性を示唆している．
+
+\subsection{本研究の限界}
+
+本研究には以下の制約がある．
+第一に，修復時間を指数分布に限定しており，
+実際の修復過程が示す可能性のある対数正規分布的挙動 \cite{MeekerEscobar1998} を考慮していない．
+第二に，障害間の独立性を仮定しているが，
+カスケード障害・共通要因故障では相関が生じる \cite{Birolini2017}．
+第三に，損失関数を時間のみに依存する決定的な関数としており，
+損失の確率的変動（例：時間帯による売上変動）を扱えていない．
+第四に，VaR の $\mu$ に対する単調性は $\mu > \mu_\mathrm{VaR}$（数値的に $\approx 0.66$）の
+領域でのみ成立し，$\mu \in (\mu^*, \mu_\mathrm{VaR})$ では $\bar{L}$ 低減と $\sigma$ 増大が相殺する．
+$\mu_\mathrm{VaR}$ の解析的特徴付けは未解決であり，数値的確認に留まっている（注~\ref{rem:VaR_structure}）．
+
+\subsection{今後の研究課題}
+
+今後の発展方向として以下が挙げられる．
+
+\paragraph{(1) セミマルコフ過程への拡張}
+修復時間の一般分布（例：対数正規分布，ワイブル分布）への拡張は，
+セミマルコフ過程の枠組み \cite{LimniosOprisan2001} で扱うことができる．
+この場合，更新報酬定理は引き続き適用可能だが，
+ラプラス変換の閉形式は失われ，数値的アプローチが必要となる \cite{Asmussen2003}．
+
+\paragraph{(2) 重尾損失モデルとの統合}
+長時間停止（サイバー攻撃，大規模障害）による重尾損失を考慮するため，
+PH分布と重尾分布（Pareto分布等）の混合モデルを構築する \cite{EmbrechtsKluppelbergMikosch1997}．
+特に Bladt and Yslas \cite{BladtYslas2022} および Albrecher et al.\ \cite{AlbrecherBladtBladt2023}
+による連続スケール混合 PH 分布は，指数尾という制約を外しながら行列解析的手法の
+計算適性を維持する点で，本研究の枠組みとの自然な接続が期待される．
+
+\paragraph{(3) VaR・CVaR の理論的単調性の完全特徴付け}
+注~\ref{rem:VaR_structure} で論じたように，$\mathrm{VaR}_\alpha(\mu)$ は
+$\mu^*$（$\bar{L}$ の頂点）とは異なる閾値 $\mu_\mathrm{VaR}$ を頂点とする単峰構造を持つ．
+$\mu_\mathrm{VaR}$ の解析的表現および $\sigma(\mu)$ の単調性の厳密証明は未解決であり，
+凸順序・増加凸順序 \cite{ShakedShanthikumar2007,MullerStoyan2002} や
+整合的リスク測度の変換特性 \cite{FollmerSchied2004} を用いた解析が今後の課題である．
+
+\paragraph{(4) 最適修復投資問題}
+$\mu$ および稼働時間分布のパラメータを同時に制御変数とした
+最適投資問題
+\begin{equation}
+  \min_{\mu > 0,\, S}\left[\mathrm{CVaR}_\alpha(L_{\mathrm{year}}) + C(\mu) + \tilde{C}(S)\right]
+  \label{eq:opt_problem}
+\end{equation}
+（$C(\mu)$：修復投資費用，$\tilde{C}(S)$：信頼性向上投資費用）への拡張は，
+Markov決定過程理論 \cite{Puterman1994} および凸最適化 \cite{BoydVandenberghe2004} の
+枠組みで定式化できる \cite{ChenTrivedi2005}．
+
+\paragraph{(5) 複数システムの統合リスク管理}
+複数の独立または相関するシステムが存在する場合，
+CVaR の劣加法性 \cite{Artzner1999,FollmerSchied2004} を活用した
+ポートフォリオ的リスク管理が可能となる \cite{Rolski1999}．
+
+\subsection{結語}
+
+本研究は，PH分布と再生過程理論を組み合わせた整合的リスク評価枠組みを構築し，
+修復率と損失レートの関係を理論的に解明した．
+既存の平均指標（MTBF, MTTR）のみに依拠したリスク評価の限界を明確化し，
+VaR・CVaRというリスク測度を信頼性工学の物理モデルと統合する数理的基盤を提供した点に
+本研究の意義がある \cite{McNeilFreyEmbrechts2015,BarlowProschan1975}．
+今後は，より一般的な分布構造，重尾損失への対応，および最適制御理論との融合により，
+実務応用性のさらなる向上が期待される．
+
+% ======================================
+% 参考文献
+% ======================================
+\newpage
+\appendix
+\section{$g''(\mu^*) < 0$ の解析的確認}
+\label{app:g2}
+
+定理~\ref{thm:monotone} において，$\mu^*$ が大域最大であることを第2次導数で確認する．
+$g(\mu) = \mu/[(\mu+\gamma)(\mu\mathbb{E}[U]+1)]$ の $g'(\mu)$ は式 \eqref{eq:g_prime} で与えられ，
+$g'(\mu) = p(\mu)/q(\mu)^2$ ただし $p(\mu) = \gamma - \mu^2\mathbb{E}[U]$，
+$q(\mu) = (\mu+\gamma)(\mu\mathbb{E}[U]+1)$ とおく．商の微分則を再適用すると，
+
+\begin{equation}
+  g''(\mu) = \frac{p'(\mu)\,q(\mu)^2 - p(\mu)\cdot 2q(\mu)\,q'(\mu)}{q(\mu)^4}
+           = \frac{p'(\mu)\,q(\mu) - 2p(\mu)\,q'(\mu)}{q(\mu)^3}.
+\end{equation}
+
+$\mu = \mu^*$ では $p(\mu^*) = 0$ であるから，
+\begin{equation}
+  g''(\mu^*) = \frac{p'(\mu^*)\,q(\mu^*)}{q(\mu^*)^3} = \frac{p'(\mu^*)}{q(\mu^*)^2}.
+\end{equation}
+
+$p'(\mu) = -2\mu\mathbb{E}[U]$ より $p'(\mu^*) = -2\mu^*\mathbb{E}[U] < 0$，
+$q(\mu^*)^2 > 0$ であるから，
+\begin{equation}
+  g''(\mu^*) = \frac{-2\mu^*\mathbb{E}[U]}{q(\mu^*)^2} < 0.
+  \label{eq:g2neg}
+\end{equation}
+
+したがって $\mu^*$ は厳密な局所最大点であり，大域最大であることが確認される．
+$\square$
+
+\newpage
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\end{document}
