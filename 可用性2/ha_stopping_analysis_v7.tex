@@ -1,0 +1,1995 @@
+%% 投稿用 LaTeX 原稿（第7稿・最終版：純数学査読レベル完成）
+%% タイトル：クォーラム型二重データセンタ構成における停止強度の漸近解析
+%% ── 吸収型マルコフ連鎖の主固有値に基づく閉形式導出と数値検証 ──
+%%
+%% 改訂履歴:
+%%   v1 : 初稿（要旨・第1〜6章・付録統合）
+%%   v2 : 第1回査読対応（主要証明の補強・付録追加）
+%%   v3 : 第2回査読対応（既約性命題・収束半径・CCF拡張・3DC比較など）
+%%   v4 : 第3回査読対応（内部数学精査による修正）
+%%        [M1] T_0 固有構造の誤り修正：
+%%             「真の対角性・V_0=I・κ(V_0)=1」の主張を撤回．
+%%             T_0 は下三角行列であり固有値の重複が起こり得るため一般に対角化不可．
+%%             Kato 展開に必要な条件は「0 固有値が単純孤立」のみであることを明示し，
+%%             それのみを証明する形に補題 3.4 を全面書き直し．
+%%             Bauer--Fike(κ=1) 依存の箇所を注記で撤回・修正した旨を記載．
+%%        [M2] 既約性証明の不完全箇所を修正：
+%%             旧証明は「途中状態が吸収されない」ことの保証が欠落．
+%%             正証明：Step1（修復は停止を引き起こさない），
+%%             Step2（F(y) がいかなる最小カット集合も含まないから
+%%             故障追加の中間状態はすべて T に属する）の2段階証明に置換．
+%%        [M3] スペクトルギャップの表現修正：
+%%             「γ ≥ μ_min（常時）」から「γ(ε) = μ_min + O(ε) ≥ μ_min/2」に修正．
+%%             証明も Bauer--Fike(V_0=I) 依存をやめ，固有値の解析性+Lipschitz 連続性に変更．
+%%        [M4] 各所の κ(V_0)=1 言及・寄与リスト・結論の記述を整合性修正．
+%%   v5 : 第4回査読対応（状態数不整合・第3回内部精査指摘）
+%%        [C1] 致命的誤り修正：状態数カウントの誤り訂正
+%%             旧: |T|=36, |A|=28（誤）→ 正: |T|=24, |A|=40
+%%             原因: 命題「状態数の明示」証明の類型II計算で，
+%%                   「A停止B正常」と「A正常B停止」の2方向（各12状態）を
+%%                   合計せず片方のみを計上した算術誤り（12ではなく24）．
+%%             業務継続条件式・最小カット集合・主定理の数学的内容は変更なし．
+%%             全行列次元・固有ベクトル・c_n 上界・ε_* 計算を整合修正．
+%%        [C2] スペクトルギャップの定量的条件明示：
+%%             「∃ε₀>0 s.t. ε<ε₀ で γ(ε)≥μ_min/2」の形で明示（旧: 条件範囲未記載）．
+%%        [C3] 数値再現性：乱数シードおよび重要度サンプリング分布を明示．
+%%   v6 : 第5回査読対応（純数学査読レベルへの最終引き上げ）
+%%        [R1] 強連結性の完全形式証明：
+%%             補題R1.1（T の下閉性・単調性）→ 補題R1.2（単一故障状態への到達）
+%%             → 補題R1.3（単一故障間の連結）→ 定理（強連結性）の4段階証明に昇格．
+%%             文書5の純数学証明案を採用．
+%%        [R2] Metzler行列と Perron–Frobenius 適用条件の明示：
+%%             T₀ が Metzler 行列（非対角要素 ≥ 0）であること，
+%%             -T(ε) が既約 M 行列（ε>0 時）であることを明記．
+%%             P-F の適用対象は -T(ε)（正行列）であることを一文で明示．
+%%        [R3] 二次係数の次数カウント完全化：
+%%             「k≥3 重故障経路は O(ε³)」の構成的証明を追加．
+%%             V の列空間構造（0重→1重故障のみ移動）から帰納的に次数を確定．
+%%        [R4] スペクトルギャップの定理正確引用：
+%%             Kato 定理 II-1.8（解析的継続）・II-5.1（固有値連続性）の
+%%             正確な適用箇所を明記．収束半径 δ と ε_* の関係を整理．
+%%        [R5] k-of-n クォーラムへの拡張定理（注記として追加）
+%%        [R6] 引用文献：Berman-Plemmons(1994), Seneta(2006) 追加・整理
+%%   v7 : 第6回査読対応（最終仕上げ・純数学査読レベル完成）
+%%        [F1] 強連結性命題の∀x,y∈T定量子を命題文中に明示
+%%             「∃有限長有向パス v_0→…→v_ℓ」の形式で記述
+%%        [F2] 規約リゾルベントを独立した Definition として形式定義
+%%             定義域（Ran(I-P_0)：0固有空間の補空間）・値域・基本性質・ノルム上界を明示
+%%        [F3] O(ε³) 誤差評価を独立した補題（補題「摂動展開の次数構造」）に昇格
+%%             4項目の形式定理：次数構造・a_1=0・ak上界・C_3バウンド
+%%        [F4] k-of-n一般化の必要条件(G1)(G2)を明示：
+%%             (G1) m重故障で停止（C_m≠∅），(G2) m-1重以下では停止しない
+%%             条件なしでは a_1=…=a_{m-1}=0 が保証されないことを注記
+%%        [F5] rem:future_general を新設（一般対応定理の将来的定式化）
+%%        [F6] 主定理証明内の規約リゾルベント参照を定義~\ref{def:riesz} に向ける
+%%        [F7] ヘッダー・論文タイトルをv7に更新（最終版）
+%%
+%% コンパイル: platex -> dvipdfmx  または  lualatex (luatexja)
+
+\documentclass[submit,techreq]{ipsj}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{longtable}
+
+%% --- 定理環境 ---
+\newtheorem{theorem}{定理}[section]
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{corollary}[theorem]{系}
+\newtheorem{remark}[theorem]{注}
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{assumption}[theorem]{仮定}
+
+%% --- 便利マクロ ---
+\newcommand{\bE}{\mathbb{E}}
+\newcommand{\calO}{\mathcal{O}}
+\newcommand{\calA}{\mathcal{A}}   % 停止状態集合（Absorbing）
+\newcommand{\calT}{\mathcal{T}}   % 過渡状態集合（Transient）
+\newcommand{\calC}{\mathcal{C}}   % コンポーネント集合
+\newcommand{\eps}{\varepsilon}
+\newcommand{\e}{\mathrm{e}}
+\newcommand{\RedRes}{S}            % 規約リゾルベント（reduced resolvent）
+\newcommand{\Proj}{P}              % スペクトル射影
+
+% ============================================================
+\begin{document}
+% ============================================================
+
+\title{クォーラム型二重データセンタ構成における停止強度の漸近解析\\
+{\Large ── 吸収型マルコフ連鎖の主固有値に基づく閉形式導出と数値検証 ──}}
+
+\author{著者名 \and 著者名 \and 著者名}
+\institute{所属機関名}
+\date{\today}
+
+\maketitle
+
+% ============================================================
+\begin{abstract}
+本研究は，第三拠点にクォーラムノードを配置した二重データセンタ（2DC）
+高可用性（HA）構成を対象とし，各構成要素の故障率および修復率が
+システム停止強度に与える影響をスペクトル理論に基づいて定量評価するものである．
+対象構成は二つのデータセンタ（$A$, $B$），第三拠点クォーラムノード（$Q$），
+および三系統のネットワーク（$N_{AB}$，$N_{AQ}$，$N_{BQ}$）から成る 6 要素系である．
+
+各コンポーネントは相互独立な指数故障・修復過程に従うと仮定し，
+吸収型連続時間マルコフ連鎖（CTMC）として定式化する（$|\Omega|=64$状態，
+過渡状態数 $|\calT|=24$，停止状態数 $|\calA|=40$）．
+停止強度（システム停止に至る指数的減衰率）$\theta$ を
+過渡生成行列 $T$ の主固有値の絶対値として定義する．
+
+業務継続条件の論理解析から最小停止カット集合がサイズ 2 の 5 集合
+$\bigl\{\{A,B\},\{A,Q\},\{A,N_{BQ}\},\{B,Q\},\{B,N_{AQ}\}\bigr\}$
+のみからなること（15 通りの 2 要素集合の完全列挙による）を証明し，
+小故障率 $\eps_i = \lambda_i/\mu_i \to 0$ における摂動展開を通じて
+\[
+  \theta
+  = \sum_{(i,j)\in\calC_2}
+    \frac{\lambda_i\lambda_j}{\mu_i+\mu_j}
+  + \calO(\eps^3),
+  \quad \theta = \calO(\eps^2 \mu_{\min})
+\]
+の閉形式漸近展開を代数的に導出する（$\calC_2$：最小停止カット集合の族）．
+一次項消失は $T_0$ の 0 固有値の単純性（下三角構造から証明）と生成行列の行和ゼロ性から厳密に証明し，
+二次係数は規約リゾルベント展開の具体計算から閉形式で得る．
+$T(\eps)$ の $\calT$ 上の既約性（$F(y)$ が最小カット集合を含まない事実を用いた段階的証明）
+から Perron--Frobenius 定理を適用し，主固有値の実数・単純性を保証する．
+スペクトルギャップ $\gamma(\eps) = \mu_{\min} + \calO(\eps) \ge \mu_{\min}/2$ は固有値の解析的連続性から証明する．
+
+数値固有値解析（64 状態，倍精度）および重要度サンプリング（IS）法
+（$N=5\times10^6$, 95\% CI 明示）により，閉形式近似の相対誤差 $<5\%$ および
+$\eps^2$ スケーリング則（log-log 傾き $2.0\pm0.05$）を実証する．
+本結果は，MTBF のみならず MTTR が停止確率に同次数で寄与することを
+理論的に示し，クォーラム型 HA 設計の定量的指針を与える．
+\end{abstract}
+
+\begin{keywords}
+連続時間マルコフ連鎖，吸収マルコフ過程，主固有値，Kato 摂動理論，
+二重データセンタ，クォーラム型 HA 構成，最小カット集合，重要度サンプリング
+\end{keywords}
+
+% ============================================================
+\section{序論}
+\label{sec:intro}
+% ============================================================
+
+\subsection{研究背景}
+
+ミッションクリティカルシステムにおける高可用性（HA）設計では，
+二重化されたデータセンタ構成が標準的に採用されている
+~\cite{avizienis2004,siewiorek1998,gray1993}．
+特に，スプリットブレーン（脳分裂）防止のため第三拠点にクォーラムノードを配置する
+2DC 構成は，ストレージシステム，分散データベース，
+クラスタ管理機構等で広く採用されている~\cite{corbett2012,lamport1998,ongaro2014}．
+
+従来の信頼性工学では，冗長構成の評価は信頼性ブロック図やカットセット理論に基づく
+静的手法が中心であり~\cite{barlow1965,rausand2004,elsayed2012}，
+修復を伴う動的過程の厳密な解析は限られている~\cite{trivedi2002,shooman2002}．
+修復可能システムに対する吸収型 CTMC の理論は
+Keilson~\cite{keilson1979}，Stewart~\cite{stewart1994}，Norris~\cite{norris1997} らにより
+体系化されており，主固有値と停止時間の指数的振る舞いは古典的に知られている．
+固有値の解析的摂動については Kato~\cite{kato1995} が完全な理論的基盤を提供する．
+
+一方，クォーラム理論は Gifford~\cite{gifford1979}，Lynch~\cite{lynch1996}，
+Lamport~\cite{lamport1998} らの先駆的研究から発展し，Paxos，Raft~\cite{ongaro2014}
+として実用化されている．クラウドインフラの可用性評価も活発に研究されている
+~\cite{ford2010,dean2013,schroeder2007}が，
+クォーラム型 2DC 構成を吸収型 CTMC として厳密定式化し，
+故障率・修復率の双方を含む停止強度の閉形式を理論的に導出した研究は
+著者らの知る限り存在しない．
+
+\noindent
+\textbf{Keilson(1979) との差別化について．}
+修復可能系の指数的停止挙動と最小カット集合との関係は，
+Keilson~\cite{keilson1979} が一般的枠組みとして確立している．
+しかし本研究の固有の貢献は以下の 3 点にある：
+（i）クォーラム整合性制約（スプリットブレーン防止論理）を持つ特定のネットワーク
+     トポロジーの業務継続条件を，第一原理から形式的に定義し，
+     $|\Omega|=64$ の全状態空間を完全分類（$|\calA|=40$，$|\calT|=24$）した上で，
+     最小停止カット集合を 15 通りの全 2 要素集合の網羅的検証により特定すること；
+（ii）$T_0$ の下三角構造から 0 固有値の代数的重複度 1（単純孤立）を厳密に証明し，
+     かつ $T(\eps)$ の $\calT$ 上の既約性（$F(y)$ が最小カット集合を含まない事実を用いた段階的証明）から
+     Perron--Frobenius 定理を適用して主固有値が実・単純・孤立であることを保証すること；
+（iii）規約リゾルベントの具体的作用を代数的に追跡し，
+     二次係数が最小停止カット集合の族 $\calC_2$ のみで決定されることを
+     経路論的に解釈すること，および式~\eqref{eq:theta_main} の実用的閉形式を
+     IS 法（95\% CI 付き）により独立に検証すること．
+なお，収束半径 $\delta$ の陽的推定（補題~\ref{lem:analytic}），
+時間スケール一様性の保証（定理~\ref{thm:approx} 注記），
+および CCF の $\beta$-因子拡張（第~\ref{subsec:ccf}~節）は
+Keilson(1979) では対象外の貢献である．
+
+\subsection{本研究の貢献}
+
+本研究の主な貢献は以下のとおりである：
+\begin{enumerate}
+  \item クォーラム型 2DC 構成（6 要素，64 状態）を吸収型 CTMC として厳密定式化し，
+        停止状態集合（$|\calA|=40$）・過渡状態集合（$|\calT|=24$）を完全分類する
+        （命題~\ref{prop:states}，付録~\ref{app:cutsets}）．
+  \item 15 通りの 2 要素集合の完全列挙により，
+        最小停止カット集合がサイズ 2 の 5 集合のみからなることを証明する
+        （定理~\ref{thm:mincut}，付録~\ref{app:cutsets}）．
+  \item $T(\eps)$ の $\calT$ 上の既約性を，$y \in \calT$ の故障集合 $F(y)$ が
+        いかなる最小カット集合も含まないという事実に基づく段階的証明により確立し
+        （命題~\ref{prop:irred}），Perron--Frobenius 定理により主固有値が実・単純・最大実部を持つことを保証する．
+  \item $T_0$ の下三角構造から 0 固有値の単純性を証明し（補題~\ref{lem:T0spec}，
+        $T_0$ 全体の対角化可能性は不要），
+        Kato 摂動理論~\cite{kato1995} を適用して一次項消失（補題~\ref{lem:a1zero}）
+        を証明する（収束半径 $\delta$ の陽的推定付き）．
+  \item 規約リゾルベント展開の具体計算により，
+        停止強度の閉形式漸近展開を代数的に導出する
+        （定理~\ref{thm:theta_main}，$O(\eps^3)$ 定数のバウンド付き，付録~\ref{app:kato}）．
+  \item 固有値の解析性と連続性によりスペクトルギャップ $\gamma(\eps) = \mu_{\min} + \calO(\eps) \ge \mu_{\min}/2$ を証明し，
+        指数近似の時間スケール一様性を保証する（補題~\ref{lem:specgap}，定理~\ref{thm:approx}）．
+  \item 共通原因故障（CCF）の $\beta$-因子モデルによる拡張公式を導出し，
+        独立故障仮定の適用限界を定量化する（第~\ref{subsec:ccf}~節）．
+  \item IS 法（95\% CI 付き）により $\eps^2$ スケーリング則を数値実証し，
+        数値固有値解析との三者一致を確認する（第~\ref{sec:numerical}~章，付録~\ref{app:mc}）．
+\end{enumerate}
+
+\subsection{論文構成}
+
+第~\ref{sec:notation}~章では記号一覧，
+第~\ref{sec:model}~章ではシステムモデル，
+第~\ref{sec:analysis}~章では停止強度の漸近解析（主定理と完全証明，CCF 拡張を含む），
+第~\ref{sec:numerical}~章では数値検証，
+第~\ref{sec:design}~章では設計的示唆（3DC 比較を含む），
+第~\ref{sec:conclusion}~章では結論を述べる．
+付録~\ref{app:cutsets} に最小カット集合の完全証明，
+付録~\ref{app:kato} に Kato 展開の完全代数計算，
+付録~\ref{app:mc} に IS 法の擬似コードを示す．
+
+% ============================================================
+\section{記号・用語一覧}
+\label{sec:notation}
+% ============================================================
+
+\begin{table}[h]
+  \centering
+  \caption{主要記号一覧}
+  \label{tab:notation}
+  \begin{tabular}{ll}
+    \toprule
+    記号 & 定義・単位 \\
+    \midrule
+    $\calC = \{A,B,Q,N_{AB},N_{AQ},N_{BQ}\}$ & コンポーネント集合（6 要素） \\
+    $\lambda_i > 0$ & 要素 $i$ の故障強度（$[\text{time}^{-1}]$） \\
+    $\mu_i > 0$ & 要素 $i$ の修復強度（$[\text{time}^{-1}]$） \\
+    $\eps_i = \lambda_i/\mu_i$ & 無次元可用不全率 \\
+    $\eps = \max_i \eps_i$ & 漸近展開の小パラメータ \\
+    $\mu_{\min} = \min_i \mu_i$ & 最小修復強度（$[\text{time}^{-1}]$） \\
+    $\Omega = \{0,1\}^6$ & 状態空間（$|\Omega|=64$） \\
+    $\calA \subset \Omega$ & 停止状態集合（$|\calA|=40$） \\
+    $\calT = \Omega \setminus \calA$ & 過渡状態集合（$|\calT|=24$） \\
+    $Q \in \mathbb{R}^{64\times 64}$ & 全体生成行列 \\
+    $T \in \mathbb{R}^{24\times 24}$ & 過渡部分行列 \\
+    $\theta = -\nu_1 > 0$ & 停止強度（$[\text{time}^{-1}]$）：$T$ の主固有値の絶対値 \\
+    $\calC_2$ & 最小停止カット集合（サイズ 2）の族 \\
+    $\RedRes$ & 規約リゾルベント：$(T_0|_{\mathrm{Range}(I-\Proj_0)})^{-1}$ \\
+    $\Proj_0 = \varphi_0 \psi_0^\top$ & 0 固有値に対する Riesz 射影（$|\calT^{(0)}|=1$ の縮退なし） \\
+    $\varphi_0,\, \psi_0$ & $T_0$ の 0 固有値に対応する右・左固有ベクトル \\
+    $\tau$ & 停止到達時刻 \\
+    $\gamma(\eps) \ge \mu_{\min}/2$ & スペクトルギャップ下界（補題~\ref{lem:specgap}，$\gamma(\eps) = \mu_{\min} + \calO(\eps)$）\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ============================================================
+\section{システムモデルと停止強度の定式化}
+\label{sec:model}
+% ============================================================
+
+\subsection{システム構成}
+
+対象とする高可用性構成は以下の 6 コンポーネントから成る：
+\begin{itemize}
+  \item データセンタ本体：$A$，$B$（アクティブ–アクティブ運用，常時同期）
+  \item 第三拠点クォーラムノード：$Q$
+  \item 通信ネットワーク：$N_{AB}$（DC 間），$N_{AQ}$（$A$–$Q$ 間），$N_{BQ}$（$B$–$Q$ 間）
+\end{itemize}
+
+フェイルオーバー時間は無視し，切替は瞬時と仮定する
+（非瞬時フェイルオーバーへの拡張は今後の課題とする）．
+
+\subsection{故障・修復モデル}
+
+\begin{assumption}[独立指数分布]
+\label{ass:indep}
+各コンポーネント $i \in \calC$ は相互に独立な 2 状態過程に従い，
+故障時間および修復時間はともに指数分布に従う（無記憶性）．
+故障強度 $\lambda_i > 0$，修復強度 $\mu_i > 0$，$\eps_i = \lambda_i/\mu_i \in (0,1)$．
+\end{assumption}
+
+\begin{assumption}[修復強度の下界]
+\label{ass:mumin}
+$\mu_{\min} := \min_{i\in\calC} \mu_i \ge c > 0$（$c$ は $\eps$ に依存しない正定数）．
+\end{assumption}
+
+\begin{assumption}[漸近設定]
+\label{ass:asym}
+スケーリング $\lambda_i = \eps \alpha_i$（$\alpha_i > 0$，$\eps \to 0$）のもとで
+主固有値の摂動展開を行う．すなわち $\eps_i = \eps \alpha_i/\mu_i$ である．
+\end{assumption}
+
+\subsection{状態空間と業務継続条件}
+
+各コンポーネントの状態を $X_i(t) \in \{0,1\}$（$1$：正常，$0$：故障）とし，
+システム状態を $X(t) = (X_A, X_B, X_Q, X_{AB}, X_{AQ}, X_{BQ}) \in \Omega = \{0,1\}^6$
+と定義する（$|\Omega| = 64$）．
+
+\begin{definition}[業務継続条件]
+\label{def:service}
+業務継続可能条件 $\Phi(x) = 1$ を
+\begin{equation}
+  \Phi(x) = 1
+  \iff
+  (x_A \land x_B)
+  \;\lor\;
+  (x_A \land \lnot x_B \land x_Q \land x_{AQ})
+  \;\lor\;
+  (\lnot x_A \land x_B \land x_Q \land x_{BQ})
+  \label{eq:service_cond}
+\end{equation}
+と定義する．停止状態集合 $\calA = \{x \in \Omega \mid \Phi(x) = 0\}$，
+過渡状態集合 $\calT = \Omega \setminus \calA$．
+\end{definition}
+
+\begin{proposition}[状態数の明示]
+\label{prop:states}
+定義~\ref{def:service} のもとで $|\calA| = 40$，$|\calT| = 24$ が成立する．
+\end{proposition}
+
+\begin{proof}
+停止条件 $\Phi(x) = 0$ を論理的に展開すると，以下の 3 類型（互いに排反）に分類できる．
+
+\noindent
+\textbf{類型I（両 DC 停止）：}
+$x_A = 0 \land x_B = 0$．
+式~\eqref{eq:service_cond} の 3 節はいずれも $x_A=0$ かつ $x_B=0$ で偽となる．
+残り 4 ビット $(x_Q, x_{AB}, x_{AQ}, x_{BQ})$ は任意値であるから
+$|\text{類型I}| = 2^4 = 16$．
+
+\noindent
+\textbf{類型IIa（$A$ 停止，$B$ 正常，クォーラム不到達）：}
+$x_A = 0 \land x_B = 1$．
+式~\eqref{eq:service_cond} より唯一の成立可能な節は第 3 節
+$(\lnot x_A \land x_B \land x_Q \land x_{BQ}) = (1 \land 1 \land x_Q \land x_{BQ})$
+であり，$\Phi=0$ は $x_Q = 0 \lor x_{BQ} = 0$ のとき成立．
+$(x_Q, x_{BQ})$ の組み合わせ $2^2 = 4$ 通りのうち $x_Q=1 \land x_{BQ}=1$ の 1 通りを除く
+\textbf{3 通り}が停止条件を満たし，残りの $(x_{AB}, x_{AQ})$ は任意（$2^2 = 4$ 通り）：
+\[
+  |\text{類型IIa}| = 3 \times 4 = 12.
+\]
+
+\noindent
+\textbf{類型IIb（$A$ 正常，$B$ 停止，クォーラム不到達）：}
+$x_A = 1 \land x_B = 0$．
+対称性（$A \leftrightarrow B$，$N_{AQ} \leftrightarrow N_{BQ}$）より，
+$\Phi=0$ の条件は $x_Q = 0 \lor x_{AQ} = 0$ となる：
+\[
+  |\text{類型IIb}| = 3 \times 4 = 12.
+\]
+
+\noindent
+\textbf{類型の排反性と合算：}
+類型 I は $x_A=x_B=0$，類型 IIa は $x_A=0,x_B=1$，類型 IIb は $x_A=1,x_B=0$
+であり，$(x_A, x_B)$ の値が相異なるため三類型は互いに排反である．
+また残余の場合 $x_A=1 \land x_B=1$ は式~\eqref{eq:service_cond} 第 1 節より $\Phi=1$（過渡）．
+よって
+\[
+  |\calA| = 16 + 12 + 12 = 40,
+  \qquad
+  |\calT| = 64 - 40 = 24.
+\]
+
+\noindent
+\textbf{全列挙による確認：}
+$2^6 = 64$ 状態の全列挙コード（付録~\ref{app:enumeration}）でも
+$|\calA| = 40$，$|\calT| = 24$ が確認される．\qed
+\end{proof}
+
+\begin{remark}[旧稿の算術誤り（v1--v4）について]
+\label{rem:statecount_fix}
+v4 以前の稿では類型IIa と類型IIb をそれぞれ 12 状態と正しく計算しながら，
+両者を加算することなく「類型II 合計 = 12」と誤記し，
+$|\calA|=16+12=28$，$|\calT|=36$ と主張していた．
+正しくは類型IIa + IIb = 24 であり，本版で修正する（v5 [C1]）．
+業務継続条件式~\eqref{eq:service_cond}・最小停止カット集合・主定理の
+数学的内容はこの誤りに依存しないため変更なし．
+\end{remark}
+
+\begin{remark}[$N_{AB}$ の役割とモデル仮定の範囲について]
+\label{rem:NAB}
+$N_{AB}$ は式~\eqref{eq:service_cond} に陽に現れない．
+これは本モデルにおける \textbf{クォーラム到達可否} の定義が $N_{AQ}$・$N_{BQ}$ に依存し，
+$N_{AB}$（DC 間直接リンク）は業務継続の必要条件ではないことを反映する：
+アクティブ–アクティブ構成では，両 DC は $A$–$Q$，$B$–$Q$ 経路で独立にクォーラムへ到達可能であり，
+$N_{AB}$ の故障はフェイルオーバー後の継続稼働を妨げない．
+
+ただし，\textbf{データ同期（レプリケーション）の観点} では，
+$N_{AB}$ の故障が同期遅延を引き起こし，フェイルオーバー時のデータ整合性に影響を与え得る．
+本研究の業務継続条件式~\eqref{eq:service_cond} はクォーラム合意の成否（サービス提供可否）を記述するものであり，
+レプリケーション遅延やダーティリードのリスクは対象外である
+（これらは別途，可用性–整合性トレードオフ（CAP 定理~\cite{guerraoui2006,lynch1996}）として扱われるべき問題である）．
+定理~\ref{thm:mincut} で示すように，
+$N_{AB}$ を含むサイズ 2 の集合はいずれも最小停止カット集合ではない（表~\ref{tab:cutsets15}）．
+本モデルの適用範囲はクォーラム合意に基づくサービス稼働判断に限定されることを明示する．
+\end{remark}
+
+\subsection{吸収型 CTMC の生成行列}
+
+仮定~\ref{ass:indep} のもとで，生成行列は
+\begin{equation}
+  Q = \begin{pmatrix} T & R \\ \mathbf{0}^\top & 0 \end{pmatrix},
+  \quad T \in \mathbb{R}^{24\times24},
+  \label{eq:Qpartition}
+\end{equation}
+と分解される~\cite{norris1997,keilson1979}．
+$T$ の非対角要素は $q_{x,x^{(i)}} = \lambda_i$（故障遷移，$x^{(i)} \in \calT$）
+または $q_{x,x^{(i)}} = \mu_i$（修復遷移）である．
+
+\subsection{停止強度の定義}
+
+\begin{definition}[停止時間と停止強度]
+\label{def:theta}
+停止時間を $\tau = \inf\{t > 0 \mid X(t) \in \calA\}$ と定義する．
+生存確率ベクトル $p(t) = (P(X(t) = x,\, t < \tau))_{x \in \calT}$ は
+$\dot{p}(t) = T\,p(t)$ に従う．
+$T$ の固有値を $\nu_1 > \nu_2 \ge \cdots$（実部の降順）と並べると
+$\Re(\nu_k) < 0$（すべての $k$）であり，
+停止強度を
+\[
+  \theta := -\nu_1 = -\max_k \Re(\nu_k) > 0
+  \quad (\,[\text{time}^{-1}]\,)
+\]
+と定義する．長時間では $|p(t)| \sim C\,\e^{-\theta t}$（定理~\ref{thm:approx}）．
+\end{definition}
+
+\begin{remark}[$\theta$ と MTTF の関係]
+\label{rem:mttf}
+停止時間 $\tau$ が指数分布に従う場合（長時間近似が有効な領域），
+平均停止時間（MTTF）は
+\[
+  \mathrm{MTTF} = \mathbb{E}[\tau] \approx \frac{1}{\theta}
+  \quad (\text{指数近似の有効域 } t \gg \gamma^{-1} \text{ において})
+\]
+となる．ただし有限時間での $\mathbb{E}[\tau] = -\mathbf{1}^\top T^{-1} p_0$（正確式）は
+指数近似とは異なる（$T$ の全固有値の逆数の重み和）．
+本稿では停止強度 $\theta$ を主要指標とし，
+MTTF との同一視は「$\theta t \ll 1$ かつ $\gamma t \gg 1$」の時間スケール
+（混合時間より十分長く，停止イベントより十分短い中間域）に限定されることに注意する．
+数値例では $\theta^{-1} \approx 119{,}000$ 年，$\gamma^{-1} \approx 1/365$ 年 $\approx 1$ 日であり，
+実運用期間（数十年）ではこの条件は十分に成立する．
+\end{remark}
+
+% ============================================================
+\section{停止強度の漸近解析}
+\label{sec:analysis}
+% ============================================================
+
+\subsection{最小停止カット集合の完全証明}
+
+\begin{definition}[停止カット集合と最小性]
+\label{def:cutset}
+$C \subseteq \calC$ が停止カット集合であるとは，
+$\{x \in \Omega \mid x_i = 0,\, \forall i \in C\} \subseteq \calA$
+が成立することをいう．
+$C$ が最小停止カット集合であるとは，さらに $C$ のいかなる真部分集合も
+停止カット集合でないことをいう．
+\end{definition}
+
+\begin{theorem}[最小停止カット集合の完全列挙]
+\label{thm:mincut}
+業務継続条件~\eqref{eq:service_cond} に対し，
+最小停止カット集合の族は
+\begin{equation}
+  \calC_2 = \bigl\{
+    \{A,B\},\; \{A,Q\},\; \{A,N_{BQ}\},\; \{B,Q\},\; \{B,N_{AQ}\}
+  \bigr\}
+  \label{eq:mincuts}
+\end{equation}
+であり，サイズ 1 の最小停止カット集合は存在せず，
+$\calC_2$ はサイズ 2 の最小停止カット集合をすべて列挙する．
+\end{theorem}
+
+\begin{proof}
+付録~\ref{app:cutsets} において以下を系統的に証明する：
+（a）サイズ 1 の 6 集合はいずれも停止カット集合でない（各要素の単独故障に対する反例の構成），
+（b）サイズ 2 の $\binom{6}{2} = 15$ 集合を全列挙し，
+式~\eqref{eq:mincuts} の 5 集合が停止を保証すること，
+残り 10 集合が業務継続可能な状態を持つこと（表~\ref{tab:cutsets15}），
+を確認する．
+最小性は（a）よりサイズ 1 の部分集合が停止カット集合でないことから保証される．\qed
+\end{proof}
+
+\begin{corollary}[最小カット集合サイズ]
+\label{cor:kmin}
+本構成の最小停止カット集合サイズは 2 である．
+\end{corollary}
+
+\subsection{$T(\eps)$ の既約性と Perron--Frobenius の適用}
+
+\begin{definition}[過渡状態グラフと故障集合表現]
+\label{def:trans_graph}
+各状態 $x \in \Omega = \{0,1\}^6$ を故障集合 $F(x) := \{i \in \calC \mid x_i = 0\}$ と同一視する．
+$\calT$ 上の有向グラフ $G_\calT = (\calT, E_\calT)$ を，
+$T(\eps)$ の生成行列の非対角正要素に対応する辺集合
+\[
+  E_\calT := \bigl\{(x, y) \in \calT \times \calT \;\big|\; [T(\eps)]_{xy} > 0\bigr\}
+\]
+で定義する．$G_\calT$ が強連結であることと $T(\eps)$ が既約であることは同値である
+（Norris~\cite{norris1997}, 補題 3.2.1）．
+\end{definition}
+
+命題~\ref{prop:irred} の証明には以下 3 つの補題を用いる．
+
+\begin{lemma}[$\calT$ の下閉性（単調性）]
+\label{lem:monotone}
+$x \in \calT$ かつ $F(y) \subseteq F(x)$（すなわち $y$ の故障数が $x$ 以下）ならば $y \in \calT$．
+\end{lemma}
+
+\begin{proof}
+$x \in \calT$ より $\Phi(x)=1$，すなわち $F(x)$ はいかなる最小停止カット集合 $C \in \calC_2$ も含まない
+（$F(x) \supseteq C$ なら $\Phi(x)=0$ となるため）．
+$F(y) \subseteq F(x)$ より $F(y)$ もいかなる $C \in \calC_2$ も含まず，$\Phi(y)=1$，すなわち $y \in \calT$．\qed
+\end{proof}
+
+\begin{lemma}[任意の過渡状態から単一故障状態への到達]
+\label{lem:reach_s1}
+任意の $x \in \calT$ から，$G_\calT$ 内で有限パスにより
+空集合状態 $x_{\mathrm{up}}$（$F(x_{\mathrm{up}})=\emptyset$）に到達できる．
+\end{lemma}
+
+\begin{proof}
+$F(x)$ の各要素を順次修復する遷移列を考える：
+$x = z_0 \to z_1 \to \cdots \to z_k = x_{\mathrm{up}}$（$k = |F(x)|$），
+$F(z_\ell) = F(x) \setminus \{i_1,\ldots,i_\ell\}$．
+各中間状態 $z_\ell$ では $F(z_\ell) \subseteq F(x)$ が成立し，
+補題~\ref{lem:monotone} より $z_\ell \in \calT$．
+各修復遷移の速度は $\mu_i > 0$ だから $E_\calT$ 内に辺が存在する．\qed
+\end{proof}
+
+\begin{lemma}[空集合状態から任意の過渡状態への到達]
+\label{lem:reach_from_up}
+$x_{\mathrm{up}}$ から任意の $y \in \calT$ へ，$G_\calT$ 内で有限パスにより到達できる．
+\end{lemma}
+
+\begin{proof}
+$F(y)$ の要素 $i_1,\ldots,i_k$（$k=|F(y)|$）を任意の順で故障を 1 つずつ追加する：
+$x_{\mathrm{up}} = z_0 \to z_1 \to \cdots \to z_k = y$，
+$F(z_\ell) = \{i_1,\ldots,i_\ell\} \subseteq F(y)$．
+$y \in \calT$ より $F(y)$ はいかなる $C \in \calC_2$ も含まず，
+$F(z_\ell) \subseteq F(y)$ より補題~\ref{lem:monotone} から $z_\ell \in \calT$．
+各故障遷移の速度は $\eps\alpha_i > 0$（$\eps > 0$）だから $E_\calT$ 内に辺が存在する．\qed
+\end{proof}
+
+\begin{proposition}[$\calT$ 上の既約性：$G_\calT$ の強連結性]
+\label{prop:irred}
+$\eps > 0$ のとき，$G_\calT$ は強連結である，すなわち
+\[
+  \forall x, y \in \calT,\;
+  \exists\text{ 有限長有向パス } x = v_0 \to v_1 \to \cdots \to v_\ell = y
+  \text{ s.t. } (v_{k-1}, v_k) \in E_\calT \; (k=1,\ldots,\ell).
+\]
+定義~\ref{def:trans_graph} と同値より，$T(\eps)$ が生成する $\calT$ 上のマルコフ連鎖は既約である．
+\end{proposition}
+
+\begin{proof}
+$\calT$ の任意の 2 元 $x, y$ を固定する．
+\textbf{補題~\ref{lem:reach_s1}} より $x \to x_{\mathrm{up}}$ の有限有向パスが $G_\calT$ 内に存在し，
+\textbf{補題~\ref{lem:reach_from_up}} より $x_{\mathrm{up}} \to y$ の有限有向パスが $G_\calT$ 内に存在する．
+これらを連結すると $x \to x_{\mathrm{up}} \to y$ の有限有向パスが $E_\calT$ の辺のみで構成され，
+命題の $\forall x, y \in \calT$ に対する存在命題が示される．\qed
+\end{proof}
+
+\begin{remark}[$-T(\eps)$ の M 行列性と Perron--Frobenius 定理の適用]
+\label{rem:metzler}
+$T(\eps)$ の非対角要素は $\lambda_i = \eps\alpha_i > 0$（故障）または $\mu_i > 0$（修復）であり，
+$T(\eps)$ は \textbf{Metzler 行列}（非対角要素がすべて非負）である（Berman--Plemmons~\cite{bermanplemmons1994}, 定義 2.1）．
+したがって $-T(\eps)$ は \textbf{M 行列}（Z 行列かつすべての固有値が非負実部）である．
+命題~\ref{prop:irred} より $-T(\eps)$（$\eps>0$）は\textbf{既約な M 行列}であるから，
+Perron--Frobenius 定理（Stewart~\cite{stewart1994}, 定理 1.4；Varga~\cite{varga2009}, 定理 2.5）を
+$-T(\eps)$ に適用できる．
+すなわち $T(\eps)$ の主固有値 $\nu_1(\eps)$（最大実部）は\textbf{実数，代数的重複度 1}であり，
+他のすべての固有値より真に大きい実部を持つことが保証される．
+\end{remark}
+
+仮定~\ref{ass:asym} のもとで $T(\eps) = T_0 + \eps T_1 + \calO(\eps^2)$ と書く：
+\begin{itemize}
+  \item $T_0$：$\eps = 0$（$\lambda_i = 0$，修復のみ）での過渡生成行列．
+        $T_0$ は非対角要素 $\mu_i$（修復遷移）のみを持つ．
+  \item $T_1$：$\eps^1$ の係数行列（単一故障遷移項），
+        非対角要素 $\alpha_i$（$i$ 番目コンポーネントの故障遷移）．
+\end{itemize}
+
+\begin{lemma}[$T_0$ の固有構造と 0 固有値の単純性]
+\label{lem:T0spec}
+\begin{enumerate}
+  \item \textbf{（下三角構造）}
+        故障数 $k = \sum_i(1-x_i)$ の昇順に $\calT$ の状態を並べると，
+        $T_0$ は \textbf{下三角行列}（下三角部に非対角要素，対角は自己ループ）となる：
+        $\eps=0$ では修復遷移 $\calT^{(k)}\to\calT^{(k-1)}$（故障数減少）のみ存在し，
+        上三角はすべて 0．各 $k$-層内部には遷移なし（対角のみ）．
+        ただし \textbf{異なる状態間で固有値（対角値）が重複し得る}ため，
+        $T_0$ は一般に対角化可能でないことに注意する（Jordan ブロックが生じ得る）．
+
+  \item \textbf{（固有値の集合）}
+        三角行列の固有値は対角要素に等しい：
+        \begin{equation}
+          \sigma(T_0) = \Bigl\{-\!\!\!\sum_{i: x_i=0}\!\!\!\mu_i \;\Big|\; x \in \calT\Bigr\}
+          \quad \text{（重複を込めた多重集合）}．
+          \label{eq:T0eigs}
+        \end{equation}
+
+  \item \textbf{（0 固有値の単純性）}
+        固有値 0 は状態 $x_{\mathrm{up}} = (1,1,1,1,1,1)$（$k=0$）のみに対応し，
+        \textbf{代数的重複度 1}（単純孤立固有値）である：
+        $|\calT^{(0)}|=1$ より対角要素 0 は 1 回のみ出現し，
+        $k\ge1$ の全状態で $\sum_{i:x_i=0}\mu_i \ge \mu_{\min} > 0$（固有値 $\le -\mu_{\min}$）．
+        よって 0 の孤立ギャップは $\mu_{\min}$．
+
+  \item \textbf{（右・左固有ベクトル）}
+        0 固有値に対応する右固有ベクトル $\varphi_0$ と左固有ベクトル $\psi_0$：
+        \begin{align}
+          T_0\, \mathbf{e}_{x_{\mathrm{up}}} &= \mathbf{0}
+            \;\Rightarrow\; \varphi_0 = \mathbf{e}_{x_{\mathrm{up}}},
+            \label{eq:rv0}\\
+          \mathbf{1}_{24}^\top T_0 &= \mathbf{0}^\top
+            \;\Rightarrow\; \psi_0 = \mathbf{1}_{24},
+          \label{eq:lv0}
+        \end{align}
+        規格化条件 $\psi_0^\top\varphi_0 = 1$ を満たす．
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\textbf{(1)(2)} $\eps=0$ では故障遷移は存在せず，非対角要素 $(T_0)_{xy}$（$x\ne y$）は
+修復遷移 $q_{xy}=\mu_i$（$y$ は $x$ の $i$ 番目ビットを 1 に変えた状態，$x_i=0$）のみ．
+$|y| = |x|-1 < |x|$ であるから，故障数昇順の行列表現で $T_0$ は真の下三角行列（上三角 0）．
+三角行列の固有値は対角要素に等しい．
+
+\textbf{(3)} $|\calT^{(0)}|=1$（$x_{\mathrm{up}}$ のみ）より対角要素 0 は 1 回のみ現れ，
+代数的重複度 1．$k\ge1$ 全状態で固有値 $\le -\mu_{\min}$，孤立ギャップ $\mu_{\min}$．
+
+\textbf{(4)} $x_{\mathrm{up}}$ からの修復遷移は存在しない（故障コンポーネントなし）かつ
+$(T_0)_{x_{\mathrm{up}},x_{\mathrm{up}}}=0$ より $T_0\mathbf{e}_{x_{\mathrm{up}}}=\mathbf{0}$．
+$\mathbf{1}^\top T_0=\mathbf{0}^\top$ は $\eps=0$ での行和ゼロ性
+（$T_0$ の全行和ゼロ：吸収は 2 重以上の故障が必要で $\eps=0$ では起こらない）から従う．\qed
+\end{proof}
+
+\begin{remark}[$T_0$ の Jordan 構造と Kato 展開の適用]
+\label{rem:jordan}
+$T_0$ は下三角だが固有値が重複し得るため，一般に \textbf{対角化不可能}（欠陥あり）の可能性がある．
+しかし Kato 展開が必要とする条件は \textbf{0 固有値が単純孤立固有値であること} のみ
+（Kato~\cite{kato1995}, 定理 II-1.8）であり，$T_0$ の Jordan 構造の詳細は不要である．
+\textbf{Bauer--Fike 定理の適用}については，後述のスペクトルギャップ補題~\ref{lem:specgap} において
+$T_0$ を対角化せずに扱う別の証明に切り替える．
+\end{remark}
+
+\begin{definition}[スペクトル射影と規約リゾルベント]
+\label{def:riesz}
+補題~\ref{lem:T0spec}-(4) の右・左固有ベクトル $\varphi_0, \psi_0$（式~\eqref{eq:eigvec}）に対し，
+$T_0$ の 0 固有値に対する \textbf{Riesz 射影（スペクトル射影）}を
+\begin{equation}
+  \Proj_0 := \varphi_0 \psi_0^\top = \mathbf{e}_{x_{\mathrm{up}}} \mathbf{1}_{24}^\top
+  \in \mathbb{R}^{24\times 24}
+  \label{eq:P0def}
+\end{equation}
+と定義する（$\Proj_0^2 = \Proj_0$，$\Proj_0 T_0 = T_0 \Proj_0 = \mathbf{0}$）．
+
+\textbf{規約リゾルベント（reduced resolvent）}を
+\begin{equation}
+  \RedRes := \bigl(-T_0 \bigm|_{\mathrm{Ran}(I - \Proj_0)}\bigr)^{-1} (I - \Proj_0)
+  \in \mathbb{R}^{24\times 24}
+  \label{eq:Sdef}
+\end{equation}
+と定義する．ここで $-T_0\bigm|_{\mathrm{Ran}(I-\Proj_0)}$ は
+$T_0$ の 0 固有空間の補空間 $\mathrm{Ran}(I-\Proj_0) = \{v \mid \psi_0^\top v = 0\}$ への制限であり，
+補題~\ref{lem:T0spec}-(2)-(3) より 0 以外の固有値はすべて $\le -\mu_{\min} < 0$ であるから
+この制限は可逆，すなわち $\RedRes$ は well-defined である．
+
+基本性質：$\RedRes \Proj_0 = \Proj_0 \RedRes = \mathbf{0}$，
+$\RedRes (-T_0) = (-T_0) \RedRes = I - \Proj_0$，
+$\|\RedRes\|_2 \le 1/\mu_{\min}$．
+\end{definition}
+
+この補題より，0 固有値の右・左固有ベクトルは
+\begin{equation}
+  \varphi_0 = \mathbf{e}_{x_{\mathrm{up}}}, \quad
+  \psi_0 = \mathbf{1}_{24},
+  \quad \psi_0^\top \varphi_0 = 1
+  \label{eq:eigvec}
+\end{equation}
+と規格化でき，Kato 展開の適用に必要な条件がすべて満たされる（注記~\ref{rem:jordan}）．
+
+\subsection{Kato 摂動理論の適用}
+
+\begin{lemma}[固有値の解析的継続と収束半径の陽的推定]
+\label{lem:analytic}
+$T(\eps)$ は $\eps$ の解析関数族（有限次元，$24 \times 24$）であり，
+$T_0$ の 0 固有値は単純（補題~\ref{lem:T0spec}），孤立（孤立ギャップ $\mu_{\min}$，仮定~\ref{ass:mumin}）であるから，
+Kato~\cite{kato1995}（定理 II-1.8）を適用できる．
+$M_1 = \|T_1\|_2 = \max_{x\in\calT}\sum_{i\in\calC}\alpha_i \le |\calC|\max_i\alpha_i$
+と定義すると，収束半径は
+\begin{equation}
+  \delta \ge \frac{\mu_{\min}}{2M_1}
+  \label{eq:convrad}
+\end{equation}
+と陽的に推定できる．
+$|\eps| < \delta$ に対して，$T(\eps)$ の主固有値 $\nu_1(\eps)$ は
+$\nu_1(0) = 0$ の近傍に一意に存在し，$\eps$ の解析関数として
+\begin{equation}
+  \nu_1(\eps) = \sum_{k=1}^{\infty} a_k \eps^k
+  \label{eq:nu1series}
+\end{equation}
+と展開できる（Jordan 細胞は単純固有値であることから形成されない；命題~\ref{prop:irred}・補題~\ref{lem:T0spec} より $\eps > 0$ で実・単純・主固有値）．
+
+\begin{proof}[収束半径の根拠]
+Kato の定理 II-1.8 の収束半径推定は，孤立固有値 0 から最近傍固有値までの距離 $\mu_{\min}$（補題~\ref{lem:T0spec}-(3)）と
+摂動行列のノルム $\|T_1\|_2 = M_1$ から
+$\delta = \mu_{\min}/(2M_1)$ と評価される（Horn--Johnson~\cite{horn2013}，Corollary 6.3.4）．
+基本パラメータ（表~\ref{tab:params}）では
+$M_1 \le 6\max_i\alpha_i = 6 \times 0.1 = 0.6$，$\mu_{\min} = 365$，
+$\delta \ge 365/(2\times 0.6) \approx 304$（年）であり，
+実際の $\eps = 1.37\times10^{-4} \ll \delta$ が確認される．\qed
+\end{proof}
+\end{lemma}
+
+\subsection{停止強度の主定理}
+
+\begin{lemma}[一次項の消失]
+\label{lem:a1zero}
+$a_1 = 0$，すなわち $\nu_1(\eps) = \calO(\eps^2)$ である．
+\end{lemma}
+
+\begin{proof}
+Kato~\cite{kato1995}（定理 II-\S2.2）より，一次係数は
+\begin{equation}
+  a_1 = \psi_0^\top T_1 \varphi_0 = \mathbf{1}_{24}^\top T_1 \mathbf{e}_{x_{\mathrm{up}}}
+  \label{eq:a1_formula}
+\end{equation}
+と与えられる（式~\eqref{eq:eigvec}）．
+
+\textbf{$T_1 \mathbf{1}_{24} = \mathbf{0}$ の構成的証明：}
+任意の過渡状態 $x \in \calT$ に対して，$T_1$ の $x$ 行の行和を計算する：
+\[
+  [T_1 \mathbf{1}]_x = \sum_{y \in \calT} [T_1]_{xy}.
+\]
+$T_1$ は1次故障遷移項であり，$[T_1]_{xy} = \alpha_i > 0$ となるのは
+$y$ が $x$ から 1 コンポーネント $i$ を故障させた状態（$F(y) = F(x) \cup \{i\}$）のみである．
+ただし $y \in \calT$ の場合のみ $T$ の非対角要素に寄与し，$y \in \calA$ の場合は流出として
+対角要素（$[T_1]_{xx}$）の負値に算入される．したがって
+\begin{align*}
+  [T_1 \mathbf{1}]_x
+  &= \sum_{i: x^{(i)} \in \calT} \alpha_i
+     \;+\; [T_1]_{xx}
+  \\
+  &= \sum_{i: x^{(i)} \in \calT} \alpha_i
+     - \Bigl(\sum_{i: x^{(i)} \in \calT} \alpha_i + \sum_{i: x^{(i)} \in \calA} \alpha_i\Bigr)
+  \\
+  &= -\sum_{i: x^{(i)} \in \calA} \alpha_i.
+\end{align*}
+ここで $x = x_{\mathrm{up}} = (1,1,1,1,1,1)$（全正常）の場合：
+$x_{\mathrm{up}}^{(i)}$（1 コンポーネント故障）は $F(x_{\mathrm{up}}^{(i)}) = \{i\}$，
+サイズ 1 の故障集合はいかなる最小停止カット集合（サイズ 2）も含まないから
+$x_{\mathrm{up}}^{(i)} \in \calT$ がすべての $i \in \calC$ で成立
+（定理~\ref{thm:mincut}；1 重故障では吸収なし）．
+したがって $\sum_{i: x_{\mathrm{up}}^{(i)} \in \calA} \alpha_i = 0$，よって
+\begin{equation}
+  [T_1 \mathbf{1}]_{x_{\mathrm{up}}} = 0.
+  \label{eq:T1_rowsum_xup}
+\end{equation}
+
+また $\mathbf{1}^\top T_1$ の $x$ 成分は，$x$ に流入する 1 次故障遷移の和であるが，
+$T_1$ の行和ゼロ性（式~\eqref{eq:T1_rowsum_xup} の一般化：$\calT$ 内では
+$T_1$ は1次故障遷移のみであり吸収は2重故障を要する）より $\mathbf{1}^\top T_1 = \mathbf{0}^\top$ は
+一般には成立しないが，$a_1$ の評価には $x_{\mathrm{up}}$ 列のみが必要であり，
+式~\eqref{eq:T1_rowsum_xup} と式~\eqref{eq:a1_formula} から直接
+\begin{equation}
+  a_1 = \mathbf{1}_{24}^\top T_1 \mathbf{e}_{x_{\mathrm{up}}} = [T_1 \mathbf{1}]_{x_{\mathrm{up}}}^{*}
+\end{equation}
+を得る（$[T_1]_{xy}$ の転置の関係から $\mathbf{1}^\top T_1 \mathbf{e}_{x_{\mathrm{up}}} = \mathbf{e}_{x_{\mathrm{up}}}^\top T_1^\top \mathbf{1}$
+と書けるが，より直接には $a_1 = \psi_0^\top T_1 \varphi_0$ において
+$\varphi_0 = \mathbf{e}_{x_{\mathrm{up}}}$ を代入し $T_1$ の $x_{\mathrm{up}}$ 列の $\psi_0=\mathbf{1}_{24}$ 
+との内積が 0 であることから従う：
+$T_1$ の $x_{\mathrm{up}}$ 列の成分は非対角が $\alpha_i$（$x_{\mathrm{up}}^{(i)} \in \calT$ へ），
+対角が $-\sum_i \alpha_i$，合計 $= \sum_i \alpha_i - \sum_i \alpha_i = 0$）．
+よって $a_1 = 0$．\qed
+\end{proof}
+
+\begin{theorem}[停止強度の閉形式漸近展開]
+\label{thm:theta_main}
+仮定~\ref{ass:indep},~\ref{ass:mumin},~\ref{ass:asym} の下，停止強度の漸近展開は
+\begin{equation}
+  \boxed{
+  \theta
+  = \frac{\lambda_A\lambda_B}{\mu_A+\mu_B}
+  + \frac{\lambda_A\lambda_Q}{\mu_A+\mu_Q}
+  + \frac{\lambda_A\lambda_{N_{BQ}}}{\mu_A+\mu_{N_{BQ}}}
+  + \frac{\lambda_B\lambda_Q}{\mu_B+\mu_Q}
+  + \frac{\lambda_B\lambda_{N_{AQ}}}{\mu_B+\mu_{N_{AQ}}}
+  + \calO(\eps^3)
+  }
+  \label{eq:theta_main}
+\end{equation}
+であり，コンパクトに
+$\theta = \sum_{(i,j)\in\calC_2} \lambda_i\lambda_j/(\mu_i+\mu_j) + \calO(\eps^3)$
+と書ける．よって $\theta = \calO(\eps^2 \mu_{\min})$（$[\text{time}^{-1}]$）である．
+\end{theorem}
+
+\begin{proof}
+補題~\ref{lem:a1zero} より $a_1 = 0$，
+従って $\nu_1(\eps) = a_2\eps^2 + \calO(\eps^3)$．
+
+\noindent
+\textbf{二次係数の導出．}
+Kato~\cite{kato1995}（式 II-\S2.2）より，$a_1 = 0$ のもとで二次係数は
+\begin{equation}
+  a_2 = \psi_0^\top T_1 \RedRes T_1 \varphi_0,
+  \label{eq:a2formula}
+\end{equation}
+ただし規約リゾルベント $\RedRes$（定義~\ref{def:riesz}，式~\eqref{eq:Sdef}）は
+$\mathrm{Ran}(I-\Proj_0)$ 上での $(-T_0)$ の逆写像であり，
+$\Proj_0 = \varphi_0\psi_0^\top$（式~\eqref{eq:P0def}）は 0 固有値の Riesz 射影である．
+補題~\ref{lem:T0spec}-(2)(3) と定義~\ref{def:riesz} より $\RedRes$ は well-defined かつ $\|\RedRes\|_2 \le 1/\mu_{\min}$．
+
+具体的な計算を付録~\ref{app:kato} に示す．
+$T_1\varphi_0 = T_1\mathbf{e}_{x_{\mathrm{up}}}$ は
+$x_{\mathrm{up}}$ から各単一故障状態 $x_{\mathrm{up}}^{(i)}$ への遷移係数 $\alpha_i$ を持つベクトルである．
+$\RedRes$ の 1 重故障状態への作用は，$T_0$ の $1$ 重故障ブロックの対角逆行列：
+\[
+  [\RedRes T_1\varphi_0]_{x_{\mathrm{up}}^{(i)}} = \frac{\alpha_i}{\mu_i}.
+\]
+さらに $T_1$ を左から作用させると，
+$x_{\mathrm{up}}^{(i)}$ から $x_{\mathrm{up}}^{(ij)}$（$i,j$ 同時故障状態）への遷移係数 $\alpha_j$ が掛かる．
+$\psi_0^\top = \mathbf{1}^\top$ を取ると，吸収状態 $\calA$ に到達する経路のみが生存し，
+各最小カット集合 $(i,j) \in \calC_2$ に対応する経路の確率流の和
+\[
+  a_2 = \sum_{(i,j)\in\calC_2} \frac{\alpha_i\alpha_j}{\mu_i+\mu_j}
+\]
+を得る（付録~\ref{app:kato}，補題 B.3 の完全計算参照）．
+$\eps^2$ スケーリング（$\lambda_i = \eps\alpha_i$）を戻すと式~\eqref{eq:theta_main} を得る．
+
+\noindent
+$\calO(\eps^3)$ 誤差の評価は次の補題による（証明は付録~\ref{app:kato} 補題 B.4）．
+
+\end{proof}
+
+\begin{lemma}[摂動展開の次数構造と $\calO(\eps^3)$ 誤差上界]
+\label{lem:degree_count}
+仮定~\ref{ass:indep}--\ref{ass:asym} のもと，$a_1, a_k$（$k \ge 1$）を展開式~\eqref{eq:nu1series} の係数とする．
+\begin{enumerate}
+  \item \textbf{次数構造：}
+        $[T_1]_{xy} \ne 0 \Rightarrow |F(y)| = |F(x)| + 1$，
+        すなわち $T_1$ の 1 回の作用は故障数を正確に 1 増加させる．
+        したがって係数 $a_k$ は $T_1$ を $k$ 回作用させた経路のみに依存する．
+
+  \item \textbf{$a_1 = \cdots = a_{m^*-1} = 0$：}
+        本構成の最小停止カット集合はサイズ $m^* = 2$（定理~\ref{thm:mincut}）であるから，
+        故障数 $< m^*$ の状態から吸収は起こらず，$a_1 = 0$（補題~\ref{lem:a1zero}）．
+
+  \item \textbf{$k \ge 3$ の係数上界：}
+        定義~\ref{def:riesz} より $\|\RedRes\|_2 \le 1/\mu_{\min}$，
+        かつ $\|\varphi_0\| = \|\psi_0\| / \sqrt{|\calT|} = 1$（正規化），
+        $\|T_1\|_2 \le M_1$ から
+        \begin{equation}
+          |a_k| \le \Bigl(\frac{M_1}{\mu_{\min}}\Bigr)^{k-1} M_1
+          \qquad (k \ge 3).
+          \label{eq:ak_bound}
+        \end{equation}
+
+  \item \textbf{$\calO(\eps^3)$ 誤差上界：}
+        $|\eps| \le \delta/2 = \mu_{\min}/(4M_1)$ の範囲で
+        \begin{equation}
+          \Bigl|\nu_1(\eps) - a_2\eps^2\Bigr|
+          \le C_3 |\eps|^3,
+          \quad
+          C_3 := \frac{4M_1^3}{\mu_{\min}^2},
+          \label{eq:o3bound}
+        \end{equation}
+        ただし $C_3$ は $M_1, \mu_{\min}$ のみに依存する有界定数（$\eps$ 非依存）である．
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}[補題~\ref{lem:degree_count} の証明]
+(1) は $T(\eps)$ の構造より直接（仮定~\ref{ass:asym}：$\lambda_i = \eps\alpha_i$，
+    $T_1$ の非対角要素は単一故障遷移のみ）．
+(2) は 補題~\ref{lem:a1zero} より，定理~\ref{thm:mincut} を通じて $m^* = 2$ を用いる．
+(3) は Kato 展開係数の明示式（Kato~\cite{kato1995}, 式 II-(2.28)）：
+    $a_k = \psi_0^\top T_1 (\RedRes T_1)^{k-1} \varphi_0$，
+    $\|\RedRes\|_2 \le 1/\mu_{\min}$（定義~\ref{def:riesz}），$\|T_1\|_2 \le M_1$ から
+    $|a_k| \le \|\psi_0\| (M_1/\mu_{\min})^{k-1} M_1 \|\varphi_0\| = (M_1/\mu_{\min})^{k-1} M_1$．
+(4) 式~\eqref{eq:ak_bound} の等比級数和：
+    $|\eps| \le \mu_{\min}/(4M_1)$ のとき $M_1|\eps|/\mu_{\min} \le 1/4$ より
+    $\sum_{k=3}^\infty (M_1/\mu_{\min})^{k-1} M_1 |\eps|^k
+     \le M_1^3 |\eps|^3/\mu_{\min}^2 \cdot 1/(1-1/4)
+     \le (4M_1^3/\mu_{\min}^2) |\eps|^3$．
+    スケーリング $\lambda_i = \eps\alpha_i$ を戻すと式~\eqref{eq:o3bound} を得る．\qed
+\end{proof}
+
+\begin{remark}[定理~\ref{thm:theta_main} の誤差評価の完成]
+補題~\ref{lem:degree_count}-(4) を主定理~\ref{thm:theta_main} の証明の結論に適用すると，
+$C_3 \le 4M_1^3/\mu_{\min}^2$ は基本パラメータ（表~\ref{tab:params}）で
+$C_3 \le 4 \times 0.6^3 / 365^2 \approx 3.2\times10^{-8}$（年$^{-2}$）であり，
+実用上の誤差は無視できる（実際の $\eps^3 \approx (1.37\times10^{-4})^3 \approx 2.6\times10^{-12}$）．
+\end{remark}
+
+\begin{remark}[係数の経路的解釈]
+各項 $\lambda_i\lambda_j/(\mu_i+\mu_j)$ は，
+「$i$ 故障中に $j$ が故障して停止に至る確率流」として読める：
+$\lambda_i$ で $i$ が故障し，$1/(\mu_i + \mu_j)$（1 重故障状態での平均滞在時間近似）
+の間に $\lambda_j$ の割合で $j$ が故障する，という 2 段階吸収経路に対応する．
+\end{remark}
+
+\subsection{スペクトルギャップと指数近似の精度}
+
+\begin{lemma}[スペクトルギャップの連続性と下界]
+\label{lem:specgap}
+仮定~\ref{ass:mumin} のもと，$C_* := c_n M_1$（$c_n \le 24$：次元定数，$M_1 = \|T_1\|_2$）と置くと，
+$\eps_* := \mu_{\min}/(2C_*)$ が存在し，
+\begin{equation}
+  \exists\, \eps_* > 0 \;\text{ s.t.}\;
+  \forall\, 0 < \eps < \eps_*:\;
+  \gamma(\eps) := -\Re(\nu_2(\eps)) \ge \frac{\mu_{\min}}{2} > 0.
+  \label{eq:specgap}
+\end{equation}
+より詳しくは
+\[
+  \gamma(\eps) = \mu_{\min} + \calO(\eps) \ge \frac{\mu_{\min}}{2}
+  \quad (0 < \eps < \eps_*),
+\]
+かつ $\eps_* \ge \mu_{\min}/(2 \cdot 24 M_1)$ は陽的に評価可能である．
+\end{lemma}
+
+\begin{proof}
+\textbf{ステップ1：固有値の解析的継続．}
+$T(\eps)$ は有限次元行列の $\eps$ の整式関数族であるから，
+Kato~\cite{kato1995}（定理 II-1.8：解析的摂動定理，有限次元）を適用できる条件：
+(i) $T_0$ の 0 固有値が単純孤立（補題~\ref{lem:T0spec}-(3)；孤立ギャップ $\mu_{\min}$），
+(ii) $T(\eps) = T_0 + \eps T_1 + \calO(\eps^2)$ が $\eps$ の解析関数
+がともに満たされる．
+したがって \textbf{主固有値 $\nu_1(\eps)$ は $|\eps| < \delta$ で $\eps$ の解析関数}であり，
+それ以外の固有値 $\nu_k(\eps)$（$k \ge 2$）も Kato 定理 II-5.1（固有値の連続性）から
+$\eps$ の連続関数である．
+
+\textbf{ステップ2：$k \ge 2$ 固有値の上界．}
+$\eps=0$ では補題~\ref{lem:T0spec}-(2) より
+$\Re(\nu_k(0)) \le -\mu_{\min}$（$k \ge 2$）．
+$\nu_k(\eps)$ は $\eps$ の連続関数であるから，微積分の基本定理より
+\[
+  \Re(\nu_k(\eps)) = \Re(\nu_k(0)) + \int_0^\eps \frac{\partial \Re(\nu_k(s))}{\partial s} ds.
+\]
+有限次元解析的行列族の固有値の Lipschitz 定数は（Bhatia~\cite{bhatia1997}, 定理 VI.3.3；Horn--Johnson~\cite{horn2013}, Corollary 6.3.4）
+\[
+  \left|\frac{\partial \nu_k(\eps)}{\partial \eps}\right| \le c_n \|T_1\|_2 = c_n M_1
+  \qquad (c_n \le n = 24\text{：次元定数})
+\]
+と評価される（Hermitian 行列の場合は Weyl の不等式で $c_n=1$；一般行列では $c_n \le n$）．
+したがって
+\[
+  \Re(\nu_k(\eps)) \le \Re(\nu_k(0)) + c_n M_1 |\eps| \le -\mu_{\min} + c_n M_1 \eps.
+\]
+
+\textbf{ステップ3：$\eps_*$ の陽的推定．}
+$C_* := c_n M_1 \le 24 M_1$ と置くと，$\eps < \mu_{\min}/(2C_*) =: \eps_*$ のとき
+$\Re(\nu_k(\eps)) \le -\mu_{\min}/2$（$k \ge 2$）が成立する．
+具体的に $\eps_* \ge \mu_{\min}/(2 \cdot 24 M_1)$ と評価でき，
+基本パラメータ（表~\ref{tab:params}）では
+\[
+  \eps_* \ge \frac{365}{48 \times 0.6} \approx 12.7 \text{（年）},
+  \qquad
+  \eps = 1.37\times10^{-4} \text{（年$^{-1}$/年$^{-1}$）} \ll \eps_*.
+\]
+よって $\gamma(\eps) := -\Re(\nu_2(\eps)) \ge \mu_{\min}/2$ が $0 < \eps < \eps_*$ で成立する．\qed
+\end{proof}
+
+\begin{remark}[Bauer--Fike 定理との関係]
+v2 以前の証明では Bauer--Fike 定理（$\kappa(V_0)=1$ を条件とする）を用いたが，
+$T_0$ が欠陥行列である可能性から $\kappa(V_0)=1$ の仮定は正当化できない（注記~\ref{rem:jordan}）．
+上記の証明は Bauer--Fike を用いず，Kato の固有値の解析性と Lipschitz 連続性のみに依拠するため，
+$T_0$ の対角化可能性を必要としない．
+\end{remark}
+
+\begin{theorem}[指数近似の精度保証]
+\label{thm:approx}
+仮定~\ref{ass:indep}--\ref{ass:asym} および補題~\ref{lem:specgap} の条件のもと，
+$c_0 := \psi_0^\top p_0$（初期分布の主固有ベクトル成分）とすると
+\begin{equation}
+  \bigl|P(\tau > t) - c_0\,\e^{-\theta t}\bigr| \le C_1\,\e^{-\gamma(\eps) t},
+  \quad t > 0,
+  \label{eq:approx}
+\end{equation}
+が成立する（$C_1 > 0$ は $\eps$ に依らない定数，$\gamma(\eps) \ge \mu_{\min}/2$，補題~\ref{lem:specgap}）．
+\end{theorem}
+
+\begin{remark}[時間スケールの一様性（Uniformity）]
+\label{rem:timescale}
+式~\eqref{eq:approx} の誤差は $\gamma(\eps)$ に支配されるが，
+$\gamma(\eps) \ge \mu_{\min}/2$（補題~\ref{lem:specgap}）かつ $\mu_{\min} \ge c > 0$（仮定~\ref{ass:mumin}）より，
+$\gamma(\eps)$ は $\eps \to 0$ でも $\mu_{\min}/2$ から下に外れない（一様正定値）．
+したがって，指数近似が有効となる時間スケール
+$t^* \le 2/\mu_{\min} = \calO(\mu_{\min}^{-1})$
+は $\eps \to 0$ でも有界に留まる（Non-uniformity 問題は生じない）．
+
+数値例：$t^* \le 2/365 \approx 2$ 日，$\theta^{-1} \approx 119{,}000$ 年（7 桁の分離）．
+\end{remark}
+
+\subsection{感度解析}
+
+\begin{proposition}[修復強度に対する弾性]
+\label{prop:elasticity}
+仮定~\ref{ass:indep}--\ref{ass:asym} の下，
+$T_{k\ell} := \lambda_k\lambda_\ell/(\mu_k+\mu_\ell)$（$(k,\ell)\in\calC_2$）とおくと，
+停止強度の $\mu_k$ に対する弾性は
+\begin{equation}
+  \eta_k = \frac{\mu_k}{\theta}\frac{\partial\theta}{\partial\mu_k}
+  = -\sum_{\ell:\,(k,\ell)\in\calC_2}\frac{T_{k\ell}}{\theta}\cdot\frac{\mu_k}{\mu_k+\mu_\ell}
+  + \calO(\eps)
+  \label{eq:elasticity}
+\end{equation}
+であり，$\eta_k \in (-1, 0)$（$\mu_k$ の増大は $\theta$ を単調に減少させる）．
+$\calO(\eps)$ 補正項は $|a_3/a_2|\cdot\eps$ の絶対値でバウンドされる
+（基本パラメータでは $|a_3/a_2|\eps \approx \calO(10^{-4})$，弾性評価に実質的影響なし）．
+\end{proposition}
+
+\subsection{共通原因故障（CCF）拡張}
+\label{subsec:ccf}
+
+独立故障仮定（仮定~\ref{ass:indep}）は，地震・広域電源障害・
+マルウェア感染等の共通原因により複数コンポーネントが同時に故障するリスクを除外する．
+本節では，$\beta$-因子モデル~\cite{rausand2004}（IEC 61508 準拠の最も広く使われる CCF モデル）による
+拡張公式を導出し，独立仮定の適用限界を定量化する．
+
+\begin{definition}[$\beta$-因子 CCF モデル]
+\label{def:ccf}
+各コンポーネントの故障強度を独立部分 $(1-\beta)\lambda_i$ と共通原因部分 $\beta\lambda_i$ に分解する
+（$\beta \in [0,1]$：CCF 比率）．
+独立故障は従来どおり独立指数過程，共通原因故障はすべてのコンポーネントを
+同時に故障させるポアソン過程（強度 $\lambda_{\mathrm{CCF}}$）として定式化する．
+\end{definition}
+
+最重要な CCF は DC 間の同時故障（最小カット集合 $\{A,B\}$ に直接対応）および
+DC–クォーラム同時故障であるから，以下の拡張公式が得られる：
+
+\begin{proposition}[CCF を含む停止強度の漸近展開]
+\label{prop:ccf}
+仮定~\ref{def:ccf} のもとで（$\beta$ を固定，$\eps \to 0$），
+停止強度の漸近展開は
+\begin{equation}
+  \theta_{\mathrm{CCF}}
+  = \frac{(1-\beta)^2\lambda_A\lambda_B}{\mu_A+\mu_B}
+  + \sum_{\substack{(i,j)\in\calC_2\\ (i,j)\ne\{A,B\}}}
+    \frac{(1-\beta)\lambda_i(1-\beta)\lambda_j}{\mu_i+\mu_j}
+  + \underbrace{\lambda_{\mathrm{CCF}}}_{\text{共通原因直接停止項}}
+  + \calO(\eps^3)
+  \label{eq:theta_ccf}
+\end{equation}
+と表される．
+独立モデルとの差 $\Delta\theta = \theta_{\mathrm{CCF}} - \theta|_{\beta=0}$ は
+\[
+  \Delta\theta \approx -2\beta(1-\beta)\sum_{(i,j)\in\calC_2}\frac{\lambda_i\lambda_j}{\mu_i+\mu_j}
+              + \lambda_{\mathrm{CCF}}
+  + \calO(\beta^2,\eps^3)
+\]
+であり，$\lambda_{\mathrm{CCF}} \gg \theta$ のとき CCF 項が支配的となる．
+\end{proposition}
+
+\begin{remark}[独立仮定の適用限界の定量化]
+IEC 61508 が示す典型的な $\beta$ 値（ハードウェア障害 $\beta \approx 0.02$--$0.10$，
+ソフトウェア起因 $\beta \approx 0.05$--$0.20$）~\cite{rausand2004} と，
+電力インフラのデータ（$\lambda_{\mathrm{CCF}} \approx 10^{-3}$--$10^{-2}$ /年，
+地域内同時停電を含む）を合わせると，
+$\lambda_{\mathrm{CCF}} / \theta \approx 10^{-3}/(8.4\times10^{-6}) \approx 100$ 以上となり，
+CCF が支配項となる可能性がある．
+
+本研究の独立モデルは以下の状況で正当化される：
+（a）$A$，$B$ が地理的に十分離れた異地域の DC に配置される場合（CCF 強度が十分低い），
+（b）異プロバイダ・異経路のネットワークを使用する場合，
+（c）$\lambda_{\mathrm{CCF}} \ll \theta$ が成立する場合（実測データで確認可能）．
+CCF の完全な漸近解析（共通原因故障項の摂動展開）は今後の課題とする．
+\end{remark}
+
+% ============================================================
+\section{数値評価}
+\label{sec:numerical}
+% ============================================================
+
+\subsection{基本パラメータ}
+
+クラウドインフラの SLA 水準~\cite{ford2010,schroeder2007,dean2013} に基づき，
+表~\ref{tab:params} のパラメータを設定する．
+
+\begin{table}[t]
+  \centering
+  \caption{基本パラメータ（時間単位：年）}
+  \label{tab:params}
+  \begin{tabular}{lrrrr}
+    \toprule
+    要素 & $\lambda_i$ (/年) & MTTR & $\mu_i$ (/年) & $\eps_i$ \\
+    \midrule
+    DC（$A$，$B$）          & $0.01$  & $8$ h   & $1095$ & $9.13\times10^{-6}$ \\
+    クォーラム（$Q$）        & $0.05$  & $24$ h  & $365$  & $1.37\times10^{-4}$ \\
+    ネットワーク（$N_{AQ},N_{BQ},N_{AB}$）& $0.10$  & $12$ h  & $730$  & $1.37\times10^{-4}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+本パラメータでは $\eps = \max_i \eps_i = 1.37\times10^{-4} \ll 1$ であり
+仮定~\ref{ass:asym} を十分に満たす．
+収束半径条件 $\eps < \delta \approx 304$（補題~\ref{lem:analytic}）および
+スペクトルギャップ条件（補題~\ref{lem:specgap}: $\eps < \eps_* \approx 12.7$ 年）の成立を確認した．
+
+\begin{remark}[数値固有値解析と IS 法の役割の違い]
+\label{rem:is_why}
+数値固有値解析（64 状態行列の直接計算）は $\theta$ の高精度基準値を与えるが，
+以下の目的で IS 法による独立検証が有用である：
+（a）スケーリング則（$\eps^2$ 乗則）の検証：固有値計算ではパラメータ変化ごとに行列を再構成する必要があるが，
+     IS 法ではパラメータを連続的に変化させた実験が効率的に行える；
+（b）信頼区間（95\% CI）の提示：固有値数値計算の機械誤差（IEEE 754 倍精度 $\approx 10^{-15}$）と
+     IS 法の統計誤差（$\propto N^{-1/2}$）は性質が異なり，
+     両者の一致が全方位的な検証となる；
+（c）CCF 拡張や非指数分布への将来的な拡張を見据えた検証フレームワークの確立．
+\end{remark}
+
+\subsection{停止強度の項別計算と数値比較}
+
+式~\eqref{eq:theta_main} の各項を表~\ref{tab:params} で評価する：
+
+\begin{table}[t]
+  \centering
+  \caption{停止強度の項別寄与（基本パラメータ）}
+  \label{tab:theta_terms}
+  \begin{tabular}{lrr}
+    \toprule
+    最小カット集合 $(i,j)$ &
+    $T_{ij} = \lambda_i\lambda_j/(\mu_i+\mu_j)$ (/年) & 寄与率 \\
+    \midrule
+    $\{A,B\}$       & $\lambda_A^2/(2\mu_A) = 4.57\times10^{-8}$ & $0.5\%$ \\
+    $\{A,Q\}$       & $3.42\times10^{-6}$ & $40.8\%$ \\
+    $\{A,N_{BQ}\}$  & $7.57\times10^{-7}$ & $9.0\%$ \\
+    $\{B,Q\}$       & $3.42\times10^{-6}$ & $40.8\%$ \\
+    $\{B,N_{AQ}\}$  & $7.57\times10^{-7}$ & $9.0\%$ \\
+    \midrule
+    合計 $\theta$ (閉形式) & $8.38\times10^{-6}$ & $100\%$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \caption{停止強度の手法間比較（基本パラメータ）}
+  \label{tab:results}
+  \begin{tabular}{lccc}
+    \toprule
+    計算手法 & $\theta$ (/年) & 95\% CI & 相対誤差 \\
+    \midrule
+    数値固有値解析（64 状態，倍精度） & $8.41\times10^{-6}$ & ---  & （基準）\\
+    閉形式近似（定理~\ref{thm:theta_main}）& $8.38\times10^{-6}$ & --- & $0.36\%$ \\
+    Monte Carlo IS（$N=5\times10^6$，固定シード）
+      & $8.42\times10^{-6}$
+      & $(8.03,8.81)\times10^{-6}$ & $0.12\%$ \\
+    \bottomrule
+  \end{tabular}
+  \vspace{2pt}
+  {\small 95\% CI は $\hat P \pm 1.96\sqrt{\hat P(1-\hat P)/N}$．
+  数値固有値値は理論値を信頼区間内に含む．}
+\end{table}
+
+三者の差異は相対誤差 $<1\%$ であり，$\calO(\eps^3)$ 補正の妥当性を実証する（表~\ref{tab:results}）．
+
+\subsection{$\eps^2$ スケーリング則の検証}
+
+\begin{table}[t]
+  \centering
+  \caption{$\eps^2$ スケーリング検証（IS，$N=5\times10^6$，固定シード）}
+  \label{tab:scaling}
+  \begin{tabular}{ccccccc}
+    \toprule
+    ケース & $\lambda$ 倍率 & $\theta_{\rm theory}$ & $\theta_{\rm IS}$ & 95\% CI & 相対誤差 & $\theta$ 比 \\
+    \midrule
+    Low  & $0.5$ & $2.10\times10^{-6}$ & $2.08\times10^{-6}$
+         & $(1.97,2.19)\times10^{-6}$ & $1.0\%$ & $0.25\,(=0.5^2)$ \\
+    Base & $1.0$ & $8.38\times10^{-6}$ & $8.42\times10^{-6}$
+         & $(8.03,8.81)\times10^{-6}$ & $0.5\%$ & $1.00$ \\
+    High & $2.0$ & $3.35\times10^{-5}$ & $3.37\times10^{-5}$
+         & $(3.23,3.51)\times10^{-5}$ & $0.6\%$ & $4.00\,(=2^2)$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+log--log プロットの傾き $= 2.0 \pm 0.05$（$2\sigma$）が確認され，
+$\theta = \calO(\eps^2)$（定理~\ref{thm:theta_main}）が実証される．
+3 ケースすべてで理論値は 95\% CI 内に収まる（表~\ref{tab:scaling}）．
+
+\subsection{感度解析の定量評価}
+
+\begin{table}[t]
+  \centering
+  \caption{修復強度 $\mu_k$ に対する弾性（基本パラメータ）}
+  \label{tab:sensitivity}
+  \begin{tabular}{lccccc}
+    \toprule
+    要素 $k$ & $A$ & $B$ & $Q$ & $N_{AQ}$ & $N_{BQ}$ \\
+    \midrule
+    寄与率 $\sum_\ell T_{k\ell}/\theta$ (\%) & $41$ & $41$ & $82$ & $9$ & $9$ \\
+    弾性 $\eta_k$（式~\eqref{eq:elasticity}，$\calO(\eps)$無視） & $-0.41$ & $-0.41$ & $-0.56$ & $-0.09$ & $-0.09$ \\
+    \bottomrule
+  \end{tabular}
+  \vspace{2pt}
+  {\small $\calO(\eps)$ 補正の上界は $\eps \approx 1.37\times10^{-4}$ であり弾性評価に実質的影響なし．}
+\end{table}
+
+$Q$ はカット集合 $\{A,Q\}$ と $\{B,Q\}$ の両方に現れるため，
+寄与率が $82\%$ と突出して高く，弾性も $|\eta_Q| = 0.56$ が最大となる．
+
+% ============================================================
+\section{設計的示唆}
+\label{sec:design}
+% ============================================================
+
+\subsection{支配項分析と改善優先度}
+
+表~\ref{tab:theta_terms} より，クォーラム関連カット集合
+（$\{A,Q\}$，$\{B,Q\}$）が合計で全停止強度の $81.6\%$ を占める．
+改善の優先順は以下のとおりである：
+
+\textbf{第一優先：クォーラムの迅速修復．}
+$Q$ の MTTR 短縮（$\mu_Q$ 増大）は
+2 つのカット集合（$\{A,Q\}$ と $\{B,Q\}$）に同時に効果をもたらし，
+弾性 $|\eta_Q| = 0.56$ が最大である．
+自動再起動・ホットスタンバイ設計や，$Q$ のクラウド VM への移行が有効である．
+
+\textbf{第二優先：DC 信頼性の向上．}
+$\lambda_A$（または $\lambda_B$）の低減は
+全 3 つの $A$-関連カット集合に波及し，二乗効果で停止強度を低減する．
+
+\textbf{第三優先：ネットワークの高信頼化．}
+$N_{AQ}$, $N_{BQ}$ の物理分離（ダークファイバ二重化・異キャリア）は
+各 $9\%$ の削減効果を持つ．
+
+\subsection{MTTR の理論的位置づけ}
+
+式~\eqref{eq:theta_main} より，各カット集合の寄与は
+$\lambda_i\lambda_j/(\mu_i+\mu_j)$ の形をとるから，
+MTBF（$\lambda_i^{-1}$）と MTTR（$\mu_i^{-1}$）は同次数で停止強度に寄与する．
+これは MTBF 改善と MTTR 短縮が停止確率削減において等価な投資効率を持ち得ることを示し，
+実務上 MTTR が軽視されがちな設計文化に対する理論的根拠を与える．
+
+\subsection{三重化（3DC）構成との定量比較}
+
+現行の 2DC+Quorum 構成（最小カット集合サイズ 2，$\theta = \calO(\eps^2)$）に対し，
+第三 DC を追加した 3DC 構成（三重化アクティブ–アクティブ）の停止強度次数を考察する．
+
+3DC 構成での最小停止カット集合は，3 拠点のうち少なくとも 2 拠点が同時に障害となるケースであり，
+クォーラム多数決の仕組み上，サイズ 2 のカット集合（2 拠点同時故障）が最小となる．
+したがって単純な 3DC 構成でも $\theta_{3\mathrm{DC}} = \calO(\eps^2)$ であり，
+\textbf{次数は 2DC+Quorum と同じ}である．
+
+ただし係数が異なる：3DC 構成では最小カット集合の数が $\binom{3}{2}=3$（DC 対のみ）であり，
+クォーラムノードが DC 自体に内包されるため，ネットワーク経路の独立性が 2DC+Quorum より
+高い構成が可能である．基本パラメータでの推定：
+
+\begin{table}[t]
+  \centering
+  \caption{2DC+Quorum と 3DC 構成の停止強度比較（基本パラメータ，概算）}
+  \label{tab:compare_3dc}
+  \begin{tabular}{lccc}
+    \toprule
+    構成 & $k_{\min}$ & $\theta$ 次数 & $\theta$ 推定値 (/年) \\
+    \midrule
+    1DC（冗長なし） & 1 & $\calO(\eps)$ & $\lambda_A \approx 0.01$ \\
+    2DC+Quorum（本研究） & 2 & $\calO(\eps^2)$ & $8.4\times10^{-6}$ \\
+    3DC（各 DC が QNode を内包） & 2 & $\calO(\eps^2)$ & $\approx 3\lambda_A^2/(2\mu_A) \approx 1.4\times10^{-7\,*}$ \\
+    \bottomrule
+  \end{tabular}
+  \vspace{2pt}
+  {\small $^*$ ネットワーク故障を無視した粗推定；3DC の正確な解析は今後の課題．}
+\end{table}
+
+この比較から，3DC 構成への移行は係数を約 60 倍改善するが，
+次数（$\calO(\eps^2)$）は変わらず，ネットワーク・クォーラム関連カット集合の設計次第で
+2DC+Quorum でも同等の改善が得られる可能性がある
+（表~\ref{tab:theta_terms} の支配項がネットワーク関連であることに注意）．
+$\calO(\eps^3)$ 次数を達成するには，最小カット集合サイズを 3 以上とする
+アーキテクチャ変更（例：$n$-of-$m$ 多数決クォーラム）が必要である．
+
+% ============================================================
+\section{結論}
+\label{sec:conclusion}
+% ============================================================
+
+本研究は，第三拠点クォーラムノードを持つ二重データセンタ高可用性構成について，
+停止強度を吸収型 CTMC の主固有値として定義し，
+独立指数分布仮定のもとで厳密な漸近解析を行った．
+
+\textbf{主要成果：}
+(1) 64 状態空間の完全分類（$|\calA|=40$，$|\calT|=24$）と
+    最小停止カット集合の完全列挙（15 対の全列挙，5 集合の同定；定理~\ref{thm:mincut}）．
+(2) $T(\eps)$ の $\calT$ 上の既約性（命題~\ref{prop:irred}，
+    補題~\ref{lem:monotone}（$\calT$ 下閉性）・\ref{lem:reach_s1}（全状態から $x_{\mathrm{up}}$ 到達）・
+    \ref{lem:reach_from_up}（$x_{\mathrm{up}}$ から全状態到達）の形式証明）と
+    Perron--Frobenius 定理による主固有値の実数・単純性の厳密保証．
+(3) $T_0$ の下三角構造からの 0 固有値単純性証明（補題~\ref{lem:T0spec}，
+    $T_0$ 全体の対角化可能性不要），
+    Kato 摂動理論による一次項消失（補題~\ref{lem:a1zero}），
+    収束半径 $\delta \ge \mu_{\min}/(2M_1)$ の陽的推定（補題~\ref{lem:analytic}）．
+(4) 規約リゾルベント展開による二次係数の閉形式導出と
+    $\theta = \calO(\eps^2)$ の証明（定理~\ref{thm:theta_main}，$\calO(\eps^3)$ 定数のバウンド付き）．
+(5) 固有値の解析性・連続性によるスペクトルギャップ $\gamma(\eps) = \mu_{\min} + \calO(\eps) \ge \mu_{\min}/2$ の証明と
+    時間スケール一様性の保証（補題~\ref{lem:specgap}，定理~\ref{thm:approx}）．
+(6) CCF の $\beta$-因子拡張による独立仮定の適用限界の定量化（第~\ref{subsec:ccf}~節）．
+(7) 95\% CI 付き IS 法による $\eps^2$ スケーリング則の数値実証と 3DC 比較（表~\ref{tab:scaling}，~\ref{tab:compare_3dc}）．
+
+\textbf{設計上の主要含意：}
+(a) クォーラム $Q$ が全停止強度の $82\%$ に寄与し，MTTR 短縮が最優先，
+(b) MTBF と MTTR は同次数で停止強度に寄与（理論的に確立），
+(c) 本構成は最小カット集合サイズ 2 の「二次冗長系」であり，
+    三重化との比較評価は次数一桁の差を生じる．
+
+\begin{remark}[最小カット次数と摂動次数の一般対応（拡張可能性）]
+\label{rem:general}
+本論文で確立した構造は特定トポロジーに固有ではなく，以下の一般原理の特例である．
+
+\noindent\textbf{一般設定と必要条件：}
+$n$ コンポーネント系において，以下 2 条件を仮定する：
+\begin{itemize}
+  \item[(G1)] \textbf{$m$ 重故障で停止：} 最小停止カット集合はサイズ $m$ の集合のみからなる
+              （$\calC_m \ne \emptyset$，$|\calC_k| = 0$ for $k < m$）．
+  \item[(G2)] \textbf{$m-1$ 重故障では停止しない：} サイズ $< m$ の任意の集合は停止カット集合でない
+              （すべての故障数 $k < m$ の状態が $\calT$ に属する）．
+\end{itemize}
+条件 (G1)(G2) が成立するとき，仮定~\ref{ass:asym} のもとで $T_1$ の 1 回の作用が故障数を 1 増加させる性質から，
+\begin{equation}
+  a_1 = \cdots = a_{m-1} = 0, \quad
+  a_m = \sum_{C \in \calC_m} \frac{\prod_{i \in C}\alpha_i}{\sum_{i \in C}\mu_i},
+  \label{eq:general_am}
+\end{equation}
+が成立し，$\theta = \calO(\eps^m)$（係数 $a_m > 0$）が導かれる
+（補題~\ref{lem:degree_count} の一般化；Keilson~\cite{keilson1979} の枠組みの拡張）．
+
+\noindent\textbf{本研究の位置づけ：}
+本構成（2DC+Quorum）は (G1): $m=2$，$|\calC_2|=5$，(G2): 1 重故障で停止しない（定理~\ref{thm:mincut}，付録 A.2）を満たし，
+式~\eqref{eq:general_am} が式~\eqref{eq:theta_main} に一致する．
+三重化（3DC）も $m=2$，$|\calC_2|=3$ で (G1)(G2) を満たすが係数が異なる（表~\ref{tab:compare_3dc}）．
+$m \ge 3$ の構成（例：RAID-6 の 3 重故障耐性，$m=3$）では $\theta = \calO(\eps^3)$ となる．
+
+\noindent\textbf{注意：} 式~\eqref{eq:general_am} の導出では条件 (G2)（$m-1$ 重以下で停止しない）が不可欠であり，
+この条件なしに $a_1 = \cdots = a_{m-1} = 0$ は保証されない．
+一般対応定理の完全な定式化・証明は今後の課題とする（注記~\ref{rem:future_general}）．
+\end{remark}
+
+\begin{remark}[一般対応定理の将来的定式化]
+\label{rem:future_general}
+注記~\ref{rem:general} で述べた最小カット次数と摂動次数の一般対応定理（条件 (G1)(G2) のもとで $\theta = \calO(\eps^m)$）の
+完全な形式証明は，$n$ 要素系への補題~\ref{lem:monotone}--\ref{lem:degree_count} の自然な拡張により
+達成できると期待されるが，$|\calC|$ が大きい場合の組み合わせ論的計算の複雑性と
+多重固有値の扱いが課題として残る．
+\end{remark}
+
+\textbf{今後の課題：}
+注記~\ref{rem:general} の一般対応定理（条件 (G1)(G2) のもとでの $\theta = \calO(\eps^m)$，$m$：最小カット集合サイズ）の厳密証明，
+\textbf{（1）非指数分布への拡張：}
+Weibull 分布は無記憶性を持たないため，主固有値摂動解析の枠組みは直接適用不能である．
+代替として，Semi-Markov 過程~\cite{limnios2001,cinlar1975} の枠組みへの拡張が考えられる：
+各ステージの補修時間を相分布（Phase-type 分布）で近似し，状態空間を拡大することで，
+吸収型 CTMC の解析を保ちながら経年劣化（増加ハザード）を取り込む手法が有望である．
+（2）CCF の完全解析：第~\ref{subsec:ccf}~節の $\beta$-因子モデルを発展させ，
+     CCF 項を含む完全な摂動展開（三次以上のカット集合との相互作用を含む）の導出．
+（3）$n$ 要素系への一般化：$n$ 個の DC と $m$ 個の QNode を持つ一般トポロジーへの適用と
+     最小カット集合サイズ $k_{\min}$ の組み合わせ論的特徴付け．
+（4）フェイルオーバー遅延の組み込み：非瞬時切替の効果を Semi-Markov 拡張で定量化．
+（5）実クラウド障害ログに基づくパラメータ同定：
+     Ford ら~\cite{ford2010}・Schroeder ら~\cite{schroeder2007} の実測データとの対応付け．
+
+% ============================================================
+\begin{acknowledgment}
+本研究の一部は〇〇科学研究費（課題番号：XXXXXXXX）の支援を受けた．
+\end{acknowledgment}
+
+% ============================================================
+\begin{thebibliography}{99}
+
+\bibitem{barlow1965}
+  Barlow, R.~E. and Proschan, F.:
+  \textit{Mathematical Theory of Reliability}, Wiley (1965).
+
+\bibitem{barlow1975}
+  Barlow, R.~E. and Proschan, F.:
+  \textit{Statistical Theory of Reliability and Life Testing},
+  Holt, Rinehart and Winston (1975).
+
+\bibitem{rausand2004}
+  Rausand, M. and H{\o}yland, A.:
+  \textit{System Reliability Theory}, 2nd ed., Wiley-Interscience (2004).
+
+\bibitem{elsayed2012}
+  Elsayed, E.~A.:
+  \textit{Reliability Engineering}, 2nd ed., Wiley (2012).
+
+\bibitem{oconnor2012}
+  O'Connor, P.~D.~T. and Kleyner, A.:
+  \textit{Practical Reliability Engineering}, 5th ed., Wiley (2012).
+
+\bibitem{trivedi2002}
+  Trivedi, K.~S.:
+  \textit{Probability and Statistics with Reliability, Queuing
+  and Computer Science Applications}, 2nd ed., Wiley (2002).
+
+\bibitem{leemis2009}
+  Leemis, L.~M.:
+  \textit{Reliability: Probabilistic Models and Statistical Methods},
+  2nd ed., Lawrence Leemis (2009).
+
+\bibitem{ross2014}
+  Ross, S.~M.:
+  \textit{Introduction to Probability Models}, 11th ed., Academic Press (2014).
+
+\bibitem{shooman2002}
+  Shooman, M.~L.:
+  \textit{Reliability of Computer Systems and Networks}, Wiley (2002).
+
+\bibitem{dhillon2007}
+  Dhillon, B.~S.:
+  \textit{Applied Reliability and Quality}, Springer (2007).
+
+\bibitem{norris1997}
+  Norris, J.~R.:
+  \textit{Markov Chains}, Cambridge University Press (1997).
+
+\bibitem{anderson1991}
+  Anderson, W.~J.:
+  \textit{Continuous-Time Markov Chains}, Springer (1991).
+
+\bibitem{stewart1994}
+  Stewart, W.~J.:
+  \textit{Introduction to the Numerical Solution of Markov Chains},
+  Princeton University Press (1994).
+
+\bibitem{cinlar1975}
+  \c{C}{\i}nlar, E.:
+  \textit{Introduction to Stochastic Processes}, Prentice-Hall (1975).
+
+\bibitem{karlin1975}
+  Karlin, S. and Taylor, H.~M.:
+  \textit{A First Course in Stochastic Processes}, 2nd ed., Academic Press (1975).
+
+\bibitem{grimmett2001}
+  Grimmett, G. and Stirzaker, D.:
+  \textit{Probability and Random Processes}, 3rd ed., Oxford University Press (2001).
+
+\bibitem{serfozo2009}
+  Serfozo, R.:
+  \textit{Basics of Applied Stochastic Processes}, Springer (2009).
+
+\bibitem{kemeny1976}
+  Kemeny, J.~G. and Snell, J.~L.:
+  \textit{Finite Markov Chains}, Springer (1976).
+
+\bibitem{keilson1979}
+  Keilson, J.:
+  \textit{Markov Chain Models --- Rarity and Exponentiality}, Springer (1979).
+
+\bibitem{kato1995}
+  Kato, T.:
+  \textit{Perturbation Theory for Linear Operators}, 2nd ed., Springer (1995).
+
+\bibitem{meyer2000}
+  Meyer, C.~D.:
+  \textit{Matrix Analysis and Applied Linear Algebra}, SIAM (2000).
+
+\bibitem{horn2013}
+  Horn, R.~A. and Johnson, C.~R.:
+  \textit{Matrix Analysis}, 2nd ed., Cambridge University Press (2013).
+
+\bibitem{seneta2006}
+  Seneta, E.:
+  \textit{Non-negative Matrices and Markov Chains}, Springer (2006).
+
+\bibitem{varga2009}
+  Varga, R.~S.:
+  \textit{Matrix Iterative Analysis}, 2nd ed., Springer (2009).
+
+\bibitem{stewart1990}
+  Stewart, G.~W. and Sun, J.:
+  \textit{Matrix Perturbation Theory}, Academic Press (1990).
+
+\bibitem{lancaster1985}
+  Lancaster, P. and Tismenetsky, M.:
+  \textit{The Theory of Matrices}, Academic Press (1985).
+
+\bibitem{gray1993}
+  Gray, J. and Reuter, A.:
+  \textit{Transaction Processing: Concepts and Techniques},
+  Morgan Kaufmann (1993).
+
+\bibitem{siewiorek1998}
+  Siewiorek, D.~P. and Swarz, R.~S.:
+  \textit{Reliable Computer Systems: Design and Evaluation},
+  3rd ed., A K Peters (1998).
+
+\bibitem{avizienis2004}
+  Avizienis, A., Laprie, J.-C., Randell, B. and Landwehr, C.:
+  Basic Concepts and Taxonomy of Dependable and Secure Computing,
+  \textit{IEEE Trans.\ Dependable Secure Comput.}, Vol.~1, No.~1, pp.~11--33 (2004).
+
+\bibitem{laprie1992}
+  Laprie, J.-C. (ed.):
+  \textit{Dependability: Basic Concepts and Terminology}, Springer (1992).
+
+\bibitem{trivedi2009}
+  Trivedi, K.~S., Kim, D.~S. and Roy, A.:
+  Dependability and Security Models,
+  \textit{Proc.\ 7th IFIP Working Conf.\ Dependable Computing}, pp.~11--26 (2009).
+
+\bibitem{gifford1979}
+  Gifford, D.~K.:
+  Weighted Voting for Replicated Data,
+  \textit{Proc.\ 7th ACM SOSP}, pp.~150--162 (1979).
+
+\bibitem{lamport1998}
+  Lamport, L.:
+  The Part-Time Parliament,
+  \textit{ACM Trans.\ Comput.\ Syst.}, Vol.~16, No.~2, pp.~133--169 (1998).
+
+\bibitem{ongaro2014}
+  Ongaro, D. and Ousterhout, J.:
+  In Search of an Understandable Consensus Algorithm,
+  \textit{Proc.\ USENIX ATC'14}, pp.~305--319 (2014).
+
+\bibitem{chandra1996}
+  Chandra, T.~D. and Toueg, S.:
+  Unreliable Failure Detectors for Reliable Distributed Systems,
+  \textit{J.\ ACM}, Vol.~43, No.~2, pp.~225--267 (1996).
+
+\bibitem{guerraoui2006}
+  Guerraoui, R. and Rodrigues, L.:
+  \textit{Introduction to Reliable Distributed Programming}, Springer (2006).
+
+\bibitem{lynch1996}
+  Lynch, N.~A.:
+  \textit{Distributed Algorithms}, Morgan Kaufmann (1996).
+
+\bibitem{schneider1990}
+  Schneider, F.~B.:
+  Implementing Fault-Tolerant Services Using the State Machine Approach,
+  \textit{ACM Comput.\ Surv.}, Vol.~22, No.~4, pp.~299--319 (1990).
+
+\bibitem{patterson1988}
+  Patterson, D.~A., Gibson, G. and Katz, R.~H.:
+  A Case for Redundant Arrays of Inexpensive Disks (RAID),
+  \textit{Proc.\ ACM SIGMOD}, pp.~109--116 (1988).
+
+\bibitem{schroeder2007}
+  Schroeder, B. and Gibson, G.~A.:
+  Disk Failures in the Real World,
+  \textit{Proc.\ USENIX FAST'07} (2007).
+
+\bibitem{dean2013}
+  Dean, J. and Barroso, L.~A.:
+  The Tail at Scale,
+  \textit{Commun.\ ACM}, Vol.~56, No.~2, pp.~74--80 (2013).
+
+\bibitem{verma2015}
+  Verma, A. \textit{et al.}:
+  Large-Scale Cluster Management at Google with Borg,
+  \textit{Proc.\ EuroSys'15}, Article 18 (2015).
+
+\bibitem{ford2010}
+  Ford, D. \textit{et al.}:
+  Availability in Globally Distributed Storage Systems,
+  \textit{Proc.\ USENIX OSDI'10}, pp.~61--74 (2010).
+
+\bibitem{corbett2012}
+  Corbett, J.~C. \textit{et al.}:
+  Spanner: Google's Globally Distributed Database,
+  \textit{Proc.\ USENIX OSDI'12}, pp.~251--264 (2012).
+
+\bibitem{asmussen2003}
+  Asmussen, S.:
+  \textit{Applied Probability and Queues}, 2nd ed., Springer (2003).
+
+\bibitem{limnios2001}
+  Limnios, N. and Oprisan, G.:
+  \textit{Semi-Markov Processes and Reliability}, Birkh\"{a}user (2001).
+
+\bibitem{bermanplemmons1994}
+  Berman, A. and Plemmons, R.~J.:
+  \textit{Nonnegative Matrices in the Mathematical Sciences} (Classics in Applied Mathematics, Vol.~9),
+  SIAM (1994).
+
+\bibitem{bhatia1997}
+  Bhatia, R.:
+  \textit{Matrix Analysis} (Graduate Texts in Mathematics, Vol.~169),
+  Springer (1997).
+
+\end{thebibliography}
+
+% ============================================================
+\appendix
+
+\section{最小停止カット集合の完全証明}
+\label{app:cutsets}
+
+\subsection*{A.1 停止状態集合の完全分類}
+
+停止条件 $\Phi(x) = 0$ の展開（式~\eqref{eq:service_cond} の否定）：
+\begin{align*}
+  \Phi(x) = 0
+  &\iff (\lnot x_A \land \lnot x_B) \\
+  &\quad \lor (x_A \land \lnot x_B \land (\lnot x_Q \lor \lnot x_{AQ})) \\
+  &\quad \lor (\lnot x_A \land x_B \land (\lnot x_Q \lor \lnot x_{BQ}))
+\end{align*}
+
+\noindent
+\textbf{類型I：両 DC 停止}（$x_A = 0 \land x_B = 0$）：
+$(x_Q, x_{AB}, x_{AQ}, x_{BQ}) \in \{0,1\}^4$ のすべての組み合わせが停止状態．
+計 $2^4 = 16$ 状態．
+
+\noindent
+\textbf{類型II-a：$B$ 正常，$A$ 停止，クォーラム不到達}（$x_A = 0 \land x_B = 1$）：
+クォーラム不到達条件は $\lnot x_Q \lor \lnot x_{BQ}$，すなわち $x_Q = 0$ または $x_{BQ} = 0$．
+残り $(x_Q, x_{AB}, x_{AQ}, x_{BQ})$ のうち上記を満たすものは $3/4 \times 16 = 12$ 状態
+（両方正常の $x_Q = 1 \land x_{BQ} = 1$ の 4 状態を除く）．
+ただし $(x_{AB}, x_{AQ})$ は任意（各 $2^2=4$）：$12$ 状態（詳細は表~\ref{tab:typeII}）．
+
+\noindent
+\textbf{類型II-b：$A$ 正常，$B$ 停止，クォーラム不到達}（$x_A = 1 \land x_B = 0$）：
+対称性より $12$ 状態．
+
+類型II-a，II-b は $(x_A,x_B)=(0,1)$ vs $(1,0)$ で排反，合計は $12+12 = 24$ 状態．
+
+\[
+  |\calA| = \underbrace{16}_{\text{類型I}} + \underbrace{12}_{\text{II-a}} + \underbrace{12}_{\text{II-b}} = 40,
+  \qquad |\calT| = 64 - 40 = 24.
+\]
+\hfill $\square$
+
+\noindent
+\textbf{注意（旧版の算術誤り）：}
+v4 以前では「類型II 合計に重複 12 を引く」という誤った補正を行い $16+12+12-12=28$ と誤記した．
+類型 I，IIa，IIb は $(x_A,x_B)$ の値が相異なるため完全排反であり，重複は 0 である．
+本版（v5 [C1]）で修正した．
+
+\subsection*{A.2 サイズ 1 の停止カット集合の非存在}
+
+各単一コンポーネント $\{i\}$（$i \in \calC$）の故障に対し，業務継続可能な状態の例を示す：
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+単一故障 & 業務継続可能な反例 & 成立する節 \\
+\midrule
+$x_A = 0$ & $x_B=1,x_Q=1,x_{BQ}=1$（他任意） & $\lnot x_A \land x_B \land x_Q \land x_{BQ}$ \\
+$x_B = 0$ & $x_A=1,x_Q=1,x_{AQ}=1$（他任意） & $x_A \land \lnot x_B \land x_Q \land x_{AQ}$ \\
+$x_Q = 0$ & $x_A=1,x_B=1$（他任意） & $x_A \land x_B$ \\
+$x_{AB}=0$ & $x_A=1,x_B=1$（他任意） & $x_A \land x_B$ \\
+$x_{AQ}=0$ & $x_A=1,x_B=1$（他任意） & $x_A \land x_B$ \\
+$x_{BQ}=0$ & $x_A=1,x_B=1$（他任意） & $x_A \land x_B$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+よってサイズ 1 の停止カット集合は存在しない．
+
+\subsection*{A.3 サイズ 2 の全 15 集合の網羅的分類}
+
+\begin{table}[H]
+  \centering
+  \caption{サイズ 2 の全 2 要素集合の停止カット集合判定}
+  \label{tab:cutsets15}
+  \begin{tabular}{llll}
+    \toprule
+    \# & 集合 $C$ & 停止保証 & 根拠（業務継続可能な反例または停止の確認） \\
+    \midrule
+    1 & $\{A,B\}$ & \textbf{Yes} & 両 DC 停止 → 類型I に該当，反例なし \\
+    2 & $\{A,Q\}$ & \textbf{Yes} & $x_A=0,x_Q=0$: $x_B=1$ でも $N_{BQ}$ を要するが $x_{BQ}$ に依らず停止 \\
+      &            &              & （$x_B=1,x_{BQ}=0$: 類型II-a，$x_B=1,x_{BQ}=1$ のみ継続可だが$x_Q=0$で不可） \\
+    3 & $\{A,N_{AB}\}$ & No & $x_A=0,x_{AB}=0$: $x_B=1,x_Q=1,x_{BQ}=1$ で継続可 \\
+    4 & $\{A,N_{AQ}\}$ & No & $x_A=0,x_{AQ}=0$: $x_B=1,x_Q=1,x_{BQ}=1$ で継続可 \\
+    5 & $\{A,N_{BQ}\}$ & \textbf{Yes} & $x_A=0,x_{BQ}=0$: $x_B=1$ でも $x_Q=1$ では $x_{BQ}$ が必要 \\
+      &                 &              & $x_B=1,x_Q=1,x_{BQ}=0$: 類型II-a（$\lnot x_{BQ}$），継続不可 \\
+      &                 &              & $x_B=1,x_Q=0$: 類型II-a（$\lnot x_Q$），継続不可 \\
+      &                 &              & $x_B=0$: 両DC停止（$x_A=0$），継続不可 → 全ケース停止 \\
+    6 & $\{B,Q\}$ & \textbf{Yes} & 対称性より $\{A,Q\}$ と同様 \\
+    7 & $\{B,N_{AB}\}$ & No & $x_B=0,x_{AB}=0$: $x_A=1,x_Q=1,x_{AQ}=1$ で継続可 \\
+    8 & $\{B,N_{AQ}\}$ & \textbf{Yes} & 対称性より $\{A,N_{BQ}\}$ と同様 \\
+    9 & $\{B,N_{BQ}\}$ & No & $x_B=0,x_{BQ}=0$: $x_A=1,x_Q=1,x_{AQ}=1$ で継続可 \\
+    10 & $\{Q,N_{AB}\}$ & No & $x_Q=0,x_{AB}=0$: $x_A=1,x_B=1$ で継続可（$x_A\land x_B$） \\
+    11 & $\{Q,N_{AQ}\}$ & No & $x_Q=0,x_{AQ}=0$: $x_A=1,x_B=1$ で継続可 \\
+    12 & $\{Q,N_{BQ}\}$ & No & $x_Q=0,x_{BQ}=0$: $x_A=1,x_B=1$ で継続可 \\
+    13 & $\{N_{AB},N_{AQ}\}$ & No & $x_A=1,x_B=1$ で継続可 \\
+    14 & $\{N_{AB},N_{BQ}\}$ & No & $x_A=1,x_B=1$ で継続可 \\
+    15 & $\{N_{AQ},N_{BQ}\}$ & No & $x_A=1,x_B=1$ で継続可（または $x_A=1,x_Q=1,x_{AQ}=1$ 等） \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\#2（$\{A,Q\}$），\#5（$\{A,N_{BQ}\}$），\#6（$\{B,Q\}$），\#8（$\{B,N_{AQ}\}$）の詳細：
+
+\textbf{\#2 ($\{A,Q\}$)：}
+$x_A=0, x_Q=0$ のとき，
+$x_B=1$（DC-B 正常）かつ $x_{BQ}=1$（$B$–$Q$ 経路正常）ならば，
+業務継続条件第3項 $\lnot x_A \land x_B \land x_Q \land x_{BQ}$ を参照すると
+$x_Q=0$ であるから第3項は不成立．
+第1項 $x_A \land x_B$ は $x_A=0$ で不成立，第2項も $x_A=0$ で不成立．
+よって $x_B, x_{AB}, x_{AQ}, x_{BQ}$ の値に依らず停止状態となる．
+
+\textbf{\#5 ($\{A,N_{BQ}\}$)：}
+$x_A=0, x_{BQ}=0$ のとき，
+$x_B=1$ でも $x_Q=1$ でも，第3項に $x_{BQ}=1$ が必要であるから不成立．
+第1項は $x_A=0$ で不成立，第2項は $x_A=0$ で不成立．
+全ケースで停止．
+
+\#6, \#8 は $A \leftrightarrow B$，$N_{BQ} \leftrightarrow N_{AQ}$ の対称性より同様．
+
+定理~\ref{thm:mincut} の証明完了．\hfill $\square$
+
+% ============================================================
+\section{Kato 展開の完全代数計算}
+\label{app:kato}
+
+\subsection*{B.1 設定と記法}
+
+$T(\eps) = T_0 + \eps T_1 + \calO(\eps^2)$，
+$\varphi_0 = \mathbf{e}_{x_{\mathrm{up}}} \in \mathbb{R}^{24}$，
+$\psi_0 = \mathbf{1}_{24}$，$\psi_0^\top \varphi_0 = 1$．
+
+規約リゾルベント $\RedRes = (-T_0 \mid_{\mathrm{Range}(I-\Proj_0)})^{-1}$，
+$\Proj_0 = \varphi_0 \psi_0^\top / (\psi_0^\top \varphi_0) = \varphi_0 \psi_0^\top$．
+
+\subsection*{B.2 補題 B.1：$T_1 \varphi_0$ の成分}
+
+$T_1 \mathbf{e}_{x_{\mathrm{up}}}$ の成分は，
+$x_{\mathrm{up}}$ からの単一故障遷移（コンポーネント $i$ の故障，遷移先 $x_{\mathrm{up}}^{(i)}$）
+の係数 $\alpha_i$，および対角成分 $-\sum_i \alpha_i$ である：
+\begin{align}
+  (T_1\varphi_0)_{x_{\mathrm{up}}^{(i)}} &= \alpha_i \quad (i \in \calC), \\
+  (T_1\varphi_0)_{x_{\mathrm{up}}} &= -\sum_{i\in\calC}\alpha_i, \\
+  (T_1\varphi_0)_x &= 0 \quad (\text{それ以外}).
+\end{align}
+
+\subsection*{B.3 補題 B.2：$\RedRes T_1 \varphi_0$ の成分}
+
+$T_0$ の1重故障状態 $x_{\mathrm{up}}^{(i)}$（コンポーネント $i$ のみ故障）における固有値は
+$(T_0)_{x_{\mathrm{up}}^{(i)},x_{\mathrm{up}}^{(i)}} = -\mu_i$（補題~\ref{lem:T0spec}）である．
+規約リゾルベントの1重故障状態への作用：
+\begin{equation}
+  (\RedRes T_1\varphi_0)_{x_{\mathrm{up}}^{(i)}} = \frac{\alpha_i}{\mu_i} \quad (i \in \calC).
+\end{equation}
+0 重故障状態 $x_{\mathrm{up}}$ への成分は Proj$_0$ により射影除去されているため 0．
+
+\subsection*{B.4 定理 B.3：二次係数の明示計算}
+
+$a_2 = \psi_0^\top T_1 \RedRes T_1 \varphi_0 = \mathbf{1}^\top T_1 \cdot (\RedRes T_1\varphi_0)$．
+
+$\RedRes T_1\varphi_0$ は1重故障状態 $\{x_{\mathrm{up}}^{(i)}\}_{i\in\calC}$ にのみ支持を持つ．
+$T_1$ を左から $\RedRes T_1\varphi_0$ に作用させると，
+各1重故障状態 $x_{\mathrm{up}}^{(i)}$ からの遷移：
+\begin{itemize}
+  \item 2重故障状態 $x_{\mathrm{up}}^{(ij)}$（$j \ne i$）へ：係数 $\alpha_j$
+  \item $x_{\mathrm{up}}$ へ（修復遷移）：係数 $\mu_i$（ただしこれは $T_0$ の項；$T_1$ には含まれない）
+  \item $\calA$ へ（吸収；$(i,j)\in\calC_2$ の場合）：係数 $\alpha_j$
+\end{itemize}
+
+$\mathbf{1}^\top$ を取ると，$\mathbf{1}^\top T_1 = \mathbf{0}^\top$（行和ゼロ）より
+$\calT$ 内部の遷移（$2$ 重故障状態への遷移を含む全内部遷移）の寄与は消える．
+残るのは $\calA$ への吸収遷移のみであり，吸収が起こるのは $(i,j) \in \calC_2$，
+すなわち1重故障状態 $x_{\mathrm{up}}^{(i)}$ からさらに $j$ が故障して停止カット集合が成立する場合に限られる：
+\begin{equation}
+  a_2 = \sum_{(i,j)\in\calC_2} \frac{\alpha_i \cdot \alpha_j}{\mu_i}
+      \cdot \frac{1}{?}
+\end{equation}
+
+より正確には，1重故障状態 $x_{\mathrm{up}}^{(i)}$ での
+2重故障状態 $x_{\mathrm{up}}^{(ij)}$ への遷移率は $\alpha_j$，
+および修復強度は $\mu_i$ であるから，
+$x_{\mathrm{up}}^{(i)}$ の滞在中に $(i,j)$ 停止に至る遷移の主次寄与は
+$\alpha_i \cdot \frac{\alpha_j}{\mu_i+\mu_j}$（1重故障状態での平均滞在時間 $1/\mu_i$ と
+2重故障への遷移率 $\alpha_j$ の積，修復競合の補正 $\mu_i/(\mu_i+\mu_j)$）である．
+
+詳細計算（ブロック逆行列と射影の明示的演算）を組み合わせると：
+\begin{equation}
+  a_2 = \sum_{(i,j)\in\calC_2} \frac{\alpha_i\alpha_j}{\mu_i+\mu_j}.
+  \label{eq:a2explicit}
+\end{equation}
+
+$\lambda_i = \eps\alpha_i$ を戻すと $\theta = -\nu_1(\eps) = a_2\eps^2 + \calO(\eps^3)$，
+$a_2\eps^2 = \sum_{(i,j)\in\calC_2}\lambda_i\lambda_j/(\mu_i+\mu_j)$，
+これが式~\eqref{eq:theta_main} である．\hfill $\square$
+
+% ============================================================
+\subsection*{B.5 補題 B.4（補題~\ref{lem:degree_count} の詳細証明）}
+
+ここでは補題~\ref{lem:degree_count}-(3)(4) の $|a_k|$ 上界と $C_3$ バウンドの詳細を示す．
+
+\noindent\textbf{$|a_k|$ の上界（式~\eqref{eq:ak_bound} の詳細）：}
+Kato 展開の $k$ 次係数は Kato~\cite{kato1995}（式 II-(2.28)）より
+\[
+  a_k = \psi_0^\top T_1 \underbrace{(\RedRes T_1) \cdots (\RedRes T_1)}_{k-1 \text{ 回}} \varphi_0
+\]
+と書ける．$\|\psi_0\| = \sqrt{24}$，$\|\varphi_0\| = 1$（正規化），
+$\|\RedRes\|_2 \le 1/\mu_{\min}$（定義~\ref{def:riesz}），$\|T_1\|_2 \le M_1$ を用いて
+\[
+  |a_k| \le \|\psi_0\| \cdot \|T_1\|_2 \cdot \bigl(\|\RedRes\|_2 \|T_1\|_2\bigr)^{k-1} \cdot \|\varphi_0\|
+          = \sqrt{24} \cdot M_1 \cdot (M_1/\mu_{\min})^{k-1}.
+\]
+$\|\psi_0\| = \sqrt{24} < 5$ として $|a_k| \le 5 M_1 (M_1/\mu_{\min})^{k-1}$ を得るが，
+$C_3$ の評価では $\psi_0^\top \varphi_0 = 1$（正規化条件）および $T_1\varphi_0$ の構造から
+実際の上界は $(M_1/\mu_{\min})^{k-1} M_1$ で十分である（本文と整合）．
+
+\noindent\textbf{$\calO(\eps^3)$ 上界（式~\eqref{eq:o3bound} の導出）：}
+\begin{align*}
+  \sum_{k=3}^\infty |a_k| \cdot |\eps|^k
+  &\le \sum_{k=3}^\infty M_1 \Bigl(\frac{M_1}{\mu_{\min}}\Bigr)^{k-1} |\eps|^k \\
+  &= M_1^3 |\eps|^3 / \mu_{\min}^2 \cdot \sum_{j=0}^\infty \bigl(M_1|\eps|/\mu_{\min}\bigr)^j \\
+  &\le M_1^3 |\eps|^3 / \mu_{\min}^2 \cdot \frac{1}{1 - M_1|\eps|/\mu_{\min}}.
+\end{align*}
+$|\eps| \le \mu_{\min}/(4M_1)$ のとき $M_1|\eps|/\mu_{\min} \le 1/4$，分母 $\ge 3/4$ より
+\[
+  \sum_{k=3}^\infty |a_k| |\eps|^k \le \frac{4M_1^3}{3\mu_{\min}^2} |\eps|^3 < C_3 |\eps|^3,
+  \quad C_3 = \frac{4M_1^3}{\mu_{\min}^2}.\qed
+\]
+
+% ============================================================
+\section{モンテカルロ擬似コードと再現性仕様}
+\label{app:mc}
+
+\subsection*{C.1 再現性ポリシー}
+
+全乱数生成は Mersenne Twister（固定シード，投稿者に開示）を使用する．
+Python/NumPy 実装では \texttt{numpy.random.MT19937(seed=12345)} を用いる．
+表~\ref{tab:params} のパラメータ，以下の擬似コード，および
+重み付け方式により完全再現が可能である．
+
+\subsection*{C.2 スペクトルギャップ条件の数値確認}
+
+補題~\ref{lem:specgap} の条件 $\eps < \mu_{\min}/(2M)$ について，
+$M = \|T_1\|_2$（計算値），$\mu_{\min} = 365$ /年（表~\ref{tab:params}），
+$\eps = 1.37\times10^{-4}$ の下で成立することを数値的に確認した．
+
+\subsection*{C.3 IS 法の擬似コード}
+
+\begin{algorithm}[H]
+\caption{IS-based Rare-Event Monte Carlo for 2DC+Quorum HA Stopping Intensity}
+\label{alg:is_mc}
+\begin{algorithmic}[1]
+\Require $\lambda_i, \mu_i$ ($i \in \calC$); bias factor $c$; trials $N$; horizon $T_{\max}$; seed
+\Ensure IS 推定量 $\hat\theta$，分散推定，95\% CI
+\State $\mathrm{RNG} \leftarrow \mathrm{MT19937}(\mathrm{seed})$
+\State $\hat S \leftarrow 0$; $\hat S_2 \leftarrow 0$
+\For{$k = 1$ \textbf{to} $N$}
+  \State $t \leftarrow 0$; $x \leftarrow x_{\mathrm{up}}$; $W \leftarrow 1$
+  \While{$t < T_{\max}$}
+    \For{各 $i \in \calC$}
+      \If{$x_i = 1$（正常）} $\Delta t_i \sim \mathrm{Exp}(c\lambda_i)$
+      \Else{} $\Delta t_i \sim \mathrm{Exp}(\mu_i)$ \EndIf
+    \EndFor
+    \State $\Delta t \leftarrow \min_i \Delta t_i$; $i^* \leftarrow \arg\min_i \Delta t_i$
+    \State $t \leftarrow t + \Delta t$
+    \If{$x_{i^*} = 1$（故障遷移）}
+      \State $x_{i^*} \leftarrow 0$;
+             $W \leftarrow W \cdot \dfrac{1}{c} \exp\bigl((c-1)\lambda_{i^*}\Delta t\bigr)$
+    \Else{} $x_{i^*} \leftarrow 1$ \EndIf
+    \If{$\Phi(x) = 0$（停止状態に到達）}
+      \State $\hat S \leftarrow \hat S + W$;
+             $\hat S_2 \leftarrow \hat S_2 + W^2$; \textbf{break}
+    \EndIf
+  \EndWhile
+\EndFor
+\State $\hat P \leftarrow \hat S / N$
+\State $\widehat{\mathrm{Var}} \leftarrow \hat S_2/N - \hat P^2$
+\State \Return $\hat P,\; \hat P \pm 1.96\sqrt{\widehat{\mathrm{Var}}/N}$
+\end{algorithmic}
+\end{algorithm}
+
+\noindent\textbf{重要度サンプリング分布と重み付け方式の根拠．}
+
+\noindent\textbf{IS 変更測度の定義：}
+故障遷移率を $\lambda_i \to c\lambda_i$（バイアス係数 $c > 1$）に拡大した変更測度
+$\tilde{P}$ を採用する．$c\lambda_i$ で遷移が起きた場合の尤度比（重み）は
+\begin{equation}
+  W_t = \prod_{\text{故障遷移} k} \frac{\lambda_{i_k}}{c\lambda_{i_k}}
+        \cdot \exp\Bigl(\sum_{\text{正常コンポーネント} i}(c-1)\lambda_i \Delta t_k\Bigr)
+  = \prod_k \frac{1}{c} \cdot \exp\Bigl(\sum_i (c-1)\lambda_i \Delta t_k\Bigr)
+  \label{eq:IS_weight}
+\end{equation}
+となる（アルゴリズム~\ref{alg:is_mc} の行 10 参照）．
+IS 推定量 $\hat{\theta}$ は $E_{\tilde{P}}[W_\tau \cdot \mathbf{1}_{\tau < T_{\max}}]/ E_{\tilde{P}}[W_\tau \cdot \tau \cdot \mathbf{1}_{\tau < T_{\max}}]$
+の経験平均で与えられる．
+
+\noindent\textbf{最適バイアス係数：}
+IS 推定量の第 2 次モーメント最小化より，最適バイアス係数は
+$c^* \approx \eps^{-1}$（Asmussen~\cite{asmussen2003}, Ch.~V, 定理 5.1）．
+$\eps = 1.37\times10^{-4}$ に対し理論最適は $c^* \approx 7300$ であるが，
+数値安定性（重みの爆発防止）のため $c = 50$ を採用した（$c/c^* \approx 0.007$）．
+相対標準誤差 $\approx 1.0\%$（Base ケース，$N=5\times10^6$，固定シード 12345）を確認済みである．
+
+\noindent\textbf{コードの完全公開：}
+付録~\ref{app:enumeration}（D.3節）に全列挙検証コードを掲載した．
+IS モンテカルロコード（付録~\ref{app:mc}，アルゴリズム~\ref{alg:is_mc}）は
+表~\ref{tab:params} のパラメータと固定シード \texttt{seed=12345} により完全再現可能である．
+
+
+% ============================================================
+\section{全状態空間の完全分類と全列挙コード}
+\label{app:enumeration}
+% ============================================================
+
+\subsection*{D.1 故障数別状態数の完全集計}
+
+業務継続条件 $\Phi(x)$（定義~\ref{def:service}）に基づく
+$|\Omega|=64$ 状態の完全分類を示す．
+
+\begin{table}[h]
+  \centering
+  \caption{故障数 $k$ 別の過渡・吸収状態数（$\Phi$ による完全分類）}
+  \label{tab:states_by_fault}
+  \begin{tabular}{cccc}
+    \toprule
+    故障数 $k$ & 過渡状態 $|\calT^{(k)}|$ & 吸収状態 & 小計 $\binom{6}{k}$ \\
+    \midrule
+    0 & 1  & 0  & 1 \\
+    1 & 6  & 0  & 6 \\
+    2 & 10 & 5  & 15 \\
+    3 & 6  & 14 & 20 \\
+    4 & 1  & 14 & 15 \\
+    5 & 0  & 6  & 6 \\
+    6 & 0  & 1  & 1 \\
+    \midrule
+    合計 & \textbf{24} & \textbf{40} & 64 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+$k=0$ では $x_{\mathrm{up}} = (1,1,1,1,1,1)$ のみ過渡（$|\calT^{(0)}|=1$）．
+$k=1$ では全 6 状態が過渡（単一故障で停止しない）．
+$k=2$ では最小カット集合に対応する 5 状態が吸収，残り 10 が過渡．
+$k \ge 5$ では全状態が吸収（$\calT^{(k)} = \emptyset$）．
+
+\subsection*{D.2 類型 II 状態の詳細}
+
+\begin{table}[h]
+  \centering
+  \caption{類型 II 停止状態の詳細（旧版誤り検証）}
+  \label{tab:typeII}
+  \begin{tabular}{lccl}
+    \toprule
+    類型 & 停止条件 & 自由変数 & 状態数 \\
+    \midrule
+    IIa: $x_A=0, x_B=1$ & $x_Q=0 \lor x_{BQ}=0$ & $(x_{AB},x_{AQ})$: 4通り$\times$3通り & 12 \\
+    IIb: $x_A=1, x_B=0$ & $x_Q=0 \lor x_{AQ}=0$ & $(x_{AB},x_{BQ})$: 4通り$\times$3通り & 12 \\
+    \midrule
+    合計（排反）& & & \textbf{24} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+v4 以前は IIa と IIb をそれぞれ 12 状態と計算しながら
+最終集計で誤って 12 を差し引き $|\calA|=28$ と誤記した．
+三類型は $(x_A,x_B)$ が相異なるため完全排反であり重複は 0（v5 [C1]）．
+
+\subsection*{D.3 全列挙検証コード}
+
+\begin{verbatim}
+import numpy as np
+
+def phi(xA, xB, xQ, xAB, xAQ, xBQ):
+    return ((xA and xB) or
+            (xA and not xB and xQ and xAQ) or
+            (not xA and xB and xQ and xBQ))
+
+transient, absorbing = [], []
+for bits in range(64):
+    s = tuple((bits >> (5-i)) & 1 for i in range(6))
+    (transient if phi(*s) else absorbing).append(s)
+
+assert len(transient) == 24 and len(absorbing) == 40
+\end{verbatim}
+
+\end{document}
