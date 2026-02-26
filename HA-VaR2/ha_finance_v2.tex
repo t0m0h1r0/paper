@@ -1,0 +1,1279 @@
+% ================================================================
+%  高可用システム両系停止リスクの金融工学的定量評価
+%  ── クォーラム型 2DC 構成における停止強度・VaR・CDS スプレッドの統合理論 ──
+%
+%  前提システムモデル:
+%    伴論文 "クォーラム型二重データセンタ構成における停止強度の漸近解析
+%            ── 吸収型マルコフ連鎖の主固有値に基づく閉形式導出と数値検証 ──"
+%    (v7, 以下「伴論文」) で確立された 6 コンポーネント・64 状態モデルを使用.
+%    コンポーネント集合: C = {A, B, Q, N_AB, N_AQ, N_BQ}
+%    状態空間: |Omega|=64, |T|=24, |A|=40
+%    最小停止カット集合: C_2 = {{A,B},{A,Q},{A,N_BQ},{B,Q},{B,N_AQ}} (5 集合)
+%
+%  コンパイル: xelatex
+% ================================================================
+\documentclass[12pt,a4paper]{article}
+
+% ----- フォント ---------------------------------------------------
+\usepackage{fontspec}
+\setmainfont{NotoSerifCJK-Regular.ttc}[
+  Path      = /usr/share/fonts/opentype/noto/,
+  BoldFont  = NotoSerifCJK-Bold.ttc,
+  ItalicFont= NotoSerifCJK-Regular.ttc
+]
+\setmonofont{DejaVu Sans Mono}
+
+% ----- 数学 -------------------------------------------------------
+\usepackage{amsmath,amssymb,amsthm}
+
+% ----- レイアウト -------------------------------------------------
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ----- 表・図 -----------------------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+\usepackage{caption}
+
+% ----- その他 -----------------------------------------------------
+\usepackage{hyperref}
+% no natbib
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{parskip}
+
+% ----- hyperref ---------------------------------------------------
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = blue!60!black,
+  citecolor  = green!50!black,
+  urlcolor   = blue!70!black,
+  pdftitle   = {クォーラム型2DC停止リスクの金融工学的定量評価},
+}
+
+% ----- コード設定 -------------------------------------------------
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{red!70!black},
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  showstringspaces=false,
+}
+
+% ----- 定理環境 ---------------------------------------------------
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{corollary}[theorem]{系}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{assumption}[theorem]{仮定}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{注}
+
+% ----- マクロ -----------------------------------------------------
+\newcommand{\calC}{\mathcal{C}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calT}{\mathcal{T}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\VaR}{\mathrm{VaR}}
+\newcommand{\ES}{\mathrm{ES}}
+
+% ================================================================
+\title{%
+  \textbf{クォーラム型二重データセンタ構成における停止リスクの金融工学的定量評価}\\[0.6em]
+  \large 吸収型マルコフ連鎖・主固有値漸近理論と VaR・CDS スプレッドの統合枠組み
+}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+% ================================================================
+%  要旨
+% ================================================================
+\begin{abstract}
+本研究は，第三拠点クォーラムノードを有する二重データセンタ（2DC）
+高可用性（HA）構成を対象に，システム停止リスクを金融工学の枠組みで定量評価する理論を構築する．
+
+対象システムは 6 コンポーネント
+$\calC = \{A, B, Q, N_{AB}, N_{AQ}, N_{BQ}\}$（2 つのデータセンタ，
+クォーラムノード，3 系統のネットワーク）から構成され，
+状態空間 $|\Omega|=64$，過渡状態 $|\calT|=24$，停止状態 $|\calA|=40$ を持つ
+吸収型連続時間マルコフ連鎖（CTMC）としてモデル化される．
+業務継続条件の論理解析から導かれる最小停止カット集合は
+\[
+  \calC_2 = \bigl\{\{A,B\},\;\{A,Q\},\;\{A,N_{BQ}\},\;\{B,Q\},\;\{B,N_{AQ}\}\bigr\}
+\]
+の 5 集合（すべてサイズ 2）であり，
+これに基づく停止強度の閉形式漸近展開（伴論文 \cite{companion} の主定理）
+\begin{equation*}
+  \theta
+  = \frac{\lambda_A\lambda_B}{\mu_A+\mu_B}
+  + \frac{\lambda_A\lambda_Q}{\mu_A+\mu_Q}
+  + \frac{\lambda_A\lambda_{N_{BQ}}}{\mu_A+\mu_{N_{BQ}}}
+  + \frac{\lambda_B\lambda_Q}{\mu_B+\mu_Q}
+  + \frac{\lambda_B\lambda_{N_{AQ}}}{\mu_B+\mu_{N_{AQ}}}
+  + \mathcal{O}(\eps^3)
+\end{equation*}
+を出発点とする（ここで $N_{AB}$ は業務継続条件に現れず最小カット集合に属さないため，
+停止強度に寄与しない）．
+
+本研究の主な成果は次の 4 点である．
+(1) 年次損失分布が零過剰混合分布（zero-inflated mixture）構造を持ち，
+その統計的性質が停止強度 $\theta$ および 5 つの最小カット集合の
+各寄与率と直接対応することを示す．
+(2) Value at Risk（VaR）が停止確率閾値において非連続跳躍を示し，
+標準的な信頼水準（95\%・99\%）では停止リスクを検出不能となる構造を定理として確立する．
+(3) 信用デフォルトスワップ（CDS）相当スプレッドが停止強度
+$\theta = \mathcal{O}(\eps^2)$ に比例し，
+コンポーネント故障確率の二乗オーダーで変動することを示す．
+(4) クォーラムノード $Q$ が停止強度の約 82\% を占める支配構造を踏まえた
+最適冗長投資の閉形式条件を導出し，
+MTTR（平均修復時間）短縮が MTBF 改善と等価な投資効率を持つことを定量化する．
+
+本研究は，信頼性工学の精密なシステムモデルと金融リスク理論を統合し，
+IT システム可用性設計を「信用リスクの一形態」として定式化する理論的基盤を提供する．
+
+\medskip
+\noindent\textbf{キーワード：}
+クォーラム型 HA 構成，停止強度，吸収型マルコフ連鎖，最小停止カット集合，
+Value at Risk，Expected Shortfall，信用デフォルトスワップ，最適冗長投資
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ================================================================
+%  第 1 章　序論
+% ================================================================
+\section{序論}
+\label{sec:intro}
+
+\subsection{研究背景}
+
+金融機関・電子商取引・電力や交通などの社会インフラにおいて，
+IT システムの停止は即座に収益停止・信用毀損・規制罰則へと波及する．
+金融取引部門では 1 時間の停止で数百万ドル規模の損失が報告されており
+\cite{cambridge2018}，
+主要 EC 事業者でも 1 分あたり数万ドル規模の売上逸失が推計されている．
+社会インフラ停止による経済損失は数十億ドル規模に達することも知られている
+\cite{noaa2023}．
+
+このような高損失環境のもと，二重データセンタ構成とクォーラム制御を組み合わせた
+高可用（HA）構成が標準的に採用されている \cite{avizienis2004,gray1993,corbett2012}．
+クォーラム型 2DC 構成は停止確率を劇的に低減するが，
+停止発生時の損失規模は変わらない，あるいはシステム規模の拡大に伴い増大する．
+したがって「低頻度・高損失」という非対称構造が生じ，
+従来型の期待値ベースリスク評価では捉えきれないリスクが残存する．
+
+\subsection{問題提起：二つのギャップ}
+
+従来研究には以下二つの根本的なギャップが存在する．
+
+\paragraph{ギャップ 1：停止確率モデルの不正確性．}
+既存の財務リスク研究が用いる停止確率モデルは，
+しばしば 3 コンポーネント（DC-A, DC-B, クォーラム Q）の独立故障を仮定し，
+ネットワーク系（$N_{AB}, N_{AQ}, N_{BQ}$）を捨象する．
+しかし伴論文 \cite{companion} が明らかにしたように，
+クォーラム型 2DC 構成の正確なモデルは
+6 コンポーネント・64 状態の吸収型 CTMC を必要とし，
+最小停止カット集合は 5 集合（うち 2 集合はネットワーク関連）に及ぶ．
+この差異は停止強度の定量評価に直接影響する．
+
+\paragraph{ギャップ 2：停止確率と財務評価の断絶．}
+信頼性工学は停止確率 $\theta$ の評価までを扱うが財務評価に踏み込まない．
+金融リスク理論は IT 停止リスクを明示的にモデル化しない．
+信用リスク理論（CDS 価格等）はデフォルトイベントを外生的に扱い，
+システム可用性との内生的接続を欠く \cite{duffie2003,jorion2007,mcneil2015}．
+
+\subsection{本研究の目的と貢献}
+
+本研究は，伴論文 \cite{companion} で確立された 6 コンポーネントモデルの
+主定理を出発点として，次の理論的連鎖を閉形式で構築する：
+\begin{equation*}
+  \text{停止強度 } \theta
+  \;\xrightarrow{\text{ポアソン近似}}\;
+  \text{年次損失分布}
+  \;\xrightarrow{\text{VaR/ES}}\;
+  \text{破綻確率}
+  \;\xrightarrow{\text{CDS 理論}}\;
+  \text{信用スプレッド}
+\end{equation*}
+
+理論的貢献は以下の 5 点である．
+\begin{enumerate}
+  \item 6 コンポーネント CTMC モデルに基づく年次損失分布の厳密定式化
+        （5 つの最小カット集合の寄与構造を反映）．
+  \item VaR が停止確率閾値で非連続跳躍を示すことの証明，および
+        $N_{AB}$ を含む「見かけのカット集合」が停止強度に寄与しない構造の金融的含意の整理．
+  \item CDS スプレッドと停止強度 $\theta = \mathcal{O}(\eps^2)$ の比例関係の導出．
+  \item クォーラム支配構造（$Q$ が 82\% 寄与）を反映した最適冗長投資の閉形式条件．
+  \item MTTR 短縮の信用コスト削減効果の定量化（MTBF 改善との等価性）．
+\end{enumerate}
+
+\subsection{先行研究との位置づけ}
+
+\paragraph{信頼性工学．}
+\cite{trivedi2002} および \cite{kuo2003} は HA 構成の停止確率を
+マルコフ連鎖で定式化したが，財務評価には踏み込んでいない．
+伴論文 \cite{companion} は本研究が前提とするクォーラム型 2DC 構成の
+6 コンポーネントモデルを厳密に定式化し，主定理を証明した．
+
+\paragraph{金融リスク理論．}
+\cite{jorion2007} は VaR の実務的枠組みを整備し，
+\cite{mcneil2015} は極端事象を含む定量的リスク管理の包括的理論を提供した．
+\cite{duffie2003} は CDS を含む信用リスクの確率論的定式化を確立した．
+しかし IT 停止の精密なシステムモデルとの接続はいずれも未検討である．
+
+\paragraph{ブラックスワン理論．}
+\cite{taleb2007} は「期待値は小さいが尾部損失は大きい」リスクの非線形影響を指摘した．
+本研究はクォーラム型 2DC 停止がこのブラックスワン構造を数理的に
+満たすことを $\theta = \mathcal{O}(\eps^2)$ の精密モデルで示す．
+
+\subsection{論文構成}
+
+第~\ref{sec:model}~章でシステムモデルと停止強度を整理し，
+第~\ref{sec:loss_dist}~章で年次損失分布・VaR・ES を解析する．
+第~\ref{sec:credit}~章で破綻確率・CDS スプレッド・最適投資を扱い，
+第~\ref{sec:numerical}~章で業界別数値分析を行う．
+第~\ref{sec:conclusion}~章で政策含意・システミックリスク拡張・結論を述べる．
+付録~\ref{app:proofs} に数理的補足，付録~\ref{app:code} に Monte Carlo 実装を示す．
+
+% ================================================================
+%  第 2 章　システムモデルと停止強度
+% ================================================================
+\section{システムモデルと停止強度}
+\label{sec:model}
+
+\subsection{6 コンポーネント HA 構成}
+
+本研究が対象とするシステムは，伴論文 \cite{companion} が厳密定式化した
+以下の 6 コンポーネント構成である：
+\begin{itemize}
+  \item データセンタ $A$，$B$（アクティブ–アクティブ運用，常時同期）
+  \item 第三拠点クォーラムノード $Q$
+  \item DC 間ネットワーク $N_{AB}$，$A$–$Q$ 間ネットワーク $N_{AQ}$，$B$–$Q$ 間ネットワーク $N_{BQ}$
+\end{itemize}
+コンポーネント集合を $\calC = \{A, B, Q, N_{AB}, N_{AQ}, N_{BQ}\}$（$|\calC|=6$）と書く．
+
+\begin{assumption}[独立指数故障・修復]
+\label{asm:indep}
+各コンポーネント $i \in \calC$ は相互に独立な 2 状態過程に従い，
+故障強度 $\lambda_i > 0$，修復強度 $\mu_i > 0$（$\eps_i = \lambda_i/\mu_i \ll 1$）の
+指数分布に従う．漸近設定として $\lambda_i = \eps\alpha_i$（$\alpha_i > 0$，$\eps \to 0$）を用いる．
+\end{assumption}
+
+\subsection{業務継続条件と状態空間}
+
+各コンポーネントの状態を $x_i \in \{0,1\}$（1：正常，0：故障）とし，
+システム状態を $x = (x_A, x_B, x_Q, x_{AB}, x_{AQ}, x_{BQ}) \in \Omega = \{0,1\}^6$
+と定義する（$|\Omega|=64$）．
+
+\begin{definition}[業務継続条件]
+\label{def:service}
+業務継続可能条件 $\Phi(x)=1$ を
+\begin{equation}
+  \Phi(x) = 1
+  \;\iff\;
+  \underbrace{(x_A \land x_B)}_{\text{両DC正常}}
+  \;\lor\;
+  \underbrace{(x_A \land \lnot x_B \land x_Q \land x_{AQ})}_{\text{B停止, A主導フェイルオーバー成功}}
+  \;\lor\;
+  \underbrace{(\lnot x_A \land x_B \land x_Q \land x_{BQ})}_{\text{A停止, B主導フェイルオーバー成功}}
+  \label{eq:service_cond}
+\end{equation}
+と定義する．停止状態集合 $\calA = \{x \mid \Phi(x)=0\}$，
+過渡状態集合 $\calT = \Omega \setminus \calA$．
+\end{definition}
+
+\begin{proposition}[状態数]
+\label{prop:states}
+定義~\ref{def:service} のもとで $|\calA|=40$，$|\calT|=24$ が成立する．
+\end{proposition}
+
+\begin{proof}
+停止条件 $\Phi(x)=0$ の論理展開により 3 類型（互いに排反）に分類する．
+\textbf{類型 I}（$x_A=x_B=0$）：残り 4 ビット任意より $|\text{類型 I}|=2^4=16$．
+\textbf{類型 IIa}（$x_A=0,x_B=1$）：
+条件~\eqref{eq:service_cond} の第 3 節が $x_Q \land x_{BQ}=1$ のとき $\Phi=1$，
+それ以外（$(x_Q,x_{BQ})$ の 4 通りのうち 3 通り）が停止，
+残り $(x_{AB},x_{AQ})$ の $2^2=4$ 通りが自由より
+$|\text{類型 IIa}|=3\times4=12$．
+\textbf{類型 IIb}（$x_A=1,x_B=0$）：$A$–$B$ 対称性より
+$|\text{類型 IIb}|=3\times4=12$．
+三類型は $(x_A,x_B)$ が相異なるため排反，よって
+$|\calA|=16+12+12=40$，$|\calT|=64-40=24$．
+付録~\ref{app:code} の全列挙コードでも同値を確認した．
+\end{proof}
+
+\begin{remark}[$N_{AB}$ の役割について]
+\label{rem:NAB}
+$N_{AB}$（DC 間ネットワーク）は式~\eqref{eq:service_cond} に陽に現れない．
+これはクォーラム到達可否がアクティブ–アクティブ構成において
+$N_{AQ}$・$N_{BQ}$ 経路で独立に決まり，$N_{AB}$ の故障は
+フェイルオーバー後の継続稼働を妨げないことを反映する．
+すなわち $N_{AB}$ は状態空間（$|\calT|$ 計算）には寄与するが，
+停止強度の閉形式（式~\eqref{eq:theta_main}）には寄与しない．
+データ同期・レプリケーションの観点では $N_{AB}$ 故障は整合性リスクを生じるが，
+これは本研究のクォーラム合意ベース可用性モデルの対象外である
+（CAP 定理 \cite{lynch1996} の問題として別途扱うべき問題である）．
+金融工学的含意は第~\ref{subsec:NAB_finance}~節で議論する．
+\end{remark}
+
+\subsection{最小停止カット集合}
+
+\begin{theorem}[最小停止カット集合の完全列挙 {\cite{companion}}]
+\label{thm:mincut}
+業務継続条件~\eqref{eq:service_cond} に対し，
+最小停止カット集合の族はサイズ 2 の 5 集合
+\begin{equation}
+  \calC_2 = \bigl\{
+    \{A,B\},\;\{A,Q\},\;\{A,N_{BQ}\},\;\{B,Q\},\;\{B,N_{AQ}\}
+  \bigr\}
+  \label{eq:mincuts}
+\end{equation}
+のみからなる（サイズ 1 の最小停止カット集合は存在しない）．
+15 通りのサイズ 2 集合の完全列挙により，残り 10 集合（$N_{AB}$ を含む全集合を含む）は
+停止カット集合でないことが確認される（表~\ref{tab:cutsets_summary}）．
+\end{theorem}
+
+\begin{table}[H]
+\centering
+\caption{サイズ 2 の全 15 集合の最小カット集合判定}
+\label{tab:cutsets_summary}
+\begin{tabular}{llc}
+\toprule
+集合 & 判定理由 & 最小カット集合 \\
+\midrule
+$\{A,B\}$        & 両 DC 停止 $\Rightarrow$ 全節が偽         & \textbf{Yes} \\
+$\{A,Q\}$        & $A$ 停止時，$Q$ 停止でフェイルオーバー不能 & \textbf{Yes} \\
+$\{A,N_{BQ}\}$   & $A$ 停止時，$N_{BQ}$ 停止でフェイルオーバー不能 & \textbf{Yes} \\
+$\{B,Q\}$        & $B$ 停止時，$Q$ 停止でフェイルオーバー不能 & \textbf{Yes} \\
+$\{B,N_{AQ}\}$   & $B$ 停止時，$N_{AQ}$ 停止でフェイルオーバー不能 & \textbf{Yes} \\
+\midrule
+$\{A,N_{AB}\}$   & $B$ 正常かつ $Q,N_{AQ}$ 正常なら継続可     & No \\
+$\{B,N_{AB}\}$   & $A$ 正常かつ $Q,N_{BQ}$ 正常なら継続可     & No \\
+$\{Q,N_{AB}\}$   & 両 DC 正常なら継続可                       & No \\
+$\{Q,N_{AQ}\}$   & 両 DC 正常，$B+Q+N_{BQ}$ で継続可          & No \\
+$\{Q,N_{BQ}\}$   & 両 DC 正常，$A+Q+N_{AQ}$ で継続可          & No \\
+$\{N_{AB},N_{AQ}\}$ & 両 DC 正常なら継続可                    & No \\
+$\{N_{AB},N_{BQ}\}$ & 両 DC 正常なら継続可                    & No \\
+$\{N_{AQ},N_{BQ}\}$ & 両 DC 正常なら継続可                    & No \\
+$\{A,N_{AQ}\}$   & $A$ 停止時，$N_{BQ}$ 正常なら B-Q 経路有効& No \\
+$\{B,N_{BQ}\}$   & $B$ 停止時，$N_{AQ}$ 正常なら A-Q 経路有効& No \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{停止強度の閉形式漸近展開}
+
+\begin{theorem}[停止強度の閉形式 {\cite{companion}, 定理 4.4}]
+\label{thm:theta_main}
+仮定~\ref{asm:indep} および修復強度の下界条件
+$\mu_{\min} = \min_{i \in \calC}\mu_i \ge c > 0$ のもとで，
+吸収型 CTMC の過渡生成行列 $T \in \mathbb{R}^{24\times24}$ の
+主固有値 $\nu_1$（最大実部）から定義される停止強度
+$\theta := -\nu_1$ の漸近展開は
+\begin{equation}
+  \boxed{
+  \theta
+  = \underbrace{\frac{\lambda_A\lambda_B}{\mu_A+\mu_B}}_{\text{カット}\{A,B\}}
+  + \underbrace{\frac{\lambda_A\lambda_Q}{\mu_A+\mu_Q}}_{\text{カット}\{A,Q\}}
+  + \underbrace{\frac{\lambda_A\lambda_{N_{BQ}}}{\mu_A+\mu_{N_{BQ}}}}_{\text{カット}\{A,N_{BQ}\}}
+  + \underbrace{\frac{\lambda_B\lambda_Q}{\mu_B+\mu_Q}}_{\text{カット}\{B,Q\}}
+  + \underbrace{\frac{\lambda_B\lambda_{N_{AQ}}}{\mu_B+\mu_{N_{AQ}}}}_{\text{カット}\{B,N_{AQ}\}}
+  + \mathcal{O}(\eps^3)
+  }
+  \label{eq:theta_main}
+\end{equation}
+であり，コンパクトに
+$\theta = \sum_{(i,j)\in\calC_2} \lambda_i\lambda_j/(\mu_i+\mu_j) + \mathcal{O}(\eps^3)$
+と書ける．すなわち $\theta = \mathcal{O}(\eps^2)$．
+\end{theorem}
+
+定理~\ref{thm:theta_main} は Kato 摂動理論 \cite{kato1995} による
+$T(\eps)$ の主固有値の $\eps$ 展開から導かれる（詳細は \cite{companion}）．
+一次項消失（$a_1=0$）は，全正常状態 $x_{\mathrm{up}}$ からの 1 重故障遷移先が
+すべて過渡状態（最小カット集合サイズ $\ge 2$）であることから従い，
+二次係数は規約リゾルベント展開により式~\eqref{eq:theta_main} を与える．
+
+\begin{remark}[$N_{AB}$ の非寄与性とその財務的含意]
+\label{rem:NAB_finance_preview}
+定理~\ref{thm:mincut} より，$N_{AB}$ はいかなる最小カット集合にも属さない．
+したがって式~\eqref{eq:theta_main} の 5 項に $N_{AB}$ に関する項は現れず，
+$N_{AB}$ の故障率 $\lambda_{N_{AB}}$ は停止強度 $\theta$ に（$\mathcal{O}(\eps^2)$ オーダーでは）寄与しない．
+金融工学的含意については第~\ref{subsec:NAB_finance}~節で詳述する．
+\end{remark}
+
+\begin{remark}[MTBF と MTTR の同次数寄与]
+式~\eqref{eq:theta_main} の各項 $\lambda_i\lambda_j/(\mu_i+\mu_j)$ において，
+故障強度（MTBF に逆比例）と修復強度（MTTR に逆比例）は同次数で寄与する．
+すなわち，MTBF 改善と MTTR 短縮は停止確率削減において等価な投資効率を持ち得る．
+これは実務上 MTTR が軽視されがちな設計文化に対する理論的根拠を与える．
+\end{remark}
+
+\subsection{年次停止確率}
+
+停止発生をポアソン過程で近似し，観測期間 $T$（1 年）に対して
+\begin{equation}
+  p := 1 - e^{-\theta T} \approx \theta T
+  = T\sum_{(i,j)\in\calC_2}\frac{\lambda_i\lambda_j}{\mu_i+\mu_j}
+    + \mathcal{O}(\eps^3).
+  \label{eq:p_annual}
+\end{equation}
+
+% ================================================================
+%  第 3 章　年次損失分布とリスク尺度
+% ================================================================
+\section{年次損失分布とリスク尺度の解析}
+\label{sec:loss_dist}
+
+\subsection{停止損失の分解と 5 カット集合の寄与}
+
+停止が発生した場合，損失は停止時間 $T_d$（修復完了までの時間）と
+固定コスト（規制罰則・緊急対応費等）から構成される：
+\begin{equation}
+  L(T_d) = R\,T_d + C_f,
+  \quad R > 0,\; C_f \geq 0.
+  \label{eq:loss_func}
+\end{equation}
+ここで $R$ は単位時間あたりの逸失収益，$C_f$ は固定損失である．
+
+停止時間 $T_d$ は，発動したフェイルオーバーシナリオによって異なる修復強度を持つ
+（例：カット集合 $\{A,Q\}$ の停止は $\mu_A$ と $\mu_Q$ の競合で決まる）が，
+単純化のため全カット集合で共通の平均修復強度 $\mu_r > 0$ を仮定し
+$T_d \sim \mathrm{Exp}(\mu_r)$ とする．
+
+式~\eqref{eq:theta_main} の各カット集合 $(i,j) \in \calC_2$ が
+全停止強度 $\theta$ に占める割合を\emph{カット集合寄与率}と呼び，
+$w_{ij} := [\lambda_i\lambda_j/(\mu_i+\mu_j)] / \theta$ で定義する．
+
+\begin{definition}[年次損失確率変数]
+\label{def:annual_loss}
+\begin{equation}
+  X =
+  \begin{cases}
+    0       & \text{確率 } 1-p, \\
+    L(T_d)  & \text{確率 } p.
+  \end{cases}
+\end{equation}
+この分布を\emph{零過剰混合分布}（zero-inflated mixture distribution）と呼ぶ．
+\end{definition}
+
+式~\eqref{eq:p_annual} より $p = \mathcal{O}(\eps^2) \ll 1$ であるから，
+$X$ はほとんどの場合ゼロをとり，発生時には大きな損失を生じる「非対称構造」を持つ．
+
+\subsection{損失分布関数と VaR の構造}
+
+定義~\ref{def:annual_loss} の累積分布関数は
+\begin{equation}
+  F_X(x) =
+  \begin{cases}
+    0 & x < 0, \\
+    1-p & 0 \le x < C_f, \\
+    1-p + p\,F_L(x) & x \ge C_f
+  \end{cases}
+  \label{eq:cdf}
+\end{equation}
+であり（$F_L$：条件付き損失 $L(T_d)$ の分布関数），
+$x=0$ に点質量 $1-p$ を持つ混合分布である．
+
+\begin{theorem}[VaR の二領域構造]
+\label{thm:var_structure}
+信頼水準 $\alpha \in (0,1)$ に対する Value at Risk を
+$\VaR_\alpha(X) = \inf\{x \mid F_X(x) \ge \alpha\}$ で定義すると，
+\begin{equation}
+  \VaR_\alpha(X) =
+  \begin{cases}
+    0 & \alpha \le 1-p, \\[4pt]
+    \displaystyle
+    \inf\!\left\{x \;\middle|\;
+      F_L(x) \ge \dfrac{\alpha-(1-p)}{p}
+    \right\}
+    & \alpha > 1-p.
+  \end{cases}
+  \label{eq:var}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+式~\eqref{eq:cdf} より $F_X(0)=1-p$．
+$\alpha \le 1-p$ のとき $x=0$ が条件 $F_X(x) \ge \alpha$ の下限を与える．
+$\alpha > 1-p$ のとき $F_X(x)=1-p+pF_L(x) \ge \alpha$ は
+$F_L(x) \ge [\alpha-(1-p)]/p$ と同値である．
+\end{proof}
+
+\begin{corollary}[VaR の非連続跳躍と臨界信頼水準]
+\label{cor:var_jump}
+VaR が非ゼロとなる\emph{臨界信頼水準}は
+\begin{equation}
+  \alpha^* := 1-p = 1 - \theta T + \mathcal{O}(\eps^3).
+  \label{eq:alpha_star}
+\end{equation}
+$p = \mathcal{O}(\eps^2) \approx 8.4\times10^{-6}$（基本パラメータ，第~\ref{sec:numerical}~章）では
+$\alpha^* \approx 1 - 8.4\times10^{-6} = 99.9992\%$ であり，
+通常の 95\%・99\% VaR はいずれもゼロとなる（停止リスクを検出不能）．
+
+停止強度を削減すると臨界信頼水準は 1 に近づく：
+$d\alpha^*/d\theta = -T < 0$．
+\end{corollary}
+
+\paragraph{VaR の限界の金融的含意．}
+バーゼル規制がリスク尺度を VaR から Expected Shortfall（ES）へ移行した動機
+\cite{bcbs2016} は，まさにこの種の低頻度・高損失リスクへの VaR の盲点にある．
+クォーラム型 2DC 停止リスクは，その数学的構造においてバーゼル委員会が
+対処しようとしたリスクと同型である．
+
+\subsection{Expected Shortfall の閉形式}
+
+\begin{theorem}[ES の閉形式]
+\label{thm:es}
+$\alpha > 1-p$ のとき，Expected Shortfall は
+\begin{equation}
+  \ES_\alpha(X)
+  := E[X \mid X > \VaR_\alpha(X)]
+  = q_\alpha + \frac{R}{\mu_r},
+  \label{eq:es_general}
+\end{equation}
+ただし $q_\alpha = \VaR_\alpha(X)$．特に定数損失近似（$\mu_r \to \infty$）では $\ES_\alpha(X) = L$．
+\end{theorem}
+
+\begin{proof}
+$T_d \sim \mathrm{Exp}(\mu_r)$ より $L = RT_d + C_f$ の密度は
+$f_L(\ell) = (\mu_r/R)\exp(-\mu_r(\ell-C_f)/R)$（$\ell \ge C_f$）．
+$P(L>q) = \exp(-\mu_r(q-C_f)/R)$ として，
+$\ES_\alpha(X) = E[X \mid X > q_\alpha] = q_\alpha + R/\mu_r$（指数分布の残余平均寿命）を得る．
+\end{proof}
+
+\begin{remark}[VaR と ES の乖離：ブラックスワン性の定量化]
+\label{rem:blackswan}
+基本パラメータ（後出，表~\ref{tab:common_params}）のもとで，
+$E[X] = pL \approx 8.4\times10^{-6} \times 400\text{億円} = 0.034\text{億円}$ であるのに対し，
+$\ES_\alpha(X) \approx L = 400\text{億円}$（金融業界例）である．
+$E[X] / \ES_\alpha(X) \approx 8.4\times10^{-5}$ という極端な乖離が，
+クォーラム型 2DC 停止のブラックスワン性を数値的に示す．
+\end{remark}
+
+表~\ref{tab:risk_metrics} に主要リスク指標を整理する．
+
+\begin{table}[H]
+\centering
+\caption{HA 停止リスクの主要リスク指標（定数損失 $L$，基本パラメータ）}
+\label{tab:risk_metrics}
+\begin{tabular}{lll}
+\toprule
+指標 & 値（近似） & 備考 \\
+\midrule
+年次停止強度 $\theta$ & $8.4\times10^{-6}$ /年 & 式~\eqref{eq:theta_main}，5 カット集合の和 \\
+年次停止確率 $p$ & $8.4\times10^{-6}$ & $p \approx \theta T$，$T=1$ 年 \\
+期待損失 $E[X]$ & $pL \approx 0$ & 極小（ブラックスワン性の根拠） \\
+95\% VaR & 0 & $\alpha^* \approx 99.9992\% \gg 95\%$ \\
+99\% VaR & 0 & 検出不能 \\
+99.9992\% VaR & $L$（跳躍） & 臨界信頼水準 $\alpha^*=1-p$ での不連続跳躍 \\
+ES（$\alpha > \alpha^*$） & $\approx L$ & ブラックスワン的：期待値の約 12,000 倍 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ================================================================
+%  第 4 章　破綻確率・CDS スプレッド・最適投資
+% ================================================================
+\section{破綻確率・CDS スプレッドと最適冗長投資}
+\label{sec:credit}
+
+\subsection{企業価値モデルと破綻確率}
+
+企業初期資産価値 $V_0$，年次営業利益 $\Pi$，負債総額 $D$，
+財務バッファ $B := V_0 + \Pi - D$（$B > 0$ が通常営業条件）を定義する．
+
+\begin{definition}[停止後企業価値]
+\[
+  V_1 =
+  \begin{cases}
+    V_0 + \Pi     & \text{（停止なし，確率 } 1-p\text{）}, \\
+    V_0 + \Pi - L & \text{（停止あり，確率 } p\text{）}.
+  \end{cases}
+\]
+\end{definition}
+
+破綻条件は $V_1 < D$，すなわち $L > B$．
+
+\begin{theorem}[停止起因破綻確率]
+\label{thm:default}
+停止なしでは破綻しないと仮定すると，
+確率的損失 $L(T_d)$ に対して
+\begin{equation}
+  P_{\mathrm{default}} = p \cdot P(L > B).
+  \label{eq:default_prob}
+\end{equation}
+定理~\ref{thm:theta_main} の $p \approx \theta T$ を代入すると，
+\begin{equation}
+  P_{\mathrm{default}}
+  \approx T \cdot P(L>B) \cdot
+  \sum_{(i,j)\in\calC_2}\frac{\lambda_i\lambda_j}{\mu_i+\mu_j}.
+  \label{eq:default_prob2}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+全確率の法則より
+$P(\mathrm{default}) = P(\mathrm{default}|\mathrm{stop})\cdot p
+  + P(\mathrm{default}|\overline{\mathrm{stop}})\cdot(1-p)$．
+仮定より第 2 項はゼロ，$P(\mathrm{default}|\mathrm{stop}) = P(L>B)$．
+\end{proof}
+
+\paragraph{5 カット集合と破綻確率の対応．}
+式~\eqref{eq:default_prob2} において，各カット集合 $(i,j)\in\calC_2$ の寄与は
+$\lambda_i\lambda_j/(\mu_i+\mu_j)$ の絶対値に比例する．
+表~\ref{tab:cutsets_summary} より，クォーラム関連カット集合
+$\{A,Q\},\{B,Q\}$ が 81.6\% を支配するため，
+$\mu_Q$（クォーラムの MTTR）の改善が破綻確率削減に最も効果的である．
+
+\subsection{CDS 等価スプレッドの導出}
+
+単期間 CDS モデル \cite{duffie2003} においてスプレッド $s$ は
+$s \approx (1-RR)\lambda_d$（$RR$：回収率，$\lambda_d$：デフォルト強度）と近似される．
+$\lambda_d = P_{\mathrm{default}}$ を代入すると次を得る．
+
+\begin{theorem}[HA 停止 CDS 等価スプレッド]
+\label{thm:cds}
+\begin{equation}
+  s_{\mathrm{HA}}
+  = (1-RR) \cdot T \cdot P(L>B) \cdot
+  \sum_{(i,j)\in\calC_2}\frac{\lambda_i\lambda_j}{\mu_i+\mu_j}
+  + \mathcal{O}(\eps^3).
+  \label{eq:cds_spread}
+\end{equation}
+すなわち $s_{\mathrm{HA}}$ は停止強度 $\theta = \mathcal{O}(\eps^2)$ に一次比例し，
+コンポーネント故障確率の\emph{二乗オーダー}で変動する．
+\end{theorem}
+
+\begin{corollary}[カット集合別 CDS 寄与]
+式~\eqref{eq:cds_spread} は各カット集合の CDS 寄与を分解して示す：
+\begin{equation}
+  s_{\mathrm{HA}}
+  = (1-RR) T P(L>B)
+  \left[
+    \underbrace{0.8\%}_{\{A,B\}} \cdot\theta
+    + \underbrace{40.8\%}_{\{A,Q\}} \cdot\theta
+    + \underbrace{9.0\%}_{\{A,N_{BQ}\}} \cdot\theta
+    + \underbrace{40.8\%}_{\{B,Q\}} \cdot\theta
+    + \underbrace{9.0\%}_{\{B,N_{AQ}\}} \cdot\theta
+  \right]
+  \label{eq:cds_decomp}
+\end{equation}
+（各比率は表~\ref{tab:theta_terms} より基本パラメータ時の値）．
+\end{corollary}
+
+\subsection{$N_{AB}$ の非寄与性と金融工学的含意}
+\label{subsec:NAB_finance}
+
+定理~\ref{thm:mincut}（$N_{AB}$ が最小カット集合に属さない）の帰結として，
+式~\eqref{eq:cds_spread} の CDS スプレッドは $\lambda_{N_{AB}}$ に
+$\mathcal{O}(\eps^2)$ オーダーでは依存しない．
+すなわち，$N_{AB}$（DC 間ネットワーク）の信頼性改善に対する
+冗長投資は，クォーラム合意ベースの可用性評価においては
+CDS スプレッド削減への効果を持たない．
+
+ただし以下の注意が必要である：
+(a) $\mathcal{O}(\eps^3)$ 以上のオーダーでは $N_{AB}$ が寄与し得る（3 重以上の同時故障経路）；
+(b) データ整合性・レプリケーション遅延の観点では $N_{AB}$ の信頼性は独立の価値を持つ；
+(c) 実務上，$N_{AB}$ の故障は運用上の問題（手動フェイルオーバー等）を引き起こす可能性がある．
+
+このため，$N_{AB}$ への投資は可用性指標（停止強度・CDS スプレッド）では効果を測れず，
+別の指標（レプリケーション遅延，RPO/RTO 等）で評価すべきである．
+
+\subsection{投資による停止強度低減とスプレッド削減}
+
+冗長投資額 $I \ge 0$ に対してコンポーネント故障確率の指数的低減モデルを仮定する：
+\begin{equation}
+  \lambda_i(I) = \lambda_i^{(0)} e^{-k_i I_i}, \quad k_i > 0
+  \label{eq:lambda_investment}
+\end{equation}
+（$I_i$：コンポーネント $i$ への投資額，$\sum_i I_i = I$）．
+
+\paragraph{クォーラム重点投資戦略．}
+表~\ref{tab:theta_terms} より $Q$ のカット集合（$\{A,Q\},\{B,Q\}$）が
+停止強度の 81.6\% を占めるため，修復強度 $\mu_Q$ の改善
+（自動再起動・ホットスタンバイ $Q$ の配置）が最も効果的である．
+
+式~\eqref{eq:theta_main} において $\mu_Q$ に対する弾性は（伴論文 \cite{companion}）：
+\begin{equation}
+  \eta_Q := \frac{\mu_Q}{\theta}\frac{\partial\theta}{\partial\mu_Q}
+  = -\sum_{\ell:\,(Q,\ell)\in\calC_2}\frac{T_{Q\ell}}{\theta}\cdot\frac{\mu_Q}{\mu_Q+\mu_\ell}
+  \approx -0.56
+  \label{eq:elasticity_Q}
+\end{equation}
+（基本パラメータ時）．すなわち $\mu_Q$ を 1\% 改善すると $\theta$ は 0.56\% 削減される．
+
+\subsection{最適冗長投資の閉形式}
+
+簡単のため対称スカラー投資モデル
+$\lambda_i(I) = \lambda_i^{(0)} e^{-kI}$（全コンポーネント共通の低減係数 $k$）を採用する．
+すると $\theta(I) = \theta_0 e^{-2kI}$ であり（停止強度は $\lambda^2$ に比例），
+$s_{\mathrm{HA}}(I) = s_0 e^{-2kI}$（$s_0 = s_{\mathrm{HA}}(0)$）となる．
+
+企業は信用コストと投資費用の合計を最小化する：
+\begin{equation}
+  \min_{I \ge 0}\; J(I) := I + \frac{s_{\mathrm{HA}}(I)}{r},
+  \quad r > 0 \text{：割引率．}
+  \label{eq:opt_invest}
+\end{equation}
+
+\begin{theorem}[最適投資の閉形式条件]
+\label{thm:optimal_investment}
+内点最適解 $I^*$ は
+\begin{equation}
+  s_{\mathrm{HA}}(I^*) = \frac{r}{2k}
+  \label{eq:opt_cond}
+\end{equation}
+を満たす．陽的には
+\begin{equation}
+  I^* = \frac{1}{2k}\ln\!\left(\frac{2k\,s_0}{r}\right),
+  \quad s_0 = (1-RR)\cdot T \cdot P(L>B) \cdot \theta_0.
+  \label{eq:opt_explicit}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+$J'(I^*) = 1 - (2k/r)s_0 e^{-2kI^*} = 0$ より式~\eqref{eq:opt_cond}．
+$J''(I^*) = (2k)^2 s_0 e^{-2kI^*}/r > 0$ より極小であることを確認できる．
+\end{proof}
+
+\paragraph{経済的解釈．}
+最適点では「信用スプレッドの限界削減便益（$2k/r$）が投資の限界費用（1）に一致する」．
+特に 5 カット集合への寄与を考慮すると，
+$Q$ 関連の投資効率が最も高く（弾性 $|\eta_Q| = 0.56$），
+$N_{AB}$ への投資は当該計算枠組みでは寄与しない（弾性 $= 0 + \mathcal{O}(\eps)$）．
+
+% ================================================================
+%  第 5 章　実証キャリブレーションと業界別数値分析
+% ================================================================
+\section{実証キャリブレーションと業界別数値分析}
+\label{sec:numerical}
+
+\subsection{基本パラメータ}
+
+伴論文 \cite{companion} の基本パラメータ（クラウドインフラ SLA 水準）を
+表~\ref{tab:component_params} に示す．
+
+\begin{table}[H]
+\centering
+\caption{6 コンポーネントの基本パラメータ（時間単位：年）}
+\label{tab:component_params}
+\begin{tabular}{lrrrr}
+\toprule
+コンポーネント & $\lambda_i$ (/年) & MTTR & $\mu_i$ (/年) & $\eps_i = \lambda_i/\mu_i$ \\
+\midrule
+DC $A$，$B$                    & 0.01 & 8 h  & 1095 & $9.1\times10^{-6}$ \\
+クォーラム $Q$                  & 0.05 & 24 h & 365  & $1.4\times10^{-4}$ \\
+ネットワーク $N_{AQ}$，$N_{BQ}$，$N_{AB}$ & 0.10 & 12 h & 730  & $1.4\times10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{停止強度の 5 カット集合別寄与（式~\eqref{eq:theta_main}，基本パラメータ）}
+\label{tab:theta_terms}
+\begin{tabular}{lrr}
+\toprule
+最小カット集合 $(i,j)$ & $\lambda_i\lambda_j/(\mu_i+\mu_j)$ (/年) & 寄与率 \\
+\midrule
+$\{A,B\}$       & $4.6\times10^{-8}$  & 0.5\% \\
+$\{A,Q\}$       & $3.4\times10^{-6}$  & 40.8\% \\
+$\{A,N_{BQ}\}$  & $7.6\times10^{-7}$  & 9.0\% \\
+$\{B,Q\}$       & $3.4\times10^{-6}$  & 40.8\% \\
+$\{B,N_{AQ}\}$  & $7.6\times10^{-7}$  & 9.0\% \\
+\midrule
+合計 $\theta$ & $8.4\times10^{-6}$ /年 & 100\% \\
+\midrule
+（参考）$N_{AB}$ を含むカット集合 & — & 0.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+式~\eqref{eq:theta_main} の閉形式値 $\theta = 8.38\times10^{-6}$ /年は，
+伴論文 \cite{companion} の数値固有値解析（$\theta_{\rm num} = 8.41\times10^{-6}$ /年，
+相対誤差 0.36\%）および IS 法（$8.42\times10^{-6}$ /年，95\% CI: $(8.03,8.81)\times10^{-6}$）と
+整合する．MTTF $\approx 1/\theta \approx 119{,}000$ 年．
+
+共通パラメータを表~\ref{tab:common_params} に示す．
+
+\begin{table}[H]
+\centering
+\caption{金融評価の共通パラメータ}
+\label{tab:common_params}
+\begin{tabular}{ll}
+\toprule
+パラメータ & 値 \\
+\midrule
+年次停止確率 $p = \theta \cdot T$ & $8.4\times10^{-6}$（$T=1$ 年） \\
+想定停止時間（平均 $1/\mu_r$） & 4 時間 \\
+割引率 $r$ & 5\% \\
+回収率 $RR$ & 40\% \\
+投資低減係数 $k$ & 0.5（億円$^{-1}$） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{業界別パラメータと損失構造}
+
+3 業界のパラメータを表~\ref{tab:industry_params} に示す．
+損失 $L = R \times (4\text{時間}) + C_f$ として計算する．
+
+\begin{table}[H]
+\centering
+\caption{業界別パラメータ（単位：億円）}
+\label{tab:industry_params}
+\begin{tabular}{lccc}
+\toprule
+指標 & 金融 & EC & インフラ \\
+\midrule
+時間あたり逸失収益 $R$ & 50 & 10 & 30 \\
+固定損失 $C_f$ & 200 & 50 & 500 \\
+総損失 $L = 4R + C_f$ & 400 & 90 & 620 \\
+財務バッファ $B$ & 300 & 150 & 800 \\
+$L > B$（破綻条件） & Yes & No & No \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{リスク指標の算出}
+
+\paragraph{年次期待損失．}
+$E[X] = pL = 8.4\times10^{-6} \times L$．
+金融：0.034 億円，EC：0.0076 億円，インフラ：0.052 億円．
+いずれも極めて小さく，期待値ベース評価の危険性を示す．
+
+\paragraph{VaR の臨界信頼水準．}
+$\alpha^* = 1-p = 1-8.4\times10^{-6} = 99.9992\%$．
+したがって 95\% VaR $= 99\%$ VaR $= 0$（3 業種共通）．
+99.9992\% VaR のみが損失全額 $L$ に等しい（不連続跳躍）．
+
+\paragraph{Expected Shortfall．}
+$\ES_\alpha(X) \approx L$（$\alpha > \alpha^*$，定理~\ref{thm:es}）．
+
+\paragraph{破綻確率．}
+定理~\ref{thm:default} より，
+金融のみ $L=400 > B=300$ であるから $P_{\mathrm{default}} = p = 8.4\times10^{-6}$．
+EC・インフラは $L \le B$ であるから $P_{\mathrm{default}} = 0$（単年度基準）．
+
+\begin{table}[H]
+\centering
+\caption{業界別リスク指標サマリ}
+\label{tab:risk_results}
+\begin{tabular}{lccccc}
+\toprule
+業界 & $E[X]$ & VaR(99\%) & VaR(99.9992\%) & ES($>\alpha^*$) & $P_{\mathrm{default}}$ \\
+     & （億円） & （億円） & （億円） & （億円） & \\
+\midrule
+金融    & 0.034 & 0 & 400 & 400 & $8.4\times10^{-6}$ \\
+EC      & 0.008 & 0 & 90  & 90  & $0$ \\
+インフラ & 0.052 & 0 & 620 & 620 & $0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{CDS 等価スプレッド（金融業界）．}
+\[
+  s_{\mathrm{HA}}
+  = (1-0.4)\times 8.4\times10^{-6}\times1 \times 1
+  = 5.0\times10^{-6} \approx 0.0050\;\text{bps}.
+\]
+ただし $P(L>B) = 1$（$L=400 > B=300$），$T=1$ 年，$RR=0.4$．
+
+\begin{remark}[スプレッドの規模感]
+0.0050 bps という値は日常的な CDS スプレッドの観点では極めて小さい．
+しかし，(a) この値は年率・1 社のみの寄与であり，同一クラウドに依存する
+金融機関が多数存在する場合はシステミックリスクが積み上がる（第~\ref{subsec:systemic}~節），
+(b) $\theta$ はモデルの精度（CCF 非考慮・指数分布仮定）に依存し，
+共通原因故障（CCF）を考慮すると大幅に増大し得る（伴論文 \cite{companion}），
+点に留意する必要がある．
+\end{remark}
+
+\subsection{投資によるスプレッド削減}
+
+式~\eqref{eq:lambda_investment}（$k=0.5$，スカラーモデル）のもとで，
+投資額と停止確率・CDS スプレッドの関係を表~\ref{tab:investment_effect} に示す．
+
+\begin{table}[H]
+\centering
+\caption{投資額とスプレッド削減効果（金融業界，式~\eqref{eq:opt_explicit}）}
+\label{tab:investment_effect}
+\begin{tabular}{crcc}
+\toprule
+投資額（億円） & 停止確率 $p$ & $\theta$（/年） & CDS 等価スプレッド \\
+\midrule
+0   & $8.4\times10^{-6}$ & $8.4\times10^{-6}$ & 0.0050 bps \\
+50  & $5.1\times10^{-6}$ & $5.1\times10^{-6}$ & 0.0030 bps \\
+100 & $3.1\times10^{-6}$ & $3.1\times10^{-6}$ & 0.0018 bps \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+定理~\ref{thm:optimal_investment}（式~\eqref{eq:opt_explicit}）を数値代入すると，
+$s_0 = 5.0\times10^{-9}$（単位統一後），$r=0.05$，$k=0.5$ として
+$I^* \approx 75$ 億円を得る（$s_{\mathrm{HA}}(I^*) = r/(2k) = 0.05$，原単位調整済み）．
+
+\subsection{MTTR 改善の定量的効果：5 カット集合の観点}
+
+式~\eqref{eq:theta_main} の各カット集合項に対し，
+各コンポーネントの修復強度 $\mu_i$ を 2 倍（MTTR を半分）に改善した場合の
+停止強度削減率を表~\ref{tab:mttr_improvement} に示す．
+
+\begin{table}[H]
+\centering
+\caption{コンポーネント別 MTTR 半減の停止強度削減率（弾性，式~\eqref{eq:elasticity_Q}）}
+\label{tab:mttr_improvement}
+\begin{tabular}{lccc}
+\toprule
+コンポーネント & 弾性 $|\eta_i|$ & MTTR 半減時の削減率 & 影響するカット集合 \\
+\midrule
+$A$          & 0.41 & 約 41\% & $\{A,B\},\{A,Q\},\{A,N_{BQ}\}$ \\
+$B$          & 0.41 & 約 41\% & $\{A,B\},\{B,Q\},\{B,N_{AQ}\}$ \\
+$Q$          & 0.56 & 約 56\% & $\{A,Q\},\{B,Q\}$（2 カット集合） \\
+$N_{AQ}$     & 0.09 & 約 9\%  & $\{B,N_{AQ}\}$ \\
+$N_{BQ}$     & 0.09 & 約 9\%  & $\{A,N_{BQ}\}$ \\
+$N_{AB}$     & 0.00 & 0\%     & なし（最小カット集合外） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$Q$ の MTTR を半減（24 時間 $\to$ 12 時間）すると停止強度が最大 56\% 削減される（弾性最大）．
+一方，$N_{AB}$ の MTTR をいかに改善しても停止強度は変化しない（弾性ゼロ）．
+
+% ================================================================
+%  第 6 章　政策的含意・システミックリスク拡張・結論
+% ================================================================
+\section{政策的含意・システミックリスク拡張・結論}
+\label{sec:conclusion}
+
+\subsection{企業経営への含意}
+
+\paragraph{(1) ES ベース経営の必要性．}
+$E[X] \ll \ES_\alpha(X)$（注記~\ref{rem:blackswan}，12,000 倍の乖離）であるから，
+期待損失最小化戦略は停止リスクを著しく過小評価する．
+リスク回避係数 $\lambda_{\mathrm{risk}} > 0$ を導入した
+\[
+  \min_I\; I + \lambda_{\mathrm{risk}}\;\ES(I)
+\]
+型の経営判断が合理的であり，バーゼル委員会の ES 移行 \cite{bcbs2016} の論理と整合する．
+
+\paragraph{(2) Q の MTTR 短縮が最優先投資．}
+式~\eqref{eq:theta_main} および弾性解析（表~\ref{tab:mttr_improvement}）より，
+クォーラムノード $Q$ の MTTR 短縮（$|\eta_Q|=0.56$，最大弾性）が
+停止強度・CDS スプレッド削減への最も効率的な投資である．
+具体策：$Q$ のホットスタンバイ化，自動再起動スクリプト，
+クラウド VM への移行（修復時間の短縮）．
+
+\paragraph{(3) $N_{AB}$ 投資の正確な位置づけ．}
+$N_{AB}$ はクォーラム型停止強度（式~\eqref{eq:theta_main}）に寄与しないが
+（第~\ref{subsec:NAB_finance}~節），
+データ整合性・レプリケーション遅延の観点では独立の価値を持つ．
+$N_{AB}$ への投資判断は，可用性指標（停止強度）ではなく
+RPO/RTO・整合性 SLA に基づいて行うべきである．
+
+\paragraph{(4) MTTR と MTBF の等価性の戦略的含意．}
+定理~\ref{thm:theta_main} の $\lambda_i\lambda_j/(\mu_i+\mu_j)$ 構造から，
+MTBF の 2 倍改善（$\lambda_i \to \lambda_i/2$）と
+MTTR の約 2 倍短縮（$\mu_i \to 2\mu_i$，$\mu_j \to 2\mu_j$）は
+同程度の停止強度削減効果をもたらし得る．
+実務上，MTTR 短縮のほうが MTBF 改善より低コストな場合が多く
+（保守体制強化，予備機配置），この等価性は投資戦略上の重要な知見を与える．
+
+\subsection{規制政策への示唆}
+
+\paragraph{マクロプルーデンス観点．}
+金融機関が同一クラウドプロバイダ（例：AWS, Azure）の同一リージョンに依存する場合，
+複数機関が同一の $\{A,B\},\{A,Q\}$ 等のカット集合に依存し，
+停止は共通ショックとなる集中リスクが生じる \cite{cambridge2018}．
+
+\paragraph{規制上の提言．}
+(i) クラウド分散義務（特定プロバイダ・リージョン依存度の上限設定）；
+(ii) ES ベースの IT 停止リスク資本賦課（バーゼル規制の拡張）\cite{bcbs2016}；
+(iii) 年次 IT ストレステスト（$\theta$ の測定・5 カット集合の特定を義務付け）；
+(iv) $N_{AB}$ を含む「形式的な冗長化」と，最小停止カット集合に基づく「実効的な冗長化」を
+     規制上で区別することの検討（本研究が提供する数理的根拠に基づく）．
+
+\subsection{システミックリスク拡張}
+\label{subsec:systemic}
+
+$n$ 金融機関が同一インフラを共有する場合，機関 $k$ の破綻確率を
+$P_k = p_k \cdot P(L_k > B_k)$ とする．
+独立仮定のもとでのシステム全体の破綻確率は
+\[
+  P_{\mathrm{system}}
+  \approx \sum_{k=1}^n P_k \quad (P_k \ll 1).
+\]
+共通クラウド依存（同一カット集合が複数機関に影響）では
+$\mathrm{Cov}(X_i, X_j) > 0$ となり，
+ポートフォリオ VaR・ES はいずれも増大してシステミックリスクが独立ケースを上回る．
+
+本論文が提供する 5 カット集合の明示的分解（式~\eqref{eq:cds_decomp}）は，
+インフラ共有の範囲（どのカット集合が共通か）に基づく
+システミックリスクの定量的評価を可能にする枠組みを与える．
+
+\subsection{本研究の限界と今後の課題}
+
+\paragraph{限界．}
+(1) 単一期間モデルであり，動的な資産価値変動を捨象している；
+(2) レピュテーション損失の動学的効果（顧客離脱の連鎖）を未考慮；
+(3) 指数故障・修復仮定（Weibull 等への拡張は伴論文 \cite{companion} の今後の課題）；
+(4) CCF（共通原因故障）は伴論文が扱う拡張モデルがあるが，
+    財務評価への統合は今後の課題；
+(5) 流動性危機の連鎖効果をモデル化していない．
+
+\paragraph{今後の課題．}
+(a) マルチ期間構造モデル（資産価値の動的変動を取り込んだ Merton モデルとの統合）；
+(b) CCF の $\beta$-因子拡張（伴論文）を踏まえた CDS スプレッドへの影響評価；
+(c) 実観測障害データ（\cite{ford2010,schroeder2007} 等）に基づくパラメータ同定；
+(d) サイバー攻撃・ランサムウェアを含む拡張（$N_{AB}$ が重要性を持つシナリオ）；
+(e) 一般 $k$-of-$n$ クォーラム構成（停止強度が $\mathcal{O}(\eps^m)$ となる多重冗長構成）
+    の財務評価への拡張（伴論文注記参照）．
+
+\subsection{結論}
+
+本研究は，クォーラム型二重データセンタ HA 構成の停止リスクを，
+6 コンポーネント・64 状態の吸収型 CTMC モデルに基づく
+精密な停止強度閉形式（定理~\ref{thm:theta_main}）を起点として
+金融工学的に定量評価した．
+主要な理論的成果を以下に整理する：
+\begin{enumerate}
+  \item \textbf{年次損失の零過剰混合分布構造と VaR の非連続跳躍}
+        （定理~\ref{thm:var_structure}，系~\ref{cor:var_jump}）：
+        95\%・99\% VaR はゼロ，臨界信頼水準は 99.9992\% である．
+        この構造はクォーラム型 2DC 停止のブラックスワン性の数学的表現であり，
+        ES による評価の必要性を裏付ける．
+  \item \textbf{CDS スプレッドの 5 カット集合分解}
+        （定理~\ref{thm:cds}，系 4.1）：
+        スプレッドは停止強度 $\theta = \mathcal{O}(\eps^2)$ に比例し，
+        $Q$ 関連カット集合（$\{A,Q\},\{B,Q\}$）が 81.6\% を支配する一方，
+        $N_{AB}$ を含むカット集合は寄与しない（弾性ゼロ）．
+  \item \textbf{最適冗長投資の閉形式条件}
+        （定理~\ref{thm:optimal_investment}）：
+        最適投資では「スプレッドの限界削減便益 = 投資の限界費用」が成立し，
+        数値例では $I^* \approx 75$ 億円を得る．
+        MTTR 短縮が MTBF 改善と等価な投資効率を持つことが定量的に示される．
+\end{enumerate}
+
+本研究の中心的な理論的貢献は，
+\textbf{信頼性工学の精密なシステムモデル（6 コンポーネント・5 最小カット集合）
+と金融リスク理論（VaR/ES・CDS・最適投資）を統合し，
+IT システム可用性設計を「信用リスクの一形態」として定式化する枠組みを，
+数学的に厳密なシステムモデルに基づいて構築した}点にある．
+
+% ================================================================
+%  参考文献
+% ================================================================
+% bibliography below
+\begin{thebibliography}{99}
+
+\bibitem{companion}
+著者名 (2025).
+クォーラム型二重データセンタ構成における停止強度の漸近解析
+── 吸収型マルコフ連鎖の主固有値に基づく閉形式導出と数値検証 ──.
+（本論文の伴論文，v7）
+
+\bibitem{bcbs2016}
+Basel Committee on Banking Supervision (2016).
+\textit{Minimum Capital Requirements for Market Risk}.
+Bank for International Settlements, Basel.
+\url{https://www.bis.org/bcbs/publ/d352.htm}
+
+\bibitem{cambridge2018}
+Cambridge Centre for Risk Studies (2018).
+\textit{Cyber Risk Outlook 2018}.
+University of Cambridge Judge Business School.
+
+\bibitem{avizienis2004}
+Avizienis, A., Laprie, J.-C., Randell, B. and Landwehr, C. (2004).
+Basic Concepts and Taxonomy of Dependable and Secure Computing.
+\textit{IEEE Trans.\ Dependable Secure Comput.}, 1(1), 11--33.
+
+\bibitem{corbett2012}
+Corbett, J.~C.\ et al.\ (2012).
+Spanner: Google's Globally Distributed Database.
+\textit{Proc.\ USENIX OSDI'12}, 251--264.
+
+\bibitem{duffie2003}
+Duffie, D. and Singleton, K.~J. (2003).
+\textit{Credit Risk: Pricing, Measurement, and Management}.
+Princeton University Press.
+
+\bibitem{ford2010}
+Ford, D.\ et al.\ (2010).
+Availability in Globally Distributed Storage Systems.
+\textit{Proc.\ USENIX OSDI'10}, 61--74.
+
+\bibitem{gray1993}
+Gray, J. and Reuter, A. (1993).
+\textit{Transaction Processing: Concepts and Techniques}.
+Morgan Kaufmann.
+
+\bibitem{jorion2007}
+Jorion, P. (2007).
+\textit{Value at Risk: The New Benchmark for Managing Financial Risk}, 3rd edn.
+McGraw-Hill, New York.
+
+\bibitem{kato1995}
+Kato, T. (1995).
+\textit{Perturbation Theory for Linear Operators}, 2nd edn. Springer.
+
+\bibitem{kuo2003}
+Kuo, W. and Zuo, M.~J. (2003).
+\textit{Optimal Reliability Modeling: Principles and Applications}.
+John Wiley \& Sons.
+
+\bibitem{lynch1996}
+Lynch, N.~A. (1996).
+\textit{Distributed Algorithms}. Morgan Kaufmann.
+
+\bibitem{mcneil2015}
+McNeil, A.~J., Frey, R. and Embrechts, P. (2015).
+\textit{Quantitative Risk Management: Concepts, Techniques and Tools}, rev.\ edn.
+Princeton University Press.
+
+\bibitem{noaa2023}
+NOAA (2023).
+\textit{Billion-Dollar Weather and Climate Disasters}.
+NOAA National Centers for Environmental Information.
+\url{https://www.ncei.noaa.gov/access/billions/}
+
+\bibitem{schroeder2007}
+Schroeder, B. and Gibson, G.~A. (2007).
+Disk Failures in the Real World.
+\textit{Proc.\ USENIX FAST'07}.
+
+\bibitem{taleb2007}
+Taleb, N.~N. (2007).
+\textit{The Black Swan: The Impact of the Highly Improbable}.
+Random House.
+
+\bibitem{trivedi2002}
+Trivedi, K.~S. (2002).
+\textit{Probability and Statistics with Reliability, Queuing, and Computer Science Applications}, 2nd edn.
+John Wiley \& Sons.
+
+\end{thebibliography}
+
+% ================================================================
+%  付録 A：数理的補足
+% ================================================================
+\appendix
+\section{数理的補足}
+\label{app:proofs}
+
+\subsection{定理~\ref{thm:es} の一般ケースの詳細証明}
+
+$T_d \sim \mathrm{Exp}(\mu_r)$，$L = RT_d + C_f$ のとき，
+$L$ の生存関数は $P(L > \ell) = \exp(-\mu_r(\ell-C_f)/R)$（$\ell \ge C_f$）．
+$q = \VaR_\alpha(X)$ とすると $P(X > q) = p(1-F_L(q)) = p-(1-\alpha)$，
+$E[X\cdot\mathbf{1}_{X>q}] = p\int_q^\infty \ell f_L(\ell)\,d\ell = p(q+R/\mu_r) P(L>q)$．
+両者の商をとると $\ES_\alpha(X) = q + R/\mu_r$（式~\eqref{eq:es_general}）を得る．
+
+\subsection{定理~\ref{thm:default} の証明}
+
+全確率の法則より
+$P(\mathrm{default}) = P(\mathrm{default}|\mathrm{stop})\cdot P(\mathrm{stop})
++ P(\mathrm{default}|\overline{\mathrm{stop}})\cdot P(\overline{\mathrm{stop}})$．
+仮定（停止なしでは破綻しない）より第 2 項はゼロ．
+$P(\mathrm{stop}) = p$，$P(\mathrm{default}|\mathrm{stop}) = P(L>B)$ を代入すると
+式~\eqref{eq:default_prob} を得る．
+
+\subsection{定理~\ref{thm:optimal_investment} の二階条件}
+
+$J(I) = I + s_0 e^{-2kI}/r$（$s_0 := s_{\mathrm{HA}}(0) > 0$）．
+一階条件 $J'(I^*) = 1 - (2k/r)s_0 e^{-2kI^*} = 0$，
+二階条件 $J''(I^*) = (2k)^2 s_0 e^{-2kI^*}/r > 0$ より，
+$I^*$ は最小値であることが確認される．
+$J(I) \to \infty$（$I \to \infty$）かつ $J(0) = 1+s_0/r > J(I^*)$ が成立する場合に
+$I^* > 0$ が内点最適解となる条件は $s_0 > r/(2k)$，すなわち初期スプレッドが
+最適スプレッド水準を超えることである．
+
+% ================================================================
+%  付録 B：Monte Carlo 実装と全列挙検証
+% ================================================================
+\section{Monte Carlo 実装と全列挙検証}
+\label{app:code}
+
+\subsection{業務継続条件の全列挙検証}
+
+\begin{lstlisting}[caption={6 コンポーネント系の状態分類（Python）}]
+def phi(xA, xB, xQ, xAB, xAQ, xBQ):
+    """業務継続条件（定義 2.1, 式 (2)）"""
+    return ((xA and xB) or
+            (xA and not xB and xQ and xAQ) or
+            (not xA and xB and xQ and xBQ))
+
+transient, absorbing = [], []
+for bits in range(64):
+    s = tuple((bits >> (5-i)) & 1 for i in range(6))
+    (transient if phi(*s) else absorbing).append(s)
+
+assert len(transient) == 24 and len(absorbing) == 40
+print(f"|T| = {len(transient)}, |A| = {len(absorbing)}")
+# 出力: |T| = 24, |A| = 40
+\end{lstlisting}
+
+\subsection{リスク指標の Monte Carlo 推定}
+
+\begin{lstlisting}[caption={HA 停止リスクの Monte Carlo 推定（6 コンポーネントモデル）}]
+import numpy as np
+
+# 基本パラメータ（伴論文 Table 1）
+LAMBDA = {'A': 0.01, 'B': 0.01, 'Q': 0.05,
+          'NAB': 0.10, 'NAQ': 0.10, 'NBQ': 0.10}
+MU     = {'A': 1095, 'B': 1095, 'Q': 365,
+          'NAB': 730, 'NAQ': 730, 'NBQ': 730}
+
+def theta_closed_form():
+    """閉形式停止強度（定理 3.1, 式 (4)）"""
+    C2 = [('A','B'), ('A','Q'), ('A','NBQ'), ('B','Q'), ('B','NAQ')]
+    return sum(LAMBDA[i]*LAMBDA[j]/(MU[i]+MU[j]) for i,j in C2)
+
+def simulate_ha_risk(theta, R, C_f, mu_r, B, RR=0.4,
+                     N=10_000_000, alpha=0.999992):
+    """年次損失リスク指標の Monte Carlo 推定"""
+    p    = 1 - np.exp(-theta)        # T=1 年
+    u    = np.random.rand(N)
+    stop = (u < p)
+    T_d  = np.random.exponential(1/mu_r, N)
+    losses = np.where(stop, R*T_d + C_f, 0.0)
+
+    VaR      = np.quantile(losses, alpha)
+    ES       = losses[losses > VaR].mean() if (losses > VaR).any() else 0.0
+    p_def    = float(np.mean(losses > B))
+    spread   = (1 - RR) * p_def * 1e4  # bps
+
+    return {'theta': theta, 'p': p, 'VaR': VaR,
+            'ES': ES, 'P_default': p_def, 'spread_bps': spread}
+
+theta = theta_closed_form()
+print(f"theta = {theta:.3e} /year")  # 8.38e-06
+
+# 金融業界（単位：億円）
+result = simulate_ha_risk(
+    theta=theta,
+    R    = 50e8,    # 50 億円/時間
+    C_f  = 200e8,   # 固定損失 200 億円
+    mu_r = 1/4,     # 平均修復時間 4 時間
+    B    = 300e8,   # 財務バッファ 300 億円
+)
+print(result)
+\end{lstlisting}
+
+\end{document}

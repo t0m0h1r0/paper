@@ -1,0 +1,68 @@
+% ================================================================
+%  クォーラム型二重データセンタ構成における停止リスクの
+%  金融工学的定量評価
+%  ── 準吸収型 CTMC の主固有値漸近展開・
+%     VaR 相転移・信用スプレッドの統合理論 ──
+%
+%  改訂方針（査読対応 v3）:
+%   [R1] 自己完結性の回復：主固有値漸近展開を本文中で証明
+%   [R2] εスケーリングを厳密定義（λ_i=εα_i, μ_i=β_i）
+%   [R3] スペクトル射影（Dunford–Taylor 積分）を用いた厳密証明
+%   [R4] 複合ポアソン近似の厳密導出
+%   [R5] VaR の相転移定理と ES の漸近展開を定理として定式化
+%   [R6] リスク中立変換を明示した CDS スプレッド接続
+%   [R7] 最適化の凸性条件と一階条件を厳密化
+%   [R8] 理論検証型数値実験（収束オーダー実証）に再設計
+%   [R9] 引用文献を 38 件に拡充
+%   [R10] ストーリーを「スペクトル理論×信用リスク統合理論」に一本化
+%
+%  コンパイル: xelatex（2 回実行）
+% ================================================================
+\documentclass[12pt,a4paper]{article}
+\usepackage{fontspec}
+\setmainfont{NotoSerifCJK-Regular.ttc}[
+  Path     = /usr/share/fonts/opentype/noto/,
+  BoldFont = NotoSerifCJK-Bold.ttc]
+\setmonofont{DejaVu Sans Mono}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{setspace}\onehalfspacing
+\usepackage{booktabs,array,float,caption}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,
+            citecolor=green!50!black,urlcolor=blue!70!black]{hyperref}
+\usepackage{microtype,xcolor,parskip,enumitem}
+\setlist{itemsep=2pt,topsep=4pt}
+\usepackage{listings}
+\lstset{language=Python,basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue},commentstyle=\color{gray},
+  stringstyle=\color{red!70!black},breaklines=true,
+  frame=single,numbers=left,numberstyle=\tiny\color{gray},
+  showstringspaces=false}
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{corollary}[theorem]{系}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{assumption}[theorem]{仮定}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{注}
+\newcommand{\calC}{\mathcal{C}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calT}{\mathcal{T}}
+\newcommand{\calO}{\mathcal{O}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\VaR}{\mathrm{VaR}}
+\newcommand{\ES}{\mathrm{ES}}
+\newcommand{\e}{\mathrm{e}}
+\newcommand{\RedRes}{S}
+\newcommand{\Proj}{P}
+% ================================================================
+\title{\textbf{準吸収型マルコフ連鎖によるクォーラム型 HA システム停止の\\
+スペクトル解析と金融工学的リスク評価}\\[0.5em]
+\large 主固有値の二次漸近展開・VaR 相転移定理・信用スプレッドの統合閉形式理論}
+\author{著者名（所属機関）}
+\date{\today}
+\begin{document}
+\maketitle\thispagestyle{empty}

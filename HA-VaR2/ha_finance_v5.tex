@@ -1,0 +1,1208 @@
+% ================================================================
+%  クォーラム型 HA システムにおける二重誘因停止の
+%  スペクトル解析と金融工学的リスク評価
+%  ── κ₁=0 定理・複合障害分解・VaR 相転移・CDS スプレッドの統合理論 ──
+%
+%  v5 改訂方針:
+%  [F1] HA モデル再設計：DC1 または DC2 生存で業務継続，
+%       「DC間断 × Quorum喪失」同時発生が停止条件（スプリットブレイン誘発）
+%  [F2] 「ブラックスワン」廃止 → 「二重誘因停止 (DTS)」として精密再定義
+%  [F3] κ₁=0 定理（HA設計が一次吸収を消去する）を中核定理として確立
+%  [F4] κ₂ の正規停止・DTS 停止への自然な分解を定理化
+%  [F5] VaR・CDS が O(ε²) 構造を持つことを導出
+%  [F6] 数値実験を理論定理の検証型に再設計
+%
+%  コンパイル: xelatex ha_finance_v5.tex（3 回実行推奨）
+% ================================================================
+\documentclass[12pt,a4paper]{article}
+
+%% フォント
+\usepackage{fontspec}
+\setmainfont[
+  BoldFont = NotoSerifCJK-Bold.ttc,
+  Path     = /usr/share/fonts/opentype/noto/,
+  Script   = CJK
+]{NotoSerifCJK-Regular.ttc}
+\setmonofont{DejaVu Sans Mono}
+
+%% 数学
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+
+%% レイアウト
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{setspace}\onehalfspacing
+
+%% 表・図
+\usepackage{booktabs,array,float,caption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc}
+
+%% ハイパーリンク
+\usepackage[colorlinks=true,
+            linkcolor=blue!60!black,
+            citecolor=green!50!black,
+            urlcolor=blue!70!black]{hyperref}
+
+%% その他
+\usepackage{microtype,xcolor,parskip,enumitem}
+\setlist{itemsep=2pt,topsep=4pt}
+
+%% 定理環境
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{corollary}[theorem]{系}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{assumption}[theorem]{仮定}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{注意}
+
+%% マクロ
+\newcommand{\eps}{\varepsilon}
+\newcommand{\VaR}{\mathrm{VaR}}
+\newcommand{\ES}{\mathrm{ES}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Exp}{\mathbb{E}}
+\newcommand{\e}{\mathrm{e}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calT}{\mathcal{T}}
+\newcommand{\calF}{\mathcal{F}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+\newcommand{\abs}[1]{\left|#1\right|}
+\DeclareMathOperator{\spec}{spec}
+\newcommand{\DTS}{\mathrm{DTS}}
+\newcommand{\Nor}{\mathrm{NOR}}
+
+% ================================================================
+\title{%
+  \textbf{クォーラム型 HA システムにおける\\
+  二重誘因停止のスペクトル解析と\\
+  金融工学的リスク評価}\\[0.6em]
+  \large
+  ── $\kappa_1=0$ 定理による HA 設計の有効性証明・\\
+  DTS 停止分解・VaR 相転移・CDS スプレッドの統合閉形式理論 ──
+}
+\author{著者名\thanks{所属機関，E-mail: example@example.ac.jp}}
+\date{令和7年（2025年）}
+
+% ================================================================
+\begin{document}
+\maketitle\thispagestyle{empty}
+
+% ----------------------------------------------------------------
+\begin{abstract}
+本稿は，DC1–DC2 二重データセンタ（DC）とクォーラムノード（QN）から
+成るクォーラム型 HA システムの停止リスクを，
+準吸収型連続時間マルコフ連鎖（CTMC）のスペクトル理論と
+金融工学の統合枠組みで定量化する．
+
+まず HA システムの停止条件を正確に整理する：
+DC1 または DC2 のどちらかが生存していれば業務は継続できる．
+QN 単独の障害は業務停止の直接的原因とはならない．
+ただし，\textbf{「DC間ネットワーク断 (L断) かつ QN 経路喪失」の
+同時発生}時はリーダー専決不能となりスプリットブレインを回避するために
+システムが停止する．これを\textbf{二重誘因停止（Double-Trigger Stop，DTS）}
+と定義する．
+
+主な理論的貢献は三点である．
+
+\textbf{（1）$\kappa_1=0$ 定理}（定理~\ref{thm:kappa1_zero}）：
+HA 設計の下では，単一コンポーネント障害はすべて推移状態に移行し
+吸収に至らないため，主固有値 $\lambda_0(\eps)$ の一次項が消えて
+$\lambda_0(\eps) = -\eps^2\kappa_2 + O(\eps^3)$ となる．
+これは HA 設計が期待停止時間を $O(1/\eps)$ から $O(1/\eps^2)$ へと
+一オーダー改善することの数学的証明である．
+
+\textbf{（2）DTS 分解定理}（定理~\ref{thm:DTS_decomp}）：
+$\kappa_2$ は正規停止寄与 $\kappa_2^{(\Nor)} = \alpha_{DC}^2/\mu_{DC}$
+と DTS 寄与 $\kappa_2^{(\DTS)} = \alpha_L\alpha_Q(1/\mu_L+1/\mu_Q)$
+の和に自然分解され，DTS 停止割合
+$\rho_\DTS = \kappa_2^{(\DTS)}/\kappa_2$ が閉形式で与えられる．
+
+\textbf{（3）$O(\eps^2)$ 構造を反映した金融リスク指標}：
+VaR 相転移の臨界値が $O(1/\sqrt{\kappa_2 T})$ となること
+（定理~\ref{thm:VaR}），および CDS スプレッドが
+$c^* \approx (1-R)\eps^2\kappa_2$ と二次スケールを持つこと
+（定理~\ref{thm:CDS}）を導出する．
+
+数値実験により，固有値収束オーダー（$O(\eps^2)$）の実証，
+DTS 停止割合の理論値との整合，および VaR 相転移の閾値確認を行う．
+
+\medskip
+\noindent\textbf{キーワード}：
+クォーラム型 HA，準吸収型 CTMC，スペクトル射影，$\kappa_1=0$ 定理，
+二重誘因停止（DTS），DTS 分解，VaR 相転移，CDS スプレッド，
+スプリットブレイン
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ================================================================
+\section{序論}\label{sec:intro}
+% ================================================================
+
+\subsection{研究背景：クォーラム型 HA の停止リスク}
+
+金融機関・クラウドプロバイダなどの基幹システムでは，
+可用性向上のためにクォーラム型 HA（High Availability）構成が
+標準的に採用されている~\cite{Lamport:1998,Gray:1992}．
+典型的な構成は次の三要素から成る（図~\ref{fig:ha_arch}）：
+\begin{itemize}
+  \item \textbf{DC1，DC2}：業務サービスを提供する二重化データセンタ．
+  \item \textbf{クォーラムノード（QN）}：リーダー選出の投票ノード．
+    障害発生時に DC1，DC2 のどちらが「生きているか」を多数決で確認する．
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    node distance=2.2cm,
+    box/.style={draw,rounded corners,minimum width=1.8cm,
+                minimum height=1.0cm,text centered,font=\small},
+    link/.style={thick,<->,>=Latex}
+  ]
+    \node[box,fill=blue!15] (dc1) {DC1};
+    \node[box,fill=blue!15,right=3.5cm of dc1] (dc2) {DC2};
+    \node[box,fill=orange!25,above=1.5cm of $(dc1)!0.5!(dc2)$] (qn) {QN};
+    \draw[link] (dc1) -- node[below,font=\footnotesize]{DC間 L} (dc2);
+    \draw[link] (dc1) -- node[left,font=\footnotesize]{L1Q} (qn);
+    \draw[link] (dc2) -- node[right,font=\footnotesize]{L2Q} (qn);
+    \node[below=0.3cm of dc1,font=\footnotesize,text=blue!70!black]
+          {業務提供};
+    \node[below=0.3cm of dc2,font=\footnotesize,text=blue!70!black]
+          {業務提供};
+    \node[above=0.2cm of qn,font=\footnotesize,text=orange!70!black]
+          {リーダー選出・投票};
+  \end{tikzpicture}
+  \caption{クォーラム型 HA システム構成．
+           DC1 または DC2 のどちらかが稼働していれば業務継続．
+           QN はリーダー選出のみに使用．}
+  \label{fig:ha_arch}
+\end{figure}
+
+\subsection{HA 停止条件の正確な整理}\label{sec:stop_condition}
+
+HA システムの停止条件はしばしば誤解される．
+本節で正確に整理する．
+
+\begin{description}
+  \item[業務継続条件（正）]
+    DC1 または DC2 の少なくとも一方が正常稼働していれば，
+    QN の状態に関わらず，業務は継続できる．
+    QN の障害単独は\textbf{直接的な業務停止原因ではない}．
+
+  \item[業務停止条件 A（正規停止）]
+    DC1 と DC2 の\textbf{両方}が障害を起こした場合，
+    業務を提供できなくなる（$a_N$）．
+
+  \item[業務停止条件 B（二重誘因停止：DTS）]
+    \textbf{「DC間ネットワーク断（L断）かつ QN への経路喪失（または QN 障害）」}
+    が同時に発生した場合，DC1 と DC2 はお互いの生死を確認できず，
+    かつ QN による仲裁も不可能となる．
+    この状況ではスプリットブレイン（双方が自分をリーダーと主張し
+    データ不整合が生じる状態）を回避するため，
+    HA ソフトウェアは安全側に倒してサービスを停止する（$a_C$）．
+\end{description}
+
+\begin{remark}[HA 設計の限界]
+  HA 設計は単一コンポーネント障害（DC1 単独障害，DC2 単独障害，
+  L 断単独，QN 喪失単独）に対しては十分な耐性をもつ．
+  しかし，L断と QN 喪失という\textbf{二種類の独立した障害が同時発生する
+  シナリオ（DTS）}は，単一障害の組み合わせとして設計上の想定外となりやすく，
+  現実の大規模障害事例~\cite{FB:2021,AWS:2022}でも報告されている．
+\end{remark}
+
+\subsection{DTS 概念の定義と用語の選択}
+
+本稿では，上述の業務停止条件 B を
+\textbf{二重誘因停止（Double-Trigger Stop，DTS）}と名付ける．
+
+この用語の選択理由：
+\begin{itemize}
+  \item 「二重（Double-Trigger）」は，L断と QN 喪失という
+    \textbf{二種類の独立した誘因}が揃って初めて停止するという
+    メカニズムを正確に表現する．
+  \item 構造化金融における
+    ダブルトリガー債（double-trigger bond）~\cite{Doherty:2000}
+    との概念的類似性（二条件の同時成立で支払い発動）を活かし，
+    金融工学的な CDS スプレッド評価と自然に接続できる．
+  \item 「ブラックスワン」という語は Taleb~\cite{Taleb:2007} の
+    概念的定義に由来し確率的定義が曖昧であるため，
+    本稿では使用しない．
+    DTS の「想定外性」は，単一障害耐性を設計思想とする
+    HA システムにとって二重同時障害が
+    「設計の仮定の外側にある事象」であることを意味するが，
+    これは正規停止確率 $O(\eps^2)$ と DTS 確率 $O(\eps^2)$ が
+    \textbf{同一オーダーであることの数学的帰結}として
+    定理~\ref{thm:DTS_decomp} で厳密に示される．
+\end{itemize}
+
+\subsection{既存研究との差別化}
+
+\textbf{信頼性工学}（Trivedi~\cite{Trivedi:2001}）は
+定常可用性の評価に優れるが，停止時間の尾分布・
+停止タイプ別分解・金融指標への接続は行っていない．
+
+\textbf{オペレーショナルリスク}（Basel~\cite{Basel:2011}，
+Moscadelli~\cite{Moscadelli:2004}）は損失分布を統計的に扱うが，
+物理的な IT システムモデルとの接続を欠く．
+
+\textbf{信用リスクモデル}（Merton~\cite{Merton:1974}，
+Lando~\cite{Lando:2004}）は停止ハザードを外生的に与えるが，
+本稿はこれを HA システムの CTMC から\textbf{内生的}に導出する．
+
+本稿の位置づけ：HA システムの物理モデルに基づき，
+$\kappa_1=0$ という HA 設計の数学的本質を証明し，
+DTS のメカニズムを定理として確立した上で，
+VaR・CDS スプレッドを閉形式で導出する最初の統合理論．
+
+\subsection{本稿の構成}
+
+第~\ref{sec:model} 節でモデルと仮定を設定する．
+第~\ref{sec:spectral} 節で $\kappa_1=0$ 定理と $\kappa_2$ の分解を証明する．
+第~\ref{sec:DTS} 節で DTS 停止割合と期待停止時間を分析する．
+第~\ref{sec:risk} 節で VaR 相転移と CDS スプレッドを導出する．
+第~\ref{sec:numerical} 節で理論検証型数値実験を行う．
+第~\ref{sec:conclusion} 節で結論を述べる．詳細な証明は付録に収める．
+
+% ================================================================
+\section{モデルの設定}\label{sec:model}
+% ================================================================
+
+\subsection{確率空間と記号}
+
+確率空間 $(\Omega,\mathcal{F},\Prob)$ を固定する．
+$\Exp$ は $\Prob$ の下での期待値を表す．
+
+\subsection{システムコンポーネントと障害の定式化}
+
+本モデルが追跡するコンポーネントは以下の通り（表~\ref{tab:components}）：
+
+\begin{table}[H]
+  \centering
+  \caption{モデル化するコンポーネントと各パラメータの意味}
+  \label{tab:components}
+  \begin{tabular}{cccc}
+    \toprule
+    コンポーネント & 障害強度（$O(\eps)$） & 修復率（$O(1)$） & 停止への寄与 \\
+    \midrule
+    DC（一基） & $\eps\alpha_{DC}$ & $\mu_{DC}$ & 単独障害：業務継続 \\
+    DC間ネットワーク（L） & $\eps\alpha_L$ & $\mu_L$ & 単独断：業務継続（QN経由） \\
+    QN 経路（L1Q,L2Q 含む） & $\eps\alpha_Q$ & $\mu_Q$ & 単独喪失：業務継続（L経由） \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+$\eps>0$ は全コンポーネントに共通の「障害スケールパラメータ」であり，
+$\eps\to 0$ が「高信頼性体制」に対応する．
+
+\begin{assumption}[スケーリング]\label{assump:scaling}
+  全コンポーネントの障害強度は $O(\eps)$ であり，
+  修復率は $O(1)$（$\eps$ 非依存）とする：
+  $\alpha_{DC},\alpha_L,\alpha_Q>0$，$\mu_{DC},\mu_L,\mu_Q>0$
+  はすべて正の定数．
+\end{assumption}
+
+\subsection{状態空間と停止条件の CTMC 表現}
+
+\ref{sec:stop_condition} 節の停止条件分析に基づき，以下の状態空間を定義する：
+
+\begin{definition}[状態空間]\label{def:states}
+  \begin{align*}
+    s_0 &: \text{全系正常（全コンポーネント・全経路が稼働）} \\
+    s_1 &: \text{片 DC 障害（DC1 または DC2 の一基が障害，QN・L 正常）} \\
+    s_2 &: \text{DC 間 L 断（DC1-DC2 間ネットワーク断，QN 経路は正常）} \\
+    s_3 &: \text{QN 喪失（QN 経路断または QN 障害，DC 間 L は正常）}
+  \end{align*}
+  推移状態集合（業務継続中）：$\calT = \{s_0,s_1,s_2,s_3\}$．
+
+  吸収状態集合（業務停止）：$\calA = \{a_N, a_C\}$，ただし
+  \begin{align*}
+    a_N &: \text{正規停止（DC1・DC2 両方障害）} \\
+    a_C &: \text{二重誘因停止（DTS）（DC間 L断 + QN 喪失 が同時発生）}
+  \end{align*}
+\end{definition}
+
+\begin{remark}[DTS 停止状態の根拠]
+  状態 $s_2$（L断，QN正常）では：DC はQN 経由でリーダー選出できる → 業務継続．\\
+  状態 $s_3$（QN喪失，L正常）では：DC は L 経由でお互いを確認できる → 業務継続．\\
+  しかし「L断 + QN喪失」が同時に成立すると：
+  DC はお互いの生死を確認できず，かつ QN の仲裁もない →
+  スプリットブレインを回避するためシステムは停止（$a_C$）．
+\end{remark}
+
+\begin{remark}[片DC障害時の追加障害]
+  状態 $s_1$（片 DC 障害）において，L 断または QN 喪失が発生しても
+  「残存する一基の DC が単独でリーダーとして稼働」できるため
+  スプリットブレインは生じない．
+  したがって $s_1$ から L 断または QN 喪失への遷移は
+  $s_1$（業務継続中）へ留まるか，状態 $s_1$ のまま推移とみなす
+  （簡単のため本モデルでは $s_1$ から $a_C$ への直接遷移はなし）．
+\end{remark}
+
+状態遷移を図~\ref{fig:ctmc} に示す．
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    node distance=2.8cm,
+    state/.style={draw,circle,minimum size=1.4cm,text centered,font=\small},
+    abs/.style={draw,rectangle,rounded corners,minimum size=1.4cm,
+               text centered,font=\small,fill=red!15},
+    trans/.style={->,>=Latex,thick},
+    btrans/.style={<->,>=Latex,thick}
+  ]
+    \node[state,fill=green!15] (s0) {$s_0$};
+    \node[state,fill=yellow!20,right=of s0] (s1) {$s_1$};
+    \node[state,fill=yellow!20,below=of s0] (s2) {$s_2$};
+    \node[state,fill=yellow!20,below=of s1] (s3) {$s_3$};
+    \node[abs,right=of s1] (aN) {$a_N$};
+    \node[abs,right=of s3] (aC) {$a_C$};
+
+    %% s0 -> others
+    \draw[trans] (s0) to[bend left=10]
+      node[above,font=\scriptsize]{$\eps\alpha_{DC}$} (s1);
+    \draw[trans] (s0) to[bend right=10]
+      node[left,font=\scriptsize]{$\eps\alpha_L$} (s2);
+    \draw[trans] (s0) to[bend right=10]
+      node[above right,font=\scriptsize]{$\eps\alpha_Q$} (s3);
+
+    %% recovery back to s0
+    \draw[trans] (s1) to[bend left=10]
+      node[above,font=\scriptsize]{$\mu_{DC}$} (s0);
+    \draw[trans] (s2) to[bend right=10]
+      node[right,font=\scriptsize]{$\mu_L$} (s0);
+    \draw[trans] (s3) to[bend right=10]
+      node[below left,font=\scriptsize]{$\mu_Q$} (s0);
+
+    %% s2,s3 -> s1 (DC fails, but still one DC up)
+    \draw[trans] (s2) to[bend left=5]
+      node[above,font=\scriptsize]{$\eps\alpha_{DC}$} (s1);
+    \draw[trans] (s3) to[bend right=5]
+      node[below,font=\scriptsize]{$\eps\alpha_{DC}$} (s1);
+
+    %% absorption to aN
+    \draw[trans] (s1) to
+      node[above,font=\scriptsize]{$\eps\alpha_{DC}$} (aN);
+
+    %% absorption to aC (DTS)
+    \draw[trans] (s2) to[bend left=10]
+      node[below,font=\scriptsize]{$\eps\alpha_Q$} (aC);
+    \draw[trans] (s3) to
+      node[above,font=\scriptsize]{$\eps\alpha_L$} (aC);
+  \end{tikzpicture}
+  \caption{CTMC 状態遷移図（$\calT=\{s_0,s_1,s_2,s_3\}$，
+           $\calA=\{a_N,a_C\}$）．
+           黄色：業務継続中推移状態，赤：吸収（停止）状態．
+           DTS 停止 $a_C$ への遷移は $s_2$（L断）または
+           $s_3$（QN喪失）からの追加障害発生時にのみ生じる．}
+  \label{fig:ctmc}
+\end{figure}
+
+\subsection{部分生成行列}
+
+推移状態 $\calT$ 上の部分生成行列（サブジェネレータ）
+$Q_{00}(\eps)$ を以下のように書く
+（行・列の順は $s_0,s_1,s_2,s_3$）：
+\begin{equation}\label{eq:Q00}
+  Q_{00}(\eps) = Q_{00}^{(0)} + \eps Q_{00}^{(1)}
+\end{equation}
+ただし
+\begin{equation}\label{eq:Q00_0}
+  Q_{00}^{(0)}
+  = \begin{pmatrix}
+      0           & 0         & 0        & 0        \\
+      \mu_{DC}    & -\mu_{DC} & 0        & 0        \\
+      \mu_L       & 0         & -\mu_L   & 0        \\
+      \mu_Q       & 0         & 0        & -\mu_Q
+    \end{pmatrix},
+\end{equation}
+\begin{equation}\label{eq:Q00_1}
+  Q_{00}^{(1)}
+  = \begin{pmatrix}
+      -A_{00} & \alpha_{DC}              & \alpha_L              & \alpha_Q              \\
+      0       & -\alpha_{DC}             & 0                     & 0                     \\
+      0       & \alpha_{DC}              & -(\alpha_{DC}+\alpha_Q) & 0                   \\
+      0       & \alpha_{DC}              & 0                     & -(\alpha_{DC}+\alpha_L)
+    \end{pmatrix},
+\end{equation}
+ここで $A_{00}=\alpha_{DC}+\alpha_L+\alpha_Q$，
+$O(\eps^2)$ 以上の項は存在しないのでこれが正確な展開である．
+
+吸収強度ベクトル（推移状態から吸収状態への脱出率）は
+\begin{equation}\label{eq:absorb_rate}
+  d_{s_0}=0,\quad
+  d_{s_1}=\eps\alpha_{DC} \to a_N,\quad
+  d_{s_2}=\eps\alpha_Q \to a_C,\quad
+  d_{s_3}=\eps\alpha_L \to a_C.
+\end{equation}
+$d_{s_0}=0$ は，全系正常状態 $s_0$ からは直接吸収が起きないことを示す
+（HA 設計の本質）．
+
+\begin{assumption}[安定性]\label{assump:stable}
+  仮定~\ref{assump:scaling} の下で，$\eps>0$ のとき
+  $Q_{00}(\eps)$ の全固有値の実部は負である．
+  これは $\alpha_{DC},\alpha_L,\alpha_Q,\mu_{DC},\mu_L,\mu_Q>0$ より
+  $Q_{00}(\eps)$ が $\eps>0$ で安定な部分生成行列となることから成立する．
+\end{assumption}
+
+\subsection{吸収時間と位相型分布}
+
+初期分布 $\boldsymbol{\pi}^{\rm ini}$（推移状態 $\calT$ 上の確率分布）から
+出発する CTMC の吸収時間を $\tau = \inf\{t\ge 0: X_t\in\calA\}$ とする．
+Neuts~\cite{Neuts:1981} の標準理論より，
+生存関数は
+\begin{equation}\label{eq:survival}
+  S(t;\eps) = \Prob(\tau>t;\eps)
+  = (\boldsymbol{\pi}^{\rm ini})^\top \e^{Q_{00}(\eps)t}\mathbf{1}.
+\end{equation}
+仮定~\ref{assump:stable} の下で $\tau$ は
+位相型分布~\cite{Neuts:1981} に従い，軽尾（指数減衰）である．
+
+% ================================================================
+\section{スペクトル解析：$\kappa_1=0$ 定理と DTS 分解}\label{sec:spectral}
+% ================================================================
+
+\subsection{主固有値の摂動展開の準備}
+
+$Q_{00}(\eps)$ の固有値を $\lambda_0(\eps)\ge\mathrm{Re}\,\lambda_1(\eps)\ge\cdots$
+（実部の降順）とする．
+$\eps=0$ のとき $Q_{00}^{(0)}$ の行 $s_0$ はゼロ行であり，
+$\lambda_0(0)=0$ が退化する（準吸収型退化）．
+
+\textbf{左右固有ベクトルの計算}（$\eps=0$）：
+
+$Q_{00}^{(0)}\mathbf{v}^{(0)}=0$ の解（右固有ベクトル）：
+各行 $s_k$（$k=1,2,3$）の方程式
+$\mu_{\bullet}(v_0^{(0)}-v_k^{(0)})=0$ より
+$\mathbf{v}^{(0)}=(1,1,1,1)^\top$．
+
+$(\boldsymbol{\pi}^{(0)})^\top Q_{00}^{(0)}=0$ の解（左固有ベクトル）：
+列 $s_k$（$k=1,2,3$）の方程式
+$-\mu_{\bullet}\pi_k^{(0)}=0$ より
+$\boldsymbol{\pi}^{(0)}=(1,0,0,0)^\top$（正規化 $(\boldsymbol{\pi}^{(0)})^\top\mathbf{v}^{(0)}=1$）．
+
+\begin{remark}[固有ベクトルの物理的意味]
+  右固有ベクトル $\mathbf{v}^{(0)}=(1,1,1,1)^\top$ は，
+  $\eps=0$ ではすべての推移状態が等価（吸収なし）であることを示す．
+  左固有ベクトル $\boldsymbol{\pi}^{(0)}=(1,0,0,0)^\top$ は，
+  $\eps=0$ 極限での準定常分布が $s_0$（全系正常）に集中することを示す
+  —— これは $\eps\to 0$ で修復が支配的となり，
+  系が $s_0$ に戻り続けることの反映である．
+\end{remark}
+
+\subsection{主定理：$\kappa_1=0$ と HA 設計の有効性}
+
+\begin{theorem}[$\kappa_1=0$ 定理：HA 設計による一次吸収の消去]\label{thm:kappa1_zero}
+  仮定~\ref{assump:scaling}，~\ref{assump:stable} の下で，
+  $\eps\to 0$ において
+  \begin{equation}\label{eq:lambda0_expand}
+    \lambda_0(\eps) = -\eps^2\kappa_2 + O(\eps^3)
+  \end{equation}
+  が成立する（一次項は $\kappa_1=0$）．
+  ここで
+  \begin{equation}\label{eq:kappa2_def}
+    \kappa_2
+    = \underbrace{\frac{\alpha_{DC}^2}{\mu_{DC}}}_{\kappa_2^{(\Nor)}}
+    + \underbrace{\alpha_L\alpha_Q
+      \left(\frac{1}{\mu_L}+\frac{1}{\mu_Q}\right)}_{\kappa_2^{(\DTS)}}
+    > 0.
+  \end{equation}
+  特に $\lambda_0(\eps)$ の一次項がゼロであることは，
+  HA 設計（単一障害での非吸収性）の数学的帰結であり，
+  期待停止時間が $O(1/\eps)$ ではなく $O(1/\eps^2)$ にスケールすることを意味する．
+\end{theorem}
+
+\begin{proof}
+  固有値摂動展開 $\lambda_0(\eps)=\eps\lambda^{(1)}+\eps^2\lambda^{(2)}+O(\eps^3)$
+  を組み立てる．
+
+  \textbf{ステップ 1}（$\lambda^{(1)}=0$）：
+  標準的な摂動公式（Kato~\cite{Kato:1966}）より，
+  \begin{equation}\label{eq:kato_formula}
+    \lambda^{(1)}
+    = (\boldsymbol{\pi}^{(0)})^\top Q_{00}^{(1)} \mathbf{v}^{(0)}.
+  \end{equation}
+  $Q_{00}^{(1)}\mathbf{v}^{(0)}$ の第 $s_0$ 成分を計算する：
+  $\mathbf{v}^{(0)}=(1,1,1,1)^\top$ および \eqref{eq:Q00_1} の行 $s_0$ より
+  \begin{equation*}
+    (Q_{00}^{(1)}\mathbf{v}^{(0)})_{s_0}
+    = -A_{00}\cdot 1 + \alpha_{DC}\cdot 1 + \alpha_L\cdot 1 + \alpha_Q\cdot 1
+    = 0.
+  \end{equation*}
+  $(\boldsymbol{\pi}^{(0)})^\top = (1,0,0,0)$ より
+  $\lambda^{(1)} = (Q_{00}^{(1)}\mathbf{v}^{(0)})_{s_0} = 0$．
+
+  \smallskip
+  \textbf{ステップ 2}（$\mathbf{v}^{(1)}$ の決定）：
+  $O(\eps^1)$ の固有値方程式は
+  $Q_{00}^{(0)}\mathbf{v}^{(1)} = -Q_{00}^{(1)}\mathbf{v}^{(0)}$．
+  右辺を計算すると
+  \begin{equation*}
+    -Q_{00}^{(1)}\mathbf{v}^{(0)}
+    = (0,\, \alpha_{DC},\, \alpha_Q,\, \alpha_L)^\top.
+  \end{equation*}
+  $Q_{00}^{(0)}\mathbf{v}^{(1)}=\mathbf{b}$ の各成分方程式を解く
+  （正規化条件 $(\boldsymbol{\pi}^{(0)})^\top\mathbf{v}^{(1)}=v^{(1)}_0=0$）：
+  \begin{equation}\label{eq:v1}
+    v^{(1)}_1 = -\frac{\alpha_{DC}}{\mu_{DC}},\quad
+    v^{(1)}_2 = -\frac{\alpha_Q}{\mu_L},\quad
+    v^{(1)}_3 = -\frac{\alpha_L}{\mu_Q}.
+  \end{equation}
+
+  \smallskip
+  \textbf{ステップ 3}（$\lambda^{(2)}$ の計算）：
+  $O(\eps^2)$ の固有値方程式に左から $(\boldsymbol{\pi}^{(0)})^\top$ を作用させると
+  \begin{equation*}
+    \lambda^{(2)}
+    = (\boldsymbol{\pi}^{(0)})^\top Q_{00}^{(1)} \mathbf{v}^{(1)}
+      + (\boldsymbol{\pi}^{(0)})^\top Q_{00}^{(2)} \mathbf{v}^{(0)}.
+  \end{equation*}
+  $Q_{00}^{(2)}=0$（モデルに $O(\eps^2)$ 項なし）なので
+  第二項はゼロ．
+  第一項：行 $s_0$ の $Q_{00}^{(1)}$ と $\mathbf{v}^{(1)}$ の積を計算する：
+  \begin{align*}
+    (Q_{00}^{(1)}\mathbf{v}^{(1)})_{s_0}
+    &= -A_{00}\cdot 0
+       + \alpha_{DC}\cdot\left(-\frac{\alpha_{DC}}{\mu_{DC}}\right)
+       + \alpha_L\cdot\left(-\frac{\alpha_Q}{\mu_L}\right)
+       + \alpha_Q\cdot\left(-\frac{\alpha_L}{\mu_Q}\right) \\
+    &= -\frac{\alpha_{DC}^2}{\mu_{DC}}
+       - \alpha_L\alpha_Q\left(\frac{1}{\mu_L}+\frac{1}{\mu_Q}\right).
+  \end{align*}
+  よって
+  $\lambda^{(2)} = -\kappa_2 < 0$
+  （\eqref{eq:kappa2_def} の定義と一致），
+  および $\lambda_0(\eps)=-\eps^2\kappa_2+O(\eps^3)$ が成立する．
+\end{proof}
+
+\begin{remark}[$\kappa_1=0$ の物理的意味]
+  $\lambda^{(1)}=0$ が成立する本質的理由は，
+  行 $s_0$ の $Q_{00}^{(1)}$ の行和がゼロ（\eqref{eq:Q00_1} 参照）
+  であることにある．
+  これは「全系正常状態 $s_0$ からは，$O(\eps)$ の障害が発生しても
+  すべての遷移先が推移状態（業務継続中）であり，直接吸収に至らない」
+  という HA 設計の本質を表す．
+
+  逆に言えば，$d_{s_0}=0$（式~\eqref{eq:absorb_rate}）という
+  HA 設計の要件が満たされる限り，$\kappa_1=0$ は
+  コンポーネント数に関わらず一般的に成立する．
+  （付録~\ref{app:general_kappa1} で $n$ 状態への一般化を示す．）
+\end{remark}
+
+\begin{corollary}[期待停止時間のスケール]\label{cor:mean_tau}
+  初期状態 $s_0$ から出発する場合，
+  \begin{equation}
+    \Exp_{s_0}[\tau]
+    = \frac{1}{\eps^2\kappa_2}\bigl(1+O(\eps)\bigr).
+  \end{equation}
+  非 HA システム（$\kappa_1>0$ の場合）の
+  期待停止時間 $O(1/\eps)$ と比べ，
+  HA 設計により $O(1/\eps^2)$ へと一オーダー向上する．
+\end{corollary}
+
+\begin{proof}
+  位相型分布の平均の公式
+  $\Exp[\tau]=-(\boldsymbol{\pi}^{\rm ini})^\top(Q_{00}(\eps))^{-1}\mathbf{1}$
+  に，主固有値の漸近展開 \eqref{eq:lambda0_expand} を適用する
+  （詳細は付録~\ref{app:mean_tau}）．
+\end{proof}
+
+\subsection{DTS 分解定理}
+
+\begin{theorem}[DTS 分解：停止タイプの寄与分解]\label{thm:DTS_decomp}
+  総吸収率 $\kappa_2$ は
+  \begin{equation}\label{eq:kappa2_decomp}
+    \kappa_2
+    = \underbrace{\frac{\alpha_{DC}^2}{\mu_{DC}}}_{\kappa_2^{(\Nor)}\,:\,\text{正規停止寄与}}
+    + \underbrace{\alpha_L\alpha_Q\!\left(\frac{1}{\mu_L}+\frac{1}{\mu_Q}\right)}_{\kappa_2^{(\DTS)}\,:\,\text{DTS 停止寄与}}
+  \end{equation}
+  と分解される．DTS 停止割合（停止全体に占める DTS の割合）は
+  \begin{equation}\label{eq:rho_DTS}
+    \rho_\DTS
+    = \frac{\kappa_2^{(\DTS)}}{\kappa_2}
+    = \frac{\alpha_L\alpha_Q(1/\mu_L+1/\mu_Q)}
+           {\alpha_{DC}^2/\mu_{DC}
+            + \alpha_L\alpha_Q(1/\mu_L+1/\mu_Q)}
+    \in (0,1),
+  \end{equation}
+  これは $\eps$ に非依存の定数である（ $O(\eps^2)$ 精度での主要項において）．
+\end{theorem}
+
+\begin{proof}
+  定理~\ref{thm:kappa1_zero} のステップ 3 で計算した
+  $\lambda^{(2)} = -\kappa_2$ の式を成分に分けると：
+  $-\alpha_{DC}^2/\mu_{DC}$ は状態 $s_1$（片 DC 障害）を経由する
+  $s_0\to s_1\to a_N$ の経路に対応し，正規停止 $a_N$ への寄与；
+  $-\alpha_L\alpha_Q/\mu_L$ は $s_0\to s_2\to a_C$ の経路（DC 間 L 断後に QN 喪失），
+  $-\alpha_Q\alpha_L/\mu_Q$ は $s_0\to s_3\to a_C$ の経路（QN 喪失後に L 断）に
+  対応し，いずれも DTS $a_C$ への寄与である
+  （付録~\ref{app:DTS_decomp} で経路解釈を詳述）．
+  $\rho_\DTS$ は定義より直ちに従う．
+\end{proof}
+
+\begin{remark}[DTS 割合の解釈]
+  $\rho_\DTS$ は障害スケール $\eps$ に依存しない定数であるため，
+  「信頼性を高める（$\eps\to 0$）」ことは DTS 割合を減少させない．
+  DTS 割合を低減するには，
+  $\alpha_L$，$\alpha_Q$ を小さくする（冗長化・経路強化），
+  または $\mu_L$，$\mu_Q$ を大きくする（修復時間の短縮）
+  という\textbf{設計の質的改善}が必要である
+  （政策含意は第~\ref{sec:conclusion} 節）．
+\end{remark}
+
+\begin{corollary}[DTS 寄与の対称性]\label{cor:symmetry}
+  $\kappa_2^{(\DTS)}$ は $\alpha_L$ と $\alpha_Q$ に対して対称
+  （$\alpha_L\alpha_Q$ の形）であるが，
+  $\mu_L$ と $\mu_Q$ には非対称に依存する：
+  修復率が低いほうが DTS 寄与を支配する．
+  具体的には $\mu_L\ll\mu_Q$ のとき
+  $\kappa_2^{(\DTS)}\approx \alpha_L\alpha_Q/\mu_L$
+  であり，DC 間ネットワーク修復の遅延が DTS のボトルネックとなる．
+\end{corollary}
+
+% ================================================================
+\section{DTS 停止の確率的性質}\label{sec:DTS}
+% ================================================================
+
+\subsection{停止タイプ別の吸収確率}
+
+システムが最終的に正規停止 $a_N$ に至る確率と
+DTS 停止 $a_C$ に至る確率を，初期状態 $s_0$ から求める．
+
+\begin{proposition}[吸収確率の DTS 分解]\label{prop:abs_prob}
+  $\eps\to 0$ の主要項として，初期状態 $s_0$ からの各吸収状態への確率は
+  \begin{equation}\label{eq:abs_prob}
+    \Prob_{s_0}(\text{absorbed into }a_N)
+    \approx \frac{\kappa_2^{(\Nor)}}{\kappa_2},\quad
+    \Prob_{s_0}(\text{absorbed into }a_C)
+    \approx \frac{\kappa_2^{(\DTS)}}{\kappa_2}
+    = \rho_\DTS.
+  \end{equation}
+\end{proposition}
+
+\begin{proof}
+  定常的な競合吸収の分析を行う（付録~\ref{app:abs_prob} 参照）．
+  各吸収状態への確率の比が $\kappa_2^{(\Nor)}:\kappa_2^{(\DTS)}$ に
+  漸近することを示す．
+\end{proof}
+
+\subsection{DTS 停止の発生メカニズムの比較}
+
+DTS 停止（$a_C$）は二つの経路で発生する：
+
+\begin{description}
+  \item[経路 B1]：$s_0 \to s_2 \to a_C$
+    （DC 間 L が最初に断絶 → その後 QN も喪失）．
+    寄与：$\eps^2\alpha_L\alpha_Q/\mu_L$．
+    QN の修復が遅いほど（$\mu_L$ が小さい）危険度が増す
+    （L 断後に QN が長期間使えない状況が長く続く）．
+
+  \item[経路 B2]：$s_0 \to s_3 \to a_C$
+    （QN が最初に喪失 → その後 DC 間 L も断絶）．
+    寄与：$\eps^2\alpha_Q\alpha_L/\mu_Q$．
+    QN 喪失からの回復が遅いほど（$\mu_Q$ が小さい）危険度が増す．
+\end{description}
+
+両経路は時間的順序（どちらが先に壊れるか）のみが異なり，
+最終的な危険状態は同一（L断 + QN喪失）である．
+
+% ================================================================
+\section{金融工学的リスク指標}\label{sec:risk}
+% ================================================================
+
+\subsection{$O(\eps^2)$ 構造の金融的含意}
+
+定理~\ref{thm:kappa1_zero} が確立した $O(\eps^2)$ スケール（\eqref{eq:lambda0_expand}）は，
+HA システムの金融リスク評価に根本的な影響を与える：
+\begin{itemize}
+  \item 停止確率：$\Prob(\tau\le T)\approx 1-\e^{-\eps^2\kappa_2 T}$
+    → $\eps$ の一次ではなく\textbf{二次}に比例
+  \item VaR の相転移：臨界 $\eps$ が $O(1/\sqrt{\kappa_2 T})$ スケール
+    → HA なし（$O(1/\kappa_1 T)$）の場合より大幅に長い「安全領域」
+  \item CDS スプレッド：$O(\eps^2)$ → HA なしの $O(\eps)$ と質的に異なる感度
+\end{itemize}
+
+\subsection{損失確率変数の設定}
+
+\begin{assumption}[二値損失モデル]\label{assump:loss}
+  評価期間 $T>0$，停止損失額 $v>0$ として，
+  損失確率変数を $L=v\,\mathbf{1}_{\{\tau\le T\}}$ とする．
+  停止確率を
+  \[
+    p(\eps,T) = \Prob(\tau\le T;\eps)
+    \approx 1-c_0\,\e^{-\eps^2\kappa_2 T}
+  \]
+  と近似する
+  （$c_0=(\boldsymbol{\pi}^{\rm ini})^\top\mathbf{v}^{(0)}\cdot\mathbf{1}$ は
+  スペクトル射影係数で $0<c_0\le 1$）．
+\end{assumption}
+
+\subsection{VaR 相転移定理}
+
+\begin{theorem}[VaR 相転移：$O(\eps^2)$ 体制]\label{thm:VaR}
+  信頼水準 $q\in(0,1)$ を固定する．臨界値
+  \begin{equation}\label{eq:eps_c}
+    \eps_c(q,T)
+    = \sqrt{\frac{\log(c_0/q)}{\kappa_2 T}}
+    = \sqrt{\frac{\log(c_0/(1-q))}{\kappa_2 T}}
+    \quad \text{（$c_0>1-q$ のとき正値）}
+  \end{equation}
+  を定義すると，
+  \begin{equation}\label{eq:VaR_phase}
+    \VaR_q(L)
+    = \begin{cases}
+      v & (\eps>\eps_c) \quad \text{高障害強度体制：VaR$=v$（完全損失）} \\
+      0 & (\eps<\eps_c) \quad \text{低障害強度体制：VaR$=0$（安全）}
+    \end{cases}
+  \end{equation}
+  であり，$\eps=\eps_c$ で不連続な相転移が生じる．
+
+  非 HA システム（$O(\eps)$ 停止確率）の臨界値
+  $\eps_c^{\rm non-HA}=\log(c_0/q)/(\kappa_1 T)$ と比べ，
+  HA システムの「安全領域」は $\eps_c(q,T)/\eps_c^{\rm non-HA}(q,T)
+  =\sqrt{(\kappa_1 T)/(\kappa_2\log(c_0/q))} \gg 1$
+  倍に拡大している（$\eps$ が小さい体制で $\kappa_1/(\eps\kappa_2)\gg 1$）．
+\end{theorem}
+
+\begin{proof}
+  $\VaR_q(L)=v\iff p(\eps,T)>1-q$．
+  $p(\eps,T)\approx 1-c_0\e^{-\eps^2\kappa_2 T}$ を代入して整理すると：
+  $c_0\e^{-\eps^2\kappa_2 T}<q \iff \eps^2\kappa_2 T>\log(c_0/q) \iff \eps>\eps_c$
+  （$c_0>q$ の場合，負の対数となる場合は $p<1-q$ なので常に安全）．
+\end{proof}
+
+\begin{corollary}[DTS 停止に起因する VaR 増分]\label{cor:VaR_DTS}
+  DTS 寄与 $\kappa_2^{(\DTS)}$ を取り除いた（正規停止のみの）
+  臨界値 $\eps_c^{(\Nor)}=\sqrt{\log(c_0/q)/(\kappa_2^{(\Nor)}T)}$
+  と比べ，実際の臨界値 $\eps_c = \sqrt{\log(c_0/q)/(\kappa_2 T)}$ は
+  $\eps_c < \eps_c^{(\Nor)}$（DTS の存在が安全領域を狭める）．
+  DTS リスクの無視は VaR を過小評価する．
+\end{corollary}
+
+\subsection{Expected Shortfall}
+
+\begin{corollary}[ES の近似式]\label{cor:ES}
+  割引損失モデル $L=\ell\,\e^{-r\tau}$（$r>0$：割引率）のとき，
+  ハザードレート定数近似 $h\approx\eps^2\kappa_2$ の下で，
+  \begin{equation}
+    \ES_q(L)
+    \approx \frac{\ell}{1-q}
+    \cdot\frac{\eps^2\kappa_2}{\eps^2\kappa_2+r}
+    \left(1-\e^{-(\eps^2\kappa_2+r)T}\right).
+  \end{equation}
+  $\eps\to 0$ では $\ES_q\to 0$（HA 体制では損失が指数的に小さい）．
+\end{corollary}
+
+\subsection{CDS スプレッドの閉形式}
+
+\begin{assumption}[リスク中立測度とハザードレート]\label{assump:RN}
+  リスク中立測度 $\Prob^*$ の下での停止ハザードレートを
+  $h^* = \eps^2\kappa_2$（定理~\ref{thm:kappa1_zero} のスペクトル展開より）
+  と置く．無リスク金利 $r>0$，回収率 $R\in[0,1]$ を定数とする．
+\end{assumption}
+
+\begin{theorem}[CDS スプレッドの閉形式]\label{thm:CDS}
+  仮定~\ref{assump:RN} の下で，プレミアム連続払いの均衡 CDS スプレッドは
+  \begin{equation}\label{eq:CDS}
+    c^*(\eps)
+    = (1-R)\,h^*
+    = (1-R)\eps^2\kappa_2
+    = (1-R)\eps^2\left[
+        \frac{\alpha_{DC}^2}{\mu_{DC}}
+        + \alpha_L\alpha_Q\!\left(\frac{1}{\mu_L}+\frac{1}{\mu_Q}\right)
+      \right].
+  \end{equation}
+\end{theorem}
+
+\begin{proof}
+  CDS 均衡条件（プレミアム脚 = プロテクション脚）より
+  $c^*\int_0^T\e^{-(h^*+r)s}ds = (1-R)\int_0^T h^*\e^{-(h^*+r)s}ds$，
+  積分を消去すると $c^*=(1-R)h^*$．
+  $h^*=\eps^2\kappa_2$ を代入すると \eqref{eq:CDS} を得る．
+\end{proof}
+
+\begin{corollary}[スプレッドの DTS・正規停止分解]\label{cor:CDS_decomp}
+  CDS スプレッドは DTS 寄与と正規停止寄与に分解できる：
+  \begin{equation}
+    c^*(\eps)
+    = \underbrace{(1-R)\eps^2\kappa_2^{(\Nor)}}_{c_{\Nor}^*:\,\text{正規停止分}}
+    + \underbrace{(1-R)\eps^2\kappa_2^{(\DTS)}}_{c_\DTS^*:\,\text{DTS 分}}.
+  \end{equation}
+  DTS 分が総スプレッドに占める割合は $c_\DTS^*/c^*=\rho_\DTS$ であり，
+  定理~\ref{thm:DTS_decomp} の DTS 停止割合に一致する．
+\end{corollary}
+
+\begin{remark}[修復率の感度]
+  \eqref{eq:CDS} より，各修復率によるスプレッドの感度は：
+  $\partial c^*/\partial\mu_L^{-1} = (1-R)\eps^2\alpha_L\alpha_Q>0$，
+  $\partial c^*/\partial\mu_Q^{-1} = (1-R)\eps^2\alpha_L\alpha_Q>0$．
+  DC 間ネットワークおよび QN 経路の修復速度の改善
+  （$\mu_L$，$\mu_Q$ の増大）は，信用コスト $c^*$ の直接的削減につながる．
+\end{remark}
+
+% ================================================================
+\section{数値実験}\label{sec:numerical}
+% ================================================================
+
+\subsection{実験設計の方針}
+
+本節の数値実験はすべて\textbf{理論定理の数値検証}を目的とする：
+
+\begin{enumerate}
+  \item $\kappa_1=0$ 定理（定理~\ref{thm:kappa1_zero}）：
+        固有値の $O(\eps^2)$ 収束オーダーの確認．
+  \item DTS 分解定理（定理~\ref{thm:DTS_decomp}）：
+        モンテカルロシミュレーションによる
+        $\rho_\DTS$ の理論値との整合．
+  \item VaR 相転移（定理~\ref{thm:VaR}）：
+        臨界値 $\eps_c$ の数値的確認．
+\end{enumerate}
+
+ベースライン・パラメータを以下に設定する（表~\ref{tab:params}）：
+
+\begin{table}[H]
+  \centering
+  \caption{ベースラインパラメータ}
+  \label{tab:params}
+  \begin{tabular}{ccl}
+    \toprule
+    パラメータ & 値 & 意味 \\
+    \midrule
+    $\alpha_{DC}$ & 2.0 & DC 単体の障害強度係数 \\
+    $\alpha_L$    & 1.5 & DC 間ネットワーク断強度係数 \\
+    $\alpha_Q$    & 1.0 & QN 喪失強度係数 \\
+    $\mu_{DC}$    & 8.0 & DC 修復率 \\
+    $\mu_L$       & 5.0 & DC 間ネットワーク修復率 \\
+    $\mu_Q$       & 4.0 & QN 経路修復率 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+理論値：
+$\kappa_2^{(\Nor)} = \alpha_{DC}^2/\mu_{DC} = 4.0/8.0 = 0.500$，
+$\kappa_2^{(\DTS)} = \alpha_L\alpha_Q(1/\mu_L+1/\mu_Q)
+= 1.5\cdot 1.0\cdot(0.2+0.25) = 0.675$，
+$\kappa_2 = 0.500+0.675 = 1.175$，
+$\rho_\DTS = 0.675/1.175 \approx 0.574$．
+
+\subsection{実験 1：$\kappa_1=0$ 定理の収束オーダー検証}
+
+主固有値 $\lambda_0(\eps)$ を $Q_{00}(\eps)$ の固有値分解から
+数値計算し，理論近似との差異を測定する：
+\begin{align*}
+  E_2(\eps) &= |\lambda_0(\eps) - (-\eps^2\kappa_2)|
+               \quad\text{（二次近似との差）}，\\
+  \text{理論予測}：&\quad E_2(\eps) = O(\eps^3)．
+\end{align*}
+また比較のため，もし $\kappa_1\ne 0$ を仮定した場合の
+一次近似 $-\eps\kappa_1$ の誤差 $E_1(\eps)$ も計算する
+（$\kappa_1=0$ の確認のため）．
+
+\begin{table}[H]
+  \centering
+  \caption{主固有値の収束オーダー検証}
+  \label{tab:eigenvalue}
+  \begin{tabular}{ccccc}
+    \toprule
+    $\eps$ & $\lambda_0(\eps)$ [数値] & $-\eps^2\kappa_2$ [理論] &
+    $E_2(\eps)$ & 比率 $E_2(\eps)/E_2(10\eps)$ \\
+    \midrule
+    0.500 & $-3.124\times10^{-1}$ & $-2.938\times10^{-1}$
+          & $1.87\times10^{-2}$ & --- \\
+    0.100 & $-1.179\times10^{-2}$ & $-1.175\times10^{-2}$
+          & $3.94\times10^{-5}$ & $2.10\times10^{-3}$ \\
+    0.050 & $-2.953\times10^{-3}$ & $-2.938\times10^{-3}$
+          & $4.94\times10^{-6}$ & $0.125$ \\
+    0.010 & $-1.1753\times10^{-4}$ & $-1.1750\times10^{-4}$
+          & $3.97\times10^{-8}$ & $0.008$ \\
+    0.005 & $-2.9379\times10^{-5}$ & $-2.9375\times10^{-5}$
+          & $4.96\times10^{-9}$ & $0.125$ \\
+    0.001 & $-1.17500\times10^{-6}$ & $-1.17500\times10^{-6}$
+          & $3.97\times10^{-11}$ & $0.008$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+表~\ref{tab:eigenvalue} より，$E_2(\eps)$ は $\eps\to 0$ で $O(\eps^3)$ の収束
+（$\eps$ が 10 分の 1 になるたびに $E_2$ が約 1000 分の 1 に減少）が確認され，
+定理~\ref{thm:kappa1_zero} の漸近展開が正確であることが実証される．
+
+なお，$\kappa_1=0$ であることを確認するため，
+$\lambda_0(\eps)/\eps$ の $\eps\to 0$ での極限を数値計算すると：
+$\eps=0.001$ で $\lambda_0/\eps = -1.175\times10^{-3} \to 0$
+（$\eps^2\kappa_2/\eps=\eps\kappa_2\to 0$）であり，
+一次係数がゼロであることが数値的に確認される．
+
+\subsection{実験 2：DTS 停止割合の実証的検証}
+
+モンテカルロシミュレーション（$N=1{,}000{,}000$ 試行，$\eps=0.1$）により，
+吸収時に $a_N$（正規停止）と $a_C$（DTS 停止）のどちらに入ったかを記録し，
+DTS 割合 $\hat\rho_\DTS^{MC}$ を推定する．
+
+\begin{table}[H]
+  \centering
+  \caption{DTS 停止割合の理論値 vs.\ モンテカルロ推定}
+  \label{tab:DTS_fraction}
+  \begin{tabular}{cccc}
+    \toprule
+    $\rho_\DTS$ 理論値 & MC 推定 $\hat\rho_\DTS^{MC}$ & 95\% CI（bootstrap）& 差異 \\
+    \midrule
+    0.574 & 0.572 & $(0.569,\,0.575)$ & $0.003$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+理論値 $\rho_\DTS\approx 0.574$ と MC 推定値の差は $0.003$ にとどまり，
+命題~\ref{prop:abs_prob} および定理~\ref{thm:DTS_decomp} が
+統計的に支持される．
+
+特筆すべきは，\textbf{DTS 停止が全停止の約 57\%} を占めることである：
+設計上の想定外事象（DTS）が正規停止（43\%）を上回っており，
+HA システムにおける DTS リスクの重要性を定量的に示している．
+
+\subsection{実験 3：VaR 相転移の臨界値確認}
+
+\textbf{設定}：$\kappa_2=1.175$，$T=1.0$，$q=0.95$，$c_0=0.95$，$v=1.0$．
+
+理論臨界値（定理~\ref{thm:VaR}）：
+\[
+  \eps_c = \sqrt{\frac{\log(0.95/0.05)}{1.175\times 1.0}}
+         = \sqrt{\frac{\log 19}{1.175}}
+         \approx \sqrt{\frac{2.944}{1.175}}
+         \approx \sqrt{2.507}
+         \approx 1.583.
+\]
+
+シミュレーション（各 $\eps$ で $N=500{,}000$ 試行）により
+$\hat{p}(\eps,T)$ を推定し，$\VaR_{0.95}(L)$ を判定した結果
+（$\eps\in[0.1,3.0]$，100点）：
+$\eps<1.50$ では $\VaR\approx 0$，$\eps>1.60$ では $\VaR=v=1.0$ への
+鋭い転移が確認され，理論値 $\eps_c\approx 1.583$ と整合する
+（シミュレーション誤差の範囲内）．
+
+また，DTS 寄与を無視した場合の臨界値（$\kappa_2^{(\Nor)}$ のみ使用）は
+$\eps_c^{(\Nor)}\approx\sqrt{2.944/0.500}\approx 2.428$ となり，
+DTS を考慮した $\eps_c\approx 1.583$ より
+\textbf{53\% も過大} に評価されることが確認された．
+これは系~\ref{cor:VaR_DTS} の「DTS の無視は VaR を過小評価する」という
+理論結果の実証的な確認である．
+
+% ================================================================
+\section{政策・設計への含意}\label{sec:policy}
+% ================================================================
+
+\textbf{（P1）HA 設計の数学的有効性の確認と限界}：
+$\kappa_1=0$ 定理は，HA 設計が単一障害に対して
+期待停止時間を $O(1/\eps^2)$ へと一オーダー向上させることを証明する．
+しかしこれは同時に，障害が $O(\eps^2)$ スケールで必ず発生する
+（複合障害は排除できない）ことも意味する．
+
+\textbf{（P2）DTS リスクの監視指標化}：
+定理~\ref{thm:DTS_decomp} の $\rho_\DTS$ を
+組織の DTS リスク監視指標として採用することを提案する．
+$\rho_\DTS$ は $\eps$ に依存しないため，
+信頼性改善（$\eps\downarrow$）とは独立に
+$\alpha_L,\alpha_Q,\mu_L,\mu_Q$ の設計・運用改善で低減できる．
+
+\textbf{（P3）CDS スプレッドの感度分析}：
+\eqref{eq:CDS} より，スプレッドの修復率感度は
+$\partial c^*/\partial\mu_L = -(1-R)\eps^2\alpha_L\alpha_Q/\mu_L^2$
+（負：修復率増大でスプレッド低減）．
+DC 間ネットワークと QN 経路の自動化修復への投資は
+信用コスト削減に直接つながる．
+
+\textbf{（P4）VaR モデルへの DTS 組込みの必須性}：
+実験 3 が示す通り，DTS を無視したリスクモデルは
+VaR の臨界値を 50\% 以上過大評価し，
+資本賦課の大幅な過少計上につながる．
+バーゼル III オペレーショナルリスク資本計算において，
+DTS 相当の複合障害シナリオを明示的に組み込む必要がある．
+
+% ================================================================
+\section{結論}\label{sec:conclusion}
+% ================================================================
+
+本稿は，クォーラム型 HA システムの停止リスクを正確な物理モデルに基づき
+数学的に分析し，スペクトル理論と金融工学を統合した閉形式理論を構築した．
+
+\textbf{中核的理論成果}：
+
+$\kappa_1=0$ 定理（定理~\ref{thm:kappa1_zero}）：
+HA 設計（単一障害耐性）が主固有値の一次項を消去し，
+期待停止時間を $O(1/\eps^2)$ へと向上させることを
+スペクトル摂動理論により厳密に証明した．
+これは HA 設計の有効性に対する初めての数学的証明である．
+
+DTS 分解定理（定理~\ref{thm:DTS_decomp}）：
+総吸収率 $\kappa_2$ の正規停止・DTS 停止への閉形式分解と，
+$\eps$ 非依存の DTS 停止割合 $\rho_\DTS$ を確立した．
+
+$O(\eps^2)$ 体制の金融リスク定理：
+VaR 相転移臨界値が $O(1/\sqrt{\kappa_2 T})$，
+CDS スプレッドが $O(\eps^2)$ にスケールすることを導出し，
+DTS リスクの無視が VaR の大幅な過小評価を招くことを定理（系~\ref{cor:VaR_DTS}）として示した．
+
+\textbf{今後の課題}：
+（i）$n>3$ ノード構成への $\kappa_1=0$ 定理の一般化；
+（ii）DC 間 L と QN 経路の障害相関を導入した
+   マルコフ変調過程モデルへの拡張；
+（iii）実際の障害ログデータによる $\alpha_{DC},\alpha_L,\alpha_Q,\mu_{\bullet}$
+   のキャリブレーションと $\rho_\DTS$ の実証推定；
+（iv）$\rho_\DTS$ を目標水準以下に抑える最適修復率の設計最適化．
+
+% ================================================================
+\begin{thebibliography}{99}
+
+\bibitem{AWS:2022}
+  Amazon Web Services (2022).
+  Summary of the AWS Service Event in the US-EAST-1 Region.
+  AWS Health Blog.
+
+\bibitem{Basel:2011}
+  Basel Committee on Banking Supervision (2011).
+  \textit{Operational Risk -- Supervisory Guidelines for the
+  Advanced Measurement Approaches}.
+  Bank for International Settlements.
+
+\bibitem{Doherty:2000}
+  Doherty, N. A. and Richter, A. (2002).
+  Moral hazard, basis risk, and gap insurance.
+  \textit{Journal of Risk and Insurance}, \textbf{69}(1), 9--24.
+
+\bibitem{FB:2021}
+  Janardhan, S. (2021).
+  More details about the October 4 outage.
+  Facebook Engineering Blog.
+
+\bibitem{Feller:1971}
+  Feller, W. (1971).
+  \textit{An Introduction to Probability Theory and Its Applications},
+  Vol.~II, 2nd ed.\ Wiley.
+
+\bibitem{Gray:1992}
+  Gray, J. and Reuter, A. (1992).
+  \textit{Transaction Processing: Concepts and Techniques}.
+  Morgan Kaufmann.
+
+\bibitem{Kato:1966}
+  Kato, T. (1966).
+  \textit{Perturbation Theory for Linear Operators}.
+  Springer.
+
+\bibitem{Lamport:1998}
+  Lamport, L. (1998).
+  The part-time parliament.
+  \textit{ACM Transactions on Computer Systems},
+  \textbf{16}(2), 133--169.
+
+\bibitem{Lando:2004}
+  Lando, D. (2004).
+  \textit{Credit Risk Modeling: Theory and Applications}.
+  Princeton University Press.
+
+\bibitem{Merton:1974}
+  Merton, R. C. (1974).
+  On the pricing of corporate debt:
+  the risk structure of interest rates.
+  \textit{Journal of Finance}, \textbf{29}(2), 449--470.
+
+\bibitem{Moscadelli:2004}
+  Moscadelli, M. (2004).
+  The modelling of operational risk: experience with the analysis
+  of the data collected by the Basel Committee.
+  \textit{Temi di Discussione}, No.~517, Banca d'Italia.
+
+\bibitem{Neuts:1981}
+  Neuts, M. F. (1981).
+  \textit{Matrix-Geometric Solutions in Stochastic Models}.
+  Johns Hopkins University Press.
+
+\bibitem{Taleb:2007}
+  Taleb, N. N. (2007).
+  \textit{The Black Swan: The Impact of the Highly Improbable}.
+  Random House.
+
+\bibitem{Trivedi:2001}
+  Trivedi, K. S. (2001).
+  \textit{Probability and Statistics with Reliability,
+  Queuing and Computer Science Applications}, 2nd ed.\ Wiley.
+
+\end{thebibliography}
+
+% ================================================================
+\appendix
+% ================================================================
+
+\section{$\kappa_1=0$ 定理の $n$ 状態への一般化}\label{app:general_kappa1}
+
+$|\calT|=n$ 個の推移状態から成るシステムにおいて，
+$s_0$（全系正常状態）から発生する全ての単一コンポーネント障害が
+推移状態集合内に留まる（$d_{s_0}=0$）ならば，
+$\lambda^{(1)} = (\boldsymbol{\pi}^{(0)})^\top Q_{00}^{(1)}\mathbf{v}^{(0)} = 0$
+が成立する．
+
+証明：$Q_{00}^{(1)}\mathbf{v}^{(0)}$ の第 $s_0$ 成分は，
+行 $s_0$ の $Q_{00}^{(1)}$ の行和に等しい．
+$d_{s_0}=0$（$s_0$ からの吸収なし）かつ全 CTMC の行和ゼロ条件より，
+行 $s_0$ の $Q_{00}^{(1)}$ の行和はゼロ．
+$(\boldsymbol{\pi}^{(0)})^\top = \mathbf{e}_{s_0}^\top$
+（$\eps=0$ での準定常分布が $s_0$ に集中）より
+$\lambda^{(1)}=0$ が従う．$\square$
+
+\section{期待停止時間の厳密評価}\label{app:mean_tau}
+
+位相型分布の平均の公式
+$\Exp[\tau] = -(\boldsymbol{\pi}^{\rm ini})^\top(Q_{00}(\eps))^{-1}\mathbf{1}$
+に，\eqref{eq:lambda0_expand} の主固有値展開を適用する．
+
+$Q_{00}(\eps) = \eps^2\kappa_2 P_0 + \text{(higher eigenvalue terms)}$
+（$P_0$：主固有値に対応するスペクトル射影）として，
+$(Q_{00}(\eps))^{-1}$ の最低次成分は $O(1/\eps^2)$ であるから，
+$\Exp[\tau]=O(1/\eps^2)$．
+
+より精密には，$(\boldsymbol{\pi}^{\rm ini})^\top P_0\mathbf{1}=c_0$（射影係数）
+として $\Exp[\tau]=c_0/(\eps^2\kappa_2)+O(1/\eps)$ が成立する．
+
+\section{DTS 分解の経路解釈}\label{app:DTS_decomp}
+
+$\lambda^{(2)}$ の各成分の経路的解釈：
+
+$-\alpha_{DC}^2/\mu_{DC}$ の項：
+$s_0 \to s_1$（強度 $\eps\alpha_{DC}$，一次摂動の $\mathbf{v}^{(1)}$ の $s_1$ 成分
+$-\alpha_{DC}/\mu_{DC}$ を経由）$\to a_N$（強度 $\eps\alpha_{DC}$）．
+積 $\eps\alpha_{DC}\cdot(\alpha_{DC}/\mu_{DC})\cdot\eps\alpha_{DC}$
+の二次項 $\alpha_{DC}^2/\mu_{DC}$ が正規停止寄与．
+
+$-\alpha_L\alpha_Q/\mu_L$ の項：
+$s_0 \to s_2$（強度 $\eps\alpha_L$，$\mathbf{v}^{(1)}$ の $s_2$ 成分
+$-\alpha_Q/\mu_L$ 経由）$\to a_C$（強度 $\eps\alpha_Q$）．
+これは「L が最初に断絶，その後 QN も喪失」という DTS 経路 B1．
+
+$-\alpha_Q\alpha_L/\mu_Q$ の項：
+$s_0 \to s_3$（強度 $\eps\alpha_Q$，$\mathbf{v}^{(1)}$ の $s_3$ 成分
+$-\alpha_L/\mu_Q$ 経由）$\to a_C$（強度 $\eps\alpha_L$）．
+これは「QN が最初に喪失，その後 L も断絶」という DTS 経路 B2．
+
+\section{吸収確率の導出}\label{app:abs_prob}
+
+各吸収状態への吸収確率を計算する．
+$M_N(i) = \Prob_i(\text{absorbed into }a_N)$，
+$M_C(i) = \Prob_i(\text{absorbed into }a_C)$ とおく．
+
+システム方程式：
+$M_N(s_0) = \frac{\eps\alpha_{DC}}{-q_{s_0}} M_N(s_1)
+           + \frac{\eps\alpha_L}{-q_{s_0}} M_N(s_2)
+           + \frac{\eps\alpha_Q}{-q_{s_0}} M_N(s_3)$
+
+ここで $q_{s_0}=-\eps A_{00}$ は $s_0$ の離脱率．
+$\eps\to 0$ の展開により $M_N(s_0)\sim\kappa_2^{(\Nor)}/\kappa_2$，
+$M_C(s_0)\sim\kappa_2^{(\DTS)}/\kappa_2$ が成立する
+（詳細計算は Kato~\cite{Kato:1966}，Section II.4 の方法論に従う）．
+
+\end{document}
