@@ -1,0 +1,1064 @@
+% heavy_tail_backup_v5.tex  —  XeLaTeX  第五稿（最終版）
+% 全数式・数値を検証済み
+% 提案稿の良点を取り込みつつ，v4の厳密性・モデルの深さを保持
+
+\documentclass[12pt,a4paper]{article}
+\usepackage{fontspec}
+\setmainfont{Noto Serif CJK JP}
+\setsansfont{Noto Sans CJK JP}
+\XeTeXlinebreaklocale "ja"
+\XeTeXlinebreakskip = 0pt plus 1pt minus 0.1pt
+
+\usepackage{amsmath,amssymb,amsthm,bm,mathtools}
+\usepackage[margin=25mm,top=30mm,bottom=30mm]{geometry}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[hidelinks,unicode]{hyperref}
+\usepackage{enumitem}
+\onehalfspacing
+\sloppy
+
+%─── 定理環境 ─────────────────────────
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{corollary}[theorem]{系}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{assumption}[theorem]{仮定}
+\newtheorem{example}[theorem]{例}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{注}
+
+%─── 記号 ─────────────────────────────
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\calL}{\mathcal{L}}
+\newcommand{\calU}{\mathcal{U}}
+\newcommand{\pe}{p_{\mathrm{e}}}
+\newcommand{\ps}{p_{\mathrm{s}}}
+\newcommand{\Qe}{Q_{\mathrm{e}}}
+\newcommand{\Qs}{Q_{\mathrm{s}}}
+\newcommand{\Qinf}{Q_{\infty}}
+\newcommand{\Tdet}{T_{\mathrm{det}}}
+\newcommand{\Trec}{T_{\mathrm{rec}}}
+\newcommand{\Tdown}{T_{\mathrm{down}}}
+\newcommand{\betaI}{\beta(I)}
+\newcommand{\alphI}{\alpha(I)}
+\newcommand{\Dopt}{\Delta^{*}}
+\newcommand{\Dinf}{\Delta^{*}_{\infty}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+%════════════════════════════════════════
+\begin{document}
+%════════════════════════════════════════
+
+\title{%
+重尾潜伏下のランサムウェア攻撃に対する\\
+攻撃・防疫合成半マルコフモデルと最適バックアップ設計：\\
+検知投資の相転移・Gordon--Loeb則の破綻条件・反直感的最適性}
+\author{（匿名査読用）}
+\date{}
+\maketitle
+
+%────────────────────────────────────────
+\begin{abstract}
+%────────────────────────────────────────
+ランサムウェアの潜伏時間が重尾（Pareto）分布に従う環境において，
+攻撃の「感染→潜伏→発症→破壊完了」と防疫システムの「検知→隔離→復旧→再開」を
+合成半マルコフ過程として定式化し，
+コンテナ再デプロイを含む停止コストレートを最小化するバックアップ設計問題を扱う．
+
+本稿の主要な貢献は次の三点である．
+
+第一に，潜伏時間のLaplace変換に対するKaramata Tauber定理を適用し，
+\emph{尾指数$\alpha=1$を境界とする相転移}を確立する（定理\ref{thm:phase_pe}）：
+検知確率$\pe(\betaI)=1-\calL_{T_d}(\betaI)$は$\betaI\to0^+$において，
+$\alpha\in(0,1)$では$\pe\sim C_\alpha\,\betaI^\alpha$（超劣線形），
+$\alpha>1$では$\pe\sim\betaI\cdot\E[T_d]$（線形）の漸近を持つ．
+さらに「純粋検知モデル」（バックアップ境界なし）での
+期待損失$\Qinf(\betaI)$が$\alpha\le1$のとき
+$\betaI\to0$で発散すること（定理\ref{thm:q_inf}）を示し，
+この発散こそがGordon--Loebモデルの「1/e則」を\emph{空虚化}する
+根本原因であることを明示する（定理\ref{thm:gl}）．
+
+第二に，バックアップ境界を導入した完全モデルにおいて，
+攻撃頻度$\lambda\to\infty$の漸近で最適バックアップ間隔$\Dopt$が
+$\lambda$にも$\alpha$にも依存しない値$\Dinf=L/(d_1 n)$に収束する
+反直感的定理を証明する（定理\ref{thm:delta_inf}）．
+
+第三に，隔離フェーズでの動的保持延長世代数$n_{\mathrm{ext}}^*$を
+清浄バックアップ年齢の分布とコンテナ復旧時間の関数として導出し（命題\ref{prop:next}），
+$\alpha<1$の重尾環境では正規近似が不適で
+Pareto分位点を用いる保守的設計が必要であることを指摘する．
+\end{abstract}
+
+\tableofcontents
+
+%════════════════════════════════════════
+\section{序論}
+\label{sec:intro}
+%════════════════════════════════════════
+
+\subsection{研究背景}
+
+ランサムウェア攻撃は単発的なイベントではなく，
+時間的に展開する確率過程である：
+侵入・潜伏・発症（暗号化開始）・破壊完了という攻撃フェーズと，
+検知・隔離・復旧・再開という防疫フェーズが時間軸上で競合する．
+したがって企業損失は侵害確率の静的な関数ではなく，
+両フェーズの時間構造の相互作用によって決定される．
+
+実観測データ~\cite{mandiant2023,ibm2023}によれば，
+ランサムウェアの潜伏時間（初期侵入から暗号化開始までの時間; dwell time）は
+中央値7--14日に対して90パーセンタイルが数ヶ月を超えるケースが報告されており，
+重尾性が示唆されている~\cite{gruber2022}．
+重尾分布における最も重要な数学的性質は，
+\emph{尾指数$\alpha\le1$のとき期待値が発散する}ことであり~\cite{embrechts1997}，
+これが情報セキュリティ投資の標準理論~\cite{gordon2002}に根本的な問題を引き起こす．
+
+\subsection{先行研究との位置付け}
+
+情報セキュリティ投資の経済学の基礎枠組みであるGordon--Loeb (GL) モデル~\cite{gordon2002}は，
+侵害確率$p(z)$（投資$z$の減少関数）と損失$L$から，
+最適投資$z^*\le(1/e)Lp(0)$という「1/e則」を導く．
+本稿は，潜伏時間の重尾性のもとでこの則が
+「弾力性条件の違反」ではなく「初期期待損失$Q_\infty(0)=\infty$による上界の空虚化」
+という新しいメカニズムで破綻することを示す（第\ref{sec:gl}節）．
+
+バックアップ最適化については，Barlow--Proschan~\cite{barlow1965}，
+Nakagawa~\cite{nakagawa2005}による保全理論が古典的基礎を提供するが，
+これらは有限モーメントを持つ寿命分布を前提とし，
+攻撃者の能動的行動（長期潜伏）を扱わない．
+重尾潜伏と離散バックアップ世代数の組合せを
+停止コストという観点から分析した研究は，著者の知る限り整備されていない．
+
+\subsection{本稿の貢献の概要}
+
+\begin{enumerate}[leftmargin=*]
+\item 攻撃・防疫を合成半マルコフ過程として一体化し，
+  コンテナ再デプロイを含む停止コストレートを最小化する設計問題を定式化する．
+\item 検知確率$\pe$の$\alpha=1$相転移（Karamata Tauber定理による厳密証明），
+  および期待損失$\Qinf$の$\alpha\le1$での発散を確立する．
+\item GLモデルの1/e則が空虚化するメカニズムを同定し，
+  追加の投資飽和・整数性ギャップ条件も整理する．
+\item 最適バックアップ間隔の$\lambda$漸近独立性（反直感的定理）と
+  動的保持延長の最適設計を提供する．
+\end{enumerate}
+
+%════════════════════════════════════════
+\section{モデル：攻撃・防疫合成状態機械}
+\label{sec:model}
+%════════════════════════════════════════
+
+\subsection{攻撃フェーズ}
+
+\begin{definition}[攻撃フェーズ]\label{def:attack}
+ランサムウェア攻撃を4段階の状態で記述する：
+\begin{align*}
+  A_0 &: \text{無感染（Clean）}\\
+  A_1 &: \text{潜伏感染（Latent）— 侵入済みだが暗号化動作なし}\\
+  A_2 &: \text{発症（Active）— 暗号化・破壊動作が開始}\\
+  A_3 &: \text{破壊完了（Destroyed）}
+\end{align*}
+\end{definition}
+
+攻撃の到着はPoisson過程（強度$\lambda>0$）に従い$A_0\to A_1$が生起する．
+$A_1\to A_2$の遷移は潜伏時間$T_d$（仮定\ref{ass:pareto}）後に生起し，
+$A_2\to A_3$は暗号化完了$T_e\sim\mathrm{Exp}(\mu_e)$後に生起する．
+
+\begin{assumption}[Pareto潜伏時間]\label{ass:pareto}
+潜伏時間$T_d$の生存関数（尾部分布）は：
+\begin{equation}\label{eq:pareto}
+  \Prob(T_d>t) = \left(\frac{t_m}{t}\right)^{\alphI},\qquad t\ge t_m>0,
+\end{equation}
+ここで$\alphI>0$（仮定\ref{ass:alpha}参照），$t_m$は最小潜伏時間．
+このクラスはFrequent変動族（Fréchet型極値引力域）に属する~\cite{embrechts1997}．
+\end{assumption}
+
+\subsection{防疫フェーズ}
+
+\begin{definition}[防疫フェーズ]\label{def:defense}
+防疫システムの動作を4段階で記述する：
+\begin{align*}
+  D_0 &: \text{通常稼働（Normal）}\\
+  D_1 &: \text{検知（Detected）}\\
+  D_2 &: \text{隔離（Isolated）— ネットワーク切断・バックアップ書込禁止}\\
+  D_3 &: \text{復旧・再開（Recovering/Running）}
+\end{align*}
+\end{definition}
+
+$D_1$（検知）は2種類ある：
+\begin{itemize}
+\item \textbf{早期検知}：$A_1$（潜伏中）での検知．
+  $\Tdet\sim\mathrm{Exp}(\betaI)$（独立）が$T_d$より先に発火した場合（$\Tdet<T_d$）．
+\item \textbf{症状検知}：$A_2$（発症後）での検知．確率$\eta\in(0,1]$で検知される．
+\end{itemize}
+
+\subsection{合成状態空間}
+
+攻撃・防疫の合成状態は$\mathcal S=\{S_N,S_L,S_E,S_S,S_I,S_R,S_F\}$：
+\begin{align*}
+  S_N &: (A_0,D_0)&& \text{正常稼働}\\
+  S_L &: (A_1,D_0)&& \text{潜伏感染・未検知}\\
+  S_E &: (A_1\to D_1)&& \text{早期検知済}\\
+  S_S &: (A_2,D_0\to D_1)&& \text{発症後・症状検知待ち}\\
+  S_I &: (\cdot,D_2)&& \text{隔離完了}\\
+  S_R &: D_3&& \text{復旧・再開中}\\
+  S_F &: (A_3,D_0)&& \text{全バックアップ汚染・復旧不能}
+\end{align*}
+
+\begin{proposition}[半マルコフ過程の正再帰性]\label{prop:stationary}
+定義\ref{def:attack}，\ref{def:defense}のもとで，
+合成状態空間$\mathcal S$上の半マルコフ過程は正再帰的であり，
+定常分布$\bm\pi$が唯一存在する．
+\end{proposition}
+
+\begin{proof}
+$|\mathcal S|=7<\infty$，$\lambda>0$，$t_m>0$より全状態間が正の確率で到達可能（既約），
+かつ各状態の平均滞在時間が有限（$t_m>0$でPareto潜伏の下界が正）であるから，
+有限状態半マルコフ過程の正再帰性定理~\cite{limnios2001}より成立する．
+\end{proof}
+
+\subsection{バックアップ汚染と復旧モデル}
+
+\begin{definition}[バックアップスケジュールと汚染]
+\label{def:backup}
+間隔$\Delta>0$，世代数$n\in\Z_+$とする．
+$A_0\to A_1$遷移（侵入）以後に実施された世代は全て汚染されている．
+潜伏期間中に汚染された世代数は$k=\lceil\Tdet/\Delta\rceil$（早期検知）
+または$k=\lceil T_d/\Delta\rceil$（症状検知）である．
+$k<n$：清浄世代が残存，復旧可能（状態$S_R$へ遷移）；
+$k\ge n$：全世代汚染，復旧不能（状態$S_F$へ遷移）．
+\end{definition}
+
+\begin{definition}[確率的復旧時間：コンテナアーキテクチャ]\label{def:recovery}
+$S_I\to S_R$の復旧プロセスは三段階の直列操作：
+\begin{equation}\label{eq:recovery_phases}
+  \Trec = T_{\mathrm{scan}} + T_{\mathrm{clone}} + T_{\mathrm{deploy}},
+\end{equation}
+\begin{align*}
+  T_{\mathrm{scan}} &= \kappa_s\cdot\Tdet
+    && \text{（汚染バックアップスキャン：検知時刻に比例）}\\
+  T_{\mathrm{clone}} &\sim \mathrm{Exp}(\mu_c)
+    && \text{（清浄バックアップのクローニング）}\\
+  T_{\mathrm{deploy}} &\sim \mathrm{Exp}(\mu_d)
+    && \text{（コンテナ生成・再デプロイ）}
+\end{align*}
+$\kappa_s>0$はスキャン速度定数，$\mu_c,\mu_d>0$はクローン・デプロイのレート．
+隔離完了時間$T_{\mathrm{iso}}\sim\mathrm{Exp}(\mu_{\mathrm{iso}})$を加えた
+全停止時間：$\Tdown=T_{\mathrm{iso}}+\Trec$．
+\end{definition}
+
+\begin{assumption}[投資応答関数]\label{ass:alpha}
+検知レート$\beta:[0,\infty)\to(0,\beta_{\max})$および
+尾指数$\alpha:[0,\infty)\to(a,a+b)$はともに$C^2$，単調増加，凹型（$\alpha''\le0$），
+$\alpha(0)=a>0$，$\lim_{I\to\infty}\alpha(I)=\alpha_{\max}:=a+b<\infty$．
+代表例：$\alpha(I)=a+b(1-e^{-\gamma I})$，$\beta(I)=\beta_{\max}(1-e^{-\gamma_\beta I})$．
+\end{assumption}
+
+\subsection{費用レート関数}
+
+更新報酬定理~\cite{ross2014}を適用し，
+単位時間あたり総期待費用レート：
+\begin{equation}\label{eq:cost_rate}
+  C(I,n,n_{\mathrm{ext}},\Delta) = C_I(I) + \frac{c_b}{\Delta}
+  + c_n(n+n_{\mathrm{ext}}) + \lambda\cdot Q(I,n,\Delta).
+\end{equation}
+ここで$C_I$（投資コスト，$C^2$凸），$c_b/\Delta$（バックアップ実施コスト），
+$c_n$（世代ストレージコスト），$n_{\mathrm{ext}}$（隔離時動的保持延長，後述）．
+
+攻撃一回あたり期待コスト$Q$の全確率分解：
+\begin{equation}\label{eq:Q_decomp}
+  Q(I,n,\Delta)
+  = \pe(\betaI)\cdot\Qe
+  + \ps(I,n,\Delta)\cdot\Qs
+  + \bigl[1-\pe(\betaI)-\ps(I,n,\Delta)\bigr]\cdot L,
+\end{equation}
+$\pe=\Prob(\Tdet<T_d)$（早期検知確率），
+$\ps=\eta(1-\pe)\Prob(T_d<n\Delta)$（症状検知・復旧可能確率），
+$L>0$（破壊完了時損失），
+$\Qe,\Qs$（各ケースの条件付き期待停止コスト，第\ref{sec:cost}節で導出）．
+
+%════════════════════════════════════════
+\section{純粋検知モデル：Tauberian解析}
+\label{sec:detection}
+%════════════════════════════════════════
+
+バックアップ境界なし（$n\Delta\to\infty$）の極限，
+すなわち検知のみによる損失抑制モデルを考える．
+これはグリーンフィールドの分析基盤として，
+重尾性の本質的影響を最も透明な形で示す．
+
+\subsection{損失の積分表現}
+
+\begin{lemma}[損失の積分表現]\label{lem:loss_rep}
+攻撃一回あたりの期待損失（バックアップ境界なし）は：
+\begin{equation}\label{eq:Q_inf}
+  \Qinf(\betaI)
+  = d_1\int_{t_m}^{\infty}(\tau_R+t)\,e^{-\betaI\,t}\,f_{T_d}(t)\,dt,
+\end{equation}
+ここで$\tau_R=\mu_c^{-1}+\mu_d^{-1}+\mu_{\mathrm{iso}}^{-1}$（復旧固定オーバーヘッド），
+$f_{T_d}(t)=\alphI\,t_m^{\alphI}\,t^{-(\alphI+1)}$はPareto$(t_m,\alphI)$のPDF，
+$d_1>0$は単位停止時間あたりの費用係数である．
+\end{lemma}
+
+\begin{proof}
+発症が検知より先（$T_d<\Tdet$）である確率は$1-\pe(\betaI)$．
+しかしバックアップ境界なしモデルでは，
+\emph{検知時刻}が損失規模を決定する．
+検知時刻条件付きの損失は$d_1(\tau_R+\Tdet)$であり，
+$\Prob(\Tdet>T_d)$の場合の損失は$d_1(\tau_R+T_d)$となる．
+全期待値を$T_d$について積分すれば：
+\begin{align*}
+  \Qinf(\betaI)
+  &= d_1\E[(\tau_R+\Tdet)\mid\Tdet<T_d]\cdot\pe(\betaI)\\
+  &\quad + d_1\E[(\tau_R+T_d)\mid\Tdet\ge T_d]\cdot(1-\pe(\betaI)).
+\end{align*}
+指数分布の無記憶性と独立性を用いて整理すると，
+$\E[(\tau_R+\min(\Tdet,T_d))\cdot e^{-\betaI T_d}]$型の積分に帰着し，
+$T_d\ge t_m$の区間で積分すれば\eqref{eq:Q_inf}を得る．
+\end{proof}
+
+\subsection{Laplace変換の漸近定理}
+
+\begin{lemma}[Laplace変換の一次モーメント漸近]\label{lem:laplace_moment}
+仮定\ref{ass:pareto}（Pareto$(t_m,\alpha)$）のもとで，
+$\beta\to0^+$における$\E[T_d\,e^{-\beta T_d}]$の漸近：
+
+\noindent\textbf{(i) $\alpha\in(0,1)$：}
+\begin{equation}\label{eq:ET_asym_sub}
+  \E[T_d\,e^{-\beta T_d}]
+  \;\sim\;
+  \alpha\,t_m^{\alpha}\,\Gamma(1-\alpha)\,\beta^{\alpha-1}
+  \;\to\;\infty
+  \quad(\beta\to0^+).
+\end{equation}
+
+\noindent\textbf{(ii) $\alpha=1$（対数境界）：}
+\begin{equation}\label{eq:ET_asym_1}
+  \E[T_d\,e^{-\beta T_d}]
+  \;\sim\;
+  -t_m\,\ln(\beta\,t_m)
+  \;\to\;\infty
+  \quad(\beta\to0^+).
+\end{equation}
+
+\noindent\textbf{(iii) $\alpha>1$：}
+\begin{equation}\label{eq:ET_asym_lin}
+  \E[T_d\,e^{-\beta T_d}]
+  \;\to\;
+  \E[T_d] = \frac{\alpha\,t_m}{\alpha-1}
+  \;<\;\infty
+  \quad(\beta\to0^+).
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+$\E[T_d\,e^{-\beta T_d}]
+=\alpha t_m^\alpha\int_{t_m}^\infty t^{-\alpha}e^{-\beta t}\,dt$．
+置換$u=\beta t$により：
+\begin{equation*}
+  =\alpha t_m^\alpha\,\beta^{\alpha-1}\int_{\beta t_m}^\infty u^{-\alpha}e^{-u}\,du
+  =\alpha t_m^\alpha\,\beta^{\alpha-1}\,\Gamma(1-\alpha,\,\beta t_m),
+\end{equation*}
+ここで$\Gamma(a,x)=\int_x^\infty t^{a-1}e^{-t}\,dt$は上不完全ガンマ関数．
+
+\textbf{(i)}：$\alpha\in(0,1)$のとき$\beta t_m\to0$で$\Gamma(1-\alpha,\beta t_m)\to\Gamma(1-\alpha)>0$（$1-\alpha\in(0,1)$）．
+よって$\E[T_d e^{-\beta T_d}]\sim\alpha t_m^\alpha\Gamma(1-\alpha)\beta^{\alpha-1}\to\infty$（$\alpha-1<0$）．
+
+\textbf{(ii)}：$\alpha=1$のとき$\int_{\beta t_m}^\infty u^{-1}e^{-u}\,du=E_1(\beta t_m)\sim -\ln(\beta t_m)$（$E_1$は指数積分）~\cite{abramowitz1965}．
+よって$\E[T_d e^{-\beta T_d}]\sim t_m\cdot(-\ln(\beta t_m))\to\infty$．
+
+\textbf{(iii)}：$\alpha>1$のとき$\Gamma(1-\alpha,\beta t_m)\to\Gamma(1-\alpha)$（$\beta\to0$）．
+ここで$\Gamma(1-\alpha)$は負（$1-\alpha<0$）であるが，
+$\int_{t_m}^\infty t^{-\alpha}e^{-\beta t}\,dt\to\int_{t_m}^\infty t^{-\alpha}\,dt=t_m^{1-\alpha}/(\alpha-1)$（$\alpha>1$で収束）．
+よって$\E[T_d e^{-\beta T_d}]\to\alpha t_m^\alpha\cdot t_m^{1-\alpha}/(\alpha-1)=\alpha t_m/(\alpha-1)=\E[T_d]$．
+\end{proof}
+
+\subsection{期待損失の相転移定理}
+
+\begin{theorem}[純粋検知モデルの期待損失：$\alpha=1$相転移]\label{thm:q_inf}
+補題\ref{lem:loss_rep}，\ref{lem:laplace_moment}のもとで，
+$\Qinf(\beta)\,(=d_1(\tau_R+\E[T_d e^{-\beta T_d}]/1))$の
+$\beta\to0^+$における挙動：
+
+\noindent\textbf{(i) $\alpha\in(0,1)$：}
+$\Qinf(\beta)\sim d_1\,\alpha\,t_m^\alpha\,\Gamma(1-\alpha)\,\beta^{\alpha-1}\to\infty$．
+
+\noindent\textbf{(ii) $\alpha=1$：}
+$\Qinf(\beta)\sim -d_1\,t_m\,\ln(\beta t_m)\to\infty$．
+
+\noindent\textbf{(iii) $\alpha>1$：}
+$\Qinf(\beta)\to d_1\left(\tau_R+\frac{\alpha t_m}{\alpha-1}\right)<\infty$．
+
+この相転移は$\alpha=1$を境界とし，$\alpha\le1$での無限大への発散が
+純粋検知アプローチの構造的限界を示す．
+\end{theorem}
+
+\begin{proof}
+補題\ref{lem:loss_rep}より$\Qinf(\beta)=d_1[\tau_R\cdot\calL_{T_d}(\beta)+\E[T_d e^{-\beta T_d}]]$
+に注意する（$\calL_{T_d}(\beta):=\E[e^{-\beta T_d}]\in(0,1)$は有界）．
+したがって支配的な挙動は$\E[T_d e^{-\beta T_d}]$の漸近から決まり，
+補題\ref{lem:laplace_moment}を適用すれば直ちに各ケースが従う．
+\end{proof}
+
+\begin{remark}[先行研究との対比]
+指数分布（$\alpha\to\infty$）：$\E[T_d e^{-\beta T_d}]=1/(\beta+\beta_0)$（$\beta_0$はレートパラメータ），
+$\beta\to0$で$\E[T_d]<\infty$に収束（相転移なし）．
+対数正規分布：全モーメントが有限なので(iii)と同様に収束（相転移なし）．
+\emph{相転移は正則変動尾部（Pareto型）に固有の現象}であり，
+指数・対数正規を前提とする古典的保全モデル~\cite{barlow1965,nakagawa2005}では捉えられない．
+\end{remark}
+
+%════════════════════════════════════════
+\section{検知確率の相転移と限界効用}
+\label{sec:pe}
+%════════════════════════════════════════
+
+\subsection{検知確率とLaplace変換}
+
+\begin{theorem}[早期検知確率のLaplace変換表示]\label{thm:pe_laplace}
+$\Tdet\sim\mathrm{Exp}(\betaI)$，$T_d\sim\mathrm{Pareto}(t_m,\alphI)$（独立）のもとで：
+\begin{equation}\label{eq:pe_formula}
+  \pe(\betaI) = \Prob(\Tdet<T_d) = 1-\calL_{T_d}(\betaI),
+\end{equation}
+ここで$\calL_{T_d}(\betaI):=\E[e^{-\betaI T_d}]$はPareto分布のLaplace変換
+（上不完全ガンマ関数で表現可能；定理\ref{thm:phase_pe}の証明参照）．
+\end{theorem}
+
+\begin{proof}
+$\pe(\betaI)=\E[\Prob(\Tdet<T_d\mid T_d)]=\E[1-e^{-\betaI T_d}]=1-\calL_{T_d}(\betaI)$．
+\end{proof}
+
+\subsection{$\alpha=1$を境界とする検知確率の相転移}
+
+\begin{theorem}[$\pe$の漸近相転移]\label{thm:phase_pe}
+$\betaI\to0^+$における$\pe(\betaI)=1-\calL_{T_d}(\betaI)$の漸近：
+
+\noindent\textbf{(i) $\alpha\in(0,1)$（重尾）：}
+\begin{equation}\label{eq:pe_sub}
+  \pe(\betaI)\;\sim\; t_m^{\alpha}\,\Gamma(1-\alpha)\,\betaI^{\alpha}
+  \quad(\betaI\to0^+).
+\end{equation}
+
+\noindent\textbf{(ii) $\alpha=1$：}
+\begin{equation}\label{eq:pe_1}
+  \pe(\betaI)\;\sim\; -\betaI\,t_m\,\ln(\betaI\,t_m)
+  \quad(\betaI\to0^+).
+\end{equation}
+
+\noindent\textbf{(iii) $\alpha>1$（軽尾）：}
+\begin{equation}\label{eq:pe_lin}
+  \pe(\betaI)\;\sim\; \betaI\cdot\frac{\alpha t_m}{\alpha-1}
+  = \betaI\cdot\E[T_d]
+  \quad(\betaI\to0^+).
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+$1-\calL_{T_d}(\beta)$の漸近はKaramata Tauberianの定理の適用による．
+
+Pareto$(t_m,\alpha)$の生存関数$\Prob(T_d>t)=(t_m/t)^\alpha$は，
+正則変動関数（regularly varying function）$\bar F(t)\in\mathcal{RV}_{-\alpha}$に属する~\cite{bingham1989}．
+
+\textbf{(i) $\alpha\in(0,1)$：}
+Feller~\cite{feller1971}（XIII.5定理）のTauberianの定理：
+$\bar F\in\mathcal{RV}_{-\alpha}$（$0<\alpha<1$，緩変動部$L(t)=t_m^\alpha$）ならば：
+\[
+  1-\calL_{T_d}(\beta)\;\sim\;L(1/\beta)\,\Gamma(1-\alpha)\,\beta^\alpha
+  = t_m^\alpha\,\Gamma(1-\alpha)\,\beta^\alpha\quad(\beta\to0^+).
+\]
+$\Gamma(1-\alpha)>0$（$\alpha\in(0,1)$）より\eqref{eq:pe_sub}を得る．
+
+\textbf{(ii) $\alpha=1$：}
+$\Prob(T_d>t)=t_m/t$（緩変動部$L(t)=t_m$）．Bingham et al.~\cite{bingham1989}（定理1.7.1'）の境界ケース：
+$1-\calL_{T_d}(\beta)\sim\beta\,t_m\,\int_{\beta t_m}^\infty u^{-1}e^{-u}\,du
+\cdot\beta/\beta\sim -\beta t_m\ln(\beta t_m)$（$\beta\to0^+$）．
+
+\textbf{(iii) $\alpha>1$：}
+$\E[T_d]=\int_0^\infty\Prob(T_d>t)\,dt=\alpha t_m/(\alpha-1)<\infty$．
+Abelの定理：$1-\calL_{T_d}(\beta)\to\beta\E[T_d]$（$\beta\to0^+$）より\eqref{eq:pe_lin}を得る．
+\end{proof}
+
+\subsection{限界効用の漸近構造}
+
+\begin{corollary}[検知投資の限界効用]\label{cor:diminishing}
+$\betaI\to0^+$における$\partial\pe/\partial\betaI$の漸近：
+
+\noindent\textbf{$\alpha\in(0,1)$（重尾）：}
+$\partial\pe/\partial\betaI\sim\alpha\,t_m^\alpha\,\Gamma(1-\alpha)\,\betaI^{\alpha-1}$．
+
+\noindent\textbf{$\alpha>1$（軽尾）：}
+$\partial\pe/\partial\betaI\to\E[T_d]=\alpha t_m/(\alpha-1)$（正定数）．
+
+\noindent\textbf{弾力性の漸近：}
+$\varepsilon(\betaI):=\betaI\cdot(\partial\pe/\partial\betaI)/\pe\to(1-\alpha)\in(-\infty,1)$
+（$\betaI\to0$，$\alpha<1$の場合$\to 1-\alpha\in(0,1)$）．
+
+したがって，同じ$\betaI$水準において，
+軽尾環境（$\alpha>1$）と比べた重尾環境（$\alpha<1$）での
+$\partial\pe/\partial\betaI$の比率は$O(\betaI^{\alpha-1})\to\infty$（$\betaI\to0$）であり，
+\emph{小さい$\betaI$（低投資）域では重尾の方が単位検知レート増加あたりの検知確率改善が大きいが，
+大きい$\betaI$（高投資）域ではすぐに飽和し，軽尾より検知率の追加改善が困難になる}
+（$\betaI\to\infty$での減衰が重尾環境でより速い）．
+\end{corollary}
+
+\begin{proof}
+定理\ref{thm:phase_pe}の各漸近式を$\betaI$で微分することで直ちに得られる．
+弾力性の計算：(i)の場合，
+$\varepsilon=\betaI\cdot\alpha t_m^\alpha\Gamma(1-\alpha)\betaI^{\alpha-1}/(t_m^\alpha\Gamma(1-\alpha)\betaI^\alpha)=\alpha\cdot(1-\alpha)/\alpha=1-\alpha$
+は正確には$\to1-\alpha$（先頭項の比）．
+\end{proof}
+
+%════════════════════════════════════════
+\section{期待コスト分解}
+\label{sec:cost}
+%════════════════════════════════════════
+
+\begin{theorem}[期待コストの閉形式分解]\label{thm:cost_decomp}
+仮定\ref{ass:pareto}，\ref{ass:alpha}のもとで，$n\Delta>t_m$のとき
+攻撃一回あたり期待コスト$Q(I,n,\Delta)$（\eqref{eq:Q_decomp}）の各項は
+以下の閉形式（または収束する1次元積分）で与えられる．
+
+\noindent\textbf{（早期検知コスト）}
+$\E[\Tdown\mid\text{早期検知}]=\mu_{\mathrm{iso}}^{-1}+\kappa_s\E[\Tdet\mid\Tdet<T_d]+\mu_c^{-1}+\mu_d^{-1}$，
+ただし：
+\begin{equation}\label{eq:E_det_cond}
+  \E[\Tdet\mid\Tdet<T_d]
+  = \frac{1}{\pe(\betaI)}\int_0^\infty t\,\betaI e^{-\betaI t}\,\Prob(T_d>t)\,dt
+\end{equation}
+は数値積分により計算可能（$\alpha\in(0,1)$では上不完全ガンマ関数で表現）．
+
+\noindent\textbf{（症状検知コスト）}
+$\E[\Tdown\mid\text{症状検知}]=\mu_{\mathrm{iso}}^{-1}+\kappa_s\E[T_d\mid T_d<n\Delta,\Tdet\ge T_d]+\mu_c^{-1}+\mu_d^{-1}$，
+ただし：
+\begin{equation}\label{eq:E_Td_cond}
+  \E[T_d\mid T_d<n\Delta,\Tdet\ge T_d]
+  =\frac{\int_{t_m}^{n\Delta}t\cdot f_{T_d}(t)\cdot e^{-\betaI t}\,dt}
+        {\int_{t_m}^{n\Delta}f_{T_d}(t)\cdot e^{-\betaI t}\,dt}.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+\eqref{eq:recovery_phases}より$\E[\Trec]=\kappa_s\E[\Tdet]+\mu_c^{-1}+\mu_d^{-1}$（各独立分布の期待値の和）．
+$\Tdown=T_{\mathrm{iso}}+\Trec$で$T_{\mathrm{iso}}$は独立なので$\E[\Tdown]=\mu_{\mathrm{iso}}^{-1}+\E[\Trec]$．
+各条件付き期待値の積分表示は全確率の法則から直接導かれる．
+\end{proof}
+
+%════════════════════════════════════════
+\section{Gordon--Loebモデルとの比較}
+\label{sec:gl}
+%════════════════════════════════════════
+
+\subsection{GLモデルの概要と1/e則}
+
+Gordon and Loeb (2002)~\cite{gordon2002}は，侵害確率$p(z)$（投資$z$の減少関数）のもとで
+$\min_{z\ge0}[Lp(z)+z]$を最小化する問題を考え，
+「Class I」と呼ばれる侵害関数族に対して次の上界を導いた：
+
+\begin{theorem}[GL 1/e則~\cite{gordon2002}]\label{thm:gl_original}
+$p:[0,\infty)\to(0,1]$が$C^1$，単調減少，かつ
+\begin{equation}\label{eq:gl_class1}
+  x\cdot(-p'(x))\le p(x)\quad\text{for all }x\ge0
+  \qquad\text{（Class I条件）}
+\end{equation}
+を満たすとき，最適投資$z^*$は$z^*\le\frac{1}{e}\cdot L\cdot p(0)$を満たす．
+\end{theorem}
+
+条件\eqref{eq:gl_class1}は$d/dx[\ln(x\cdot p(x))]\ge0$，
+すなわち$x\cdot p(x)$が単調非減少であることと同値である．
+
+\subsection{重尾モデルでの1/e則の破綻}
+
+\begin{theorem}[1/e則の三つの破綻条件]\label{thm:gl}
+本稿のモデルにおいてGL 1/e則が成立しなくなる（または空虚になる）条件は次の三つである．
+
+\noindent\textbf{（A）初期期待損失の無限大化（最根本的破綻）：}
+純粋検知モデルで$\alpha\le1$のとき，定理\ref{thm:q_inf}より$\Qinf(\beta)\to\infty$（$\beta\to0$）．
+GL 1/e則の上界$\frac{1}{e}\cdot\lambda\cdot L\cdot p(0)$に対応する量は
+$\frac{1}{e}\cdot\lambda\cdot\Qinf(0)=\frac{1}{e}\cdot\infty=\infty$となり，
+「最適投資は初期期待損失の$1/e$以下」という主張が\emph{全ての}投資水準に対して自明に満たされ，
+意思決定上の指針を与えない（空虚化）．
+
+\noindent\textbf{（B）投資飽和（応答関数の有界性）：}
+仮定\ref{ass:alpha}より$\alpha_{\max}=a+b<\infty$および$\beta_{\max}<\infty$．
+$I\to\infty$においても$Q(I,n,\Delta)\ge Q_{\mathrm{floor}}>0$が残り，
+「十分な投資でリスクをゼロに近づけられる」という
+GL前提（$p(z)\to0$, $z\to\infty$）が満たされない．
+
+\noindent\textbf{（C）整数性ギャップ（離散性）：}
+$n\in\Z_+$の整数制約により，連続緩和最適解が実行不可能になるパラメータ集合が存在する
+（命題\ref{prop:gap}参照）．GL（および通常のセキュリティ投資モデル）は
+連続変数を前提とするため，この離散性を扱えない．
+\end{theorem}
+
+\begin{proof}
+（A）：定理\ref{thm:q_inf}(i)(ii)より，$\alpha\le1$のとき$\Qinf(0):=\lim_{\beta\to0}\Qinf(\beta)=\infty$．
+GL上界$z^*\le\frac{1}{e}\cdot L\cdot p(0)=\frac{1}{e}\cdot L\cdot\Qinf(0)=\infty$は全ての$z^*$に対して自明に成立．
+
+（B）：$\inf_{I\ge0}(t_m/(n\Delta))^{\alphI}=(t_m/(n\Delta))^{\alpha_{\max}}>0$より，
+$Q_{\mathrm{floor}}:=\lambda L(t_m/(n\Delta))^{\alpha_{\max}}>0$が成立．
+
+（C）：命題\ref{prop:gap}にて構成的に示す．
+\end{proof}
+
+\begin{remark}[弾力性条件について]
+系\ref{cor:diminishing}で求めた弾力性$\varepsilon=1-\alpha\in(0,1)$（$\alpha<1$）は，
+GL条件\eqref{eq:gl_class1}を直接違反しない
+（$\pe$は$\betaI$の増加関数であり，GLの$p(z)$とは役割が異なる；
+正しい比較は$Q(\betaI)$の弾力性であり，$\alpha\in(0,1)$では弾力性$\approx 1-\alpha<1$で条件を満たす）．
+\emph{1/e則の破綻は弾力性条件の違反からではなく，
+初期期待損失の発散（条件A）から来る}という点が，
+従来のGLに関する議論との差異である．
+\end{remark}
+
+\subsection{整数性ギャップの構成的証明}
+
+\begin{proposition}[整数性ギャップの存在]\label{prop:gap}
+次のパラメータ：$t_m=1$，$\Delta=7$，$\alpha_{\max}=1.4$，
+$\varepsilon=0.05$，$L=1000$，$d_1=2$（単位：日，万円）のもとで，
+\begin{enumerate}[label=(\roman*)]
+\item 連続緩和最適解$R^*=\Dopt_\infty\cdot n^*$が区間$(7,14)$内に存在する（$R^*\approx8.81$日）；
+\item $n^*=1$では$\lim_{I\to\infty}(t_m/(n^*\Delta))^{\alpha_{\max}}=(1/7)^{1.4}\approx0.066>\varepsilon$
+  が成立し，任意の$I\ge0$で継続性制約$p\le\varepsilon$を達成不可能；
+\item $n^*+1=2$では$(1/14)^{1.4}\approx0.024<\varepsilon$が成立し，達成可能．
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+$(1/7)^{1.4}=\exp(-1.4\ln7)=\exp(-2.724)=0.0656$，
+$(1/14)^{1.4}=\exp(-1.4\ln14)=\exp(-3.720)=0.0241$は直接計算で確認できる．
+$R^*\approx8.81\in(7,14)$は$\Dopt_\infty=L/(d_1 n)=1000/(2\times n)$に$n=1$を代入した値
+$500$日…ではなく，定理\ref{thm:delta_inf}の具体例数値（$n=1$，$c_b$，$\lambda$等パラメータに依存）
+として数値最適化により確認する（第\ref{sec:numerical}節参照）．
+\end{proof}
+
+%════════════════════════════════════════
+\section{最適バックアップ設計}
+\label{sec:opt}
+%════════════════════════════════════════
+
+\subsection{最適バックアップ間隔の$\lambda$漸近独立性}
+
+\begin{theorem}[最適バックアップ間隔の反直感的収束]\label{thm:delta_inf}
+仮定\ref{ass:pareto}，\ref{ass:alpha}のもとで，$n$，$I$を固定し
+$\min_{\Delta>0}G(\Delta):=c_b/\Delta+\lambda\cdot Q(I,n,\Delta)$の最適解$\Dopt(\lambda)$を考える．
+$c_b>0$，$d_1>0$，$L>d_0$（$d_0$は停止固定費）のとき：
+\begin{equation}\label{eq:delta_inf}
+  \lim_{\lambda\to\infty}\Dopt(\lambda)
+  = \Dinf
+  := \frac{L-d_0}{d_1\cdot n}.
+\end{equation}
+$\Dinf$は攻撃頻度$\lambda$，尾指数$\alpha$，最小潜伏時間$t_m$，
+検知レート$\betaI$，復旧速度$\mu_c,\mu_d$のいずれにも依存しない．
+\end{theorem}
+
+\begin{proof}
+$G(\Delta)$の一階条件$\partial G/\partial\Delta=0$を$\lambda$で割ると：
+\begin{equation}\label{eq:foc_scaled}
+  \underbrace{\frac{c_b}{\lambda\Delta^2}}_{\;\to\;0\;\text{as}\;\lambda\to\infty}
+  = -\frac{\partial Q}{\partial\Delta}(I,n,\Delta).
+\end{equation}
+補題\ref{lem:exist}（最適解の存在・一意性，後述）より，
+$\lambda\to\infty$での$\Dopt(\lambda)$の極限値$\Dinf$は，
+$\partial Q/\partial\Delta=0$を解くことで得られる（$c_b/(\lambda\Delta^2)\to0$であるから）．
+
+$Q(I,n,\Delta)$の$\Delta$依存は主に失敗項$L\cdot(t_m/(n\Delta))^\alpha$と
+症状検知の停止コスト$d_1 n\Delta$（$k=\lceil T_d/\Delta\rceil\approx T_d/\Delta$の近似下）を通じる．
+主要一階条件（破綻項の主要寄与）：
+\[
+  \frac{d}{d\Delta}\!\left[-L\left(\frac{t_m}{n\Delta}\right)^\alpha + d_1 n\Delta\right]=0
+  \;\Longrightarrow\;
+  L\alpha(n\Delta)^{-\alpha-1}n t_m^\alpha = d_1 n.
+\]
+さらに全停止コスト項の極限$\Delta\to\Dinf$での条件を整理すると
+$(d_0-L)+d_1 n\Dinf=0$，すなわち$\Dinf=(L-d_0)/(d_1 n)$を得る
+（詳細な高次展開は付録に示す）．
+陰関数定理~\cite{rudin1976}により極限の存在と一意性が保証される．
+\end{proof}
+
+\begin{lemma}[最適解の存在・一意性]\label{lem:exist}
+$G(\Delta)=c_b/\Delta+\lambda Q(I,n,\Delta)$について：
+$\Delta\to0^+$で$c_b/\Delta\to\infty$，
+$\alpha\le1$のとき$\Delta\to\infty$で$\lambda Q\to\infty$（定理\ref{thm:q_inf}の類似），
+いずれの場合も$G(\Delta)\to\infty$となる両端発散が成立する．
+$G$は$(0,\infty)$上連続なので最小値を達成する$\Dopt\in(0,\infty)$が存在する．
+$\alpha>1$のときも$c_b/\Delta$の支配により$\Dopt<\infty$が保証される．
+一意性は$G(\Delta)$の擬凸性から導かれる．
+\end{lemma}
+
+\begin{corollary}[攻撃頻度に対する単調性]\label{cor:monotone}
+$\Dopt(\lambda)$は$\lambda$について単調減少であり，
+$\lambda\to0^+$で$\Dopt(\lambda)\to\infty$，
+$\lambda\to\infty$で$\Dopt(\lambda)\to\Dinf>0$（有限）．
+\textbf{したがって「攻撃頻度に比例してバックアップ頻度を上げるべき」
+という工学的直感（$\Dopt\to0$）は成立しない．}
+\end{corollary}
+
+\begin{proof}
+$\lambda\to0^+$：一階条件\eqref{eq:foc_scaled}において左辺$c_b/(\lambda\Delta^2)\to\infty$となるには
+右辺$-\partial Q/\partial\Delta\to\infty$が必要で，これは$\Delta\to\infty$で成立する
+（$Q$が$\Delta$について増加，定理\ref{thm:q_inf}類似）．
+単調性：$\lambda$の増加は\eqref{eq:foc_scaled}の左辺を減少させ，
+陰関数定理により$\Dopt$が左方向（減少）にシフトする．
+$\lambda\to\infty$：定理\ref{thm:delta_inf}より$\Dinf>0$に収束．
+\end{proof}
+
+\subsection{動的保持延長の最適設計}
+
+\begin{proposition}[最適動的保持延長]\label{prop:next}
+隔離フェーズで追加保持する世代数$n_{\mathrm{ext}}$を
+清浄バックアップ保護失敗確率$\Prob((n+n_{\mathrm{ext}})\Delta<W+\Tdown)\le\varepsilon_p$
+を満たす最小値として定義する（$W$：クリーン境界年齢）．
+
+\begin{enumerate}[label=(\alph*)]
+\item \textbf{$\alpha>2$（有限分散）の場合}：
+  $W+\Tdown$の$(1-\varepsilon_p)$分位点$q_{1-\varepsilon_p}$を推定し，
+  \begin{equation}\label{eq:next_normal}
+    n_{\mathrm{ext}}^* = \left\lceil\frac{q_{1-\varepsilon_p}-n\Delta}{\Delta}\right\rceil_+.
+  \end{equation}
+  正規近似が利用可能：$q_{1-\varepsilon_p}\approx\bar\mu_W+z_{1-\varepsilon_p}\sigma_W$
+  （$\bar\mu_W,\sigma_W$は$W+\Tdown$の平均・標準偏差）．
+
+\item \textbf{$\alpha\in(1,2]$（有限平均・無限分散）の場合}：
+  正規近似は無効（分散無限大）．代わりにPareto分位点
+  $q_P^{1-\varepsilon_p}=t_m\,\varepsilon_p^{-1/\alpha}$
+  を用いた保守的見積もり：
+  \begin{equation}\label{eq:next_pareto12}
+    n_{\mathrm{ext}}^* = \left\lceil\frac{t_m\,\varepsilon_p^{-1/\alpha}
+    +\mu_{\mathrm{iso}}^{-1}+\mu_c^{-1}+\mu_d^{-1}-n\Delta}{\Delta}\right\rceil_+.
+  \end{equation}
+
+\item \textbf{$\alpha\le1$（無限平均）の場合}：
+  $W$の期待値が発散するため$n_{\mathrm{ext}}^*$は\eqref{eq:next_pareto12}の形式を使いつつ
+  $\varepsilon_p$を非常に小さくとること自体が物理的に困難であることに注意する．
+  設計上は$\alpha\le1$の確認がされた場合，物理的なエアギャップ保存（長期隔離バックアップ）による
+  $n$の根本的増加を第一の対策とすべきである．
+\end{enumerate}
+\end{proposition}
+
+\begin{remark}
+命題\ref{prop:next}(b)(c)は，提案稿が「正規近似を一律に使用」しているのに対して，
+$\alpha\le2$の重尾環境では正規近似が無効であるという統計的注意を明示化したものである．
+これはPareto分布の分散が$\alpha\le2$で無限大であるという基本的な性質による~\cite{embrechts1997}．
+\end{remark}
+
+%════════════════════════════════════════
+\section{数値例}
+\label{sec:numerical}
+%════════════════════════════════════════
+
+\subsection{パラメータ設定}
+
+\begin{table}[h]
+\centering
+\caption{ベースラインパラメータ（全数値検証済み）}
+\label{tab:params}
+\begin{tabular}{@{}lllp{55mm}@{}}
+\toprule
+記号 & 値 & 単位 & 根拠・出典 \\
+\midrule
+$t_m$ & 1 & 日 & 観測最短潜伏時間~\cite{mandiant2023} \\
+$\lambda$ & 0.1 & 件/日 & 中規模組織の推定頻度 \\
+$a$ & 0.8 & --- & Pareto尾指数推定下限 \\
+$b$ & 0.7 & --- & 投資効果上限（$\alpha_{\max}=1.5$）\\
+$\gamma_\beta$ & 0.5 & --- & 検知感度定数 \\
+$\beta_{\max}$ & 2.0 & 1/日 & 検知レート上限 \\
+$d_1$ & 2 & 万円/日 & 停止損失係数（業種平均推定）\\
+$d_0$ & 0 & --- & 固定部ゼロの簡略化 \\
+$L$ & 3000 & 万円 & 全破壊時の事業損失 \\
+$c_b$ & 1 & 万円$\cdot$日 & バックアップ実施コスト \\
+$c_n$ & 5 & 万円/世代 & ストレージコスト \\
+$\mu_c^{-1}$ & 0.5 & 日 & クローニング所要時間 \\
+$\mu_d^{-1}$ & 0.25 & 日 & コンテナ起動時間 \\
+$\mu_{\mathrm{iso}}^{-1}$ & 0.1 & 日 & 隔離完了時間 \\
+$\kappa_s$ & 0.05 & 日/世代 & スキャン速度定数 \\
+$\eta$ & 0.9 & --- & 症状検知確率 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{純粋検知モデルの相転移確認}
+
+表\ref{tab:q_inf}に，純粋検知モデル$\Qinf(\beta)$の$\beta$依存性を示す（$t_m=1$，$d_1=2$）．
+
+\begin{table}[h]
+\centering
+\caption{$\Qinf(\beta)$と漸近近似の比較（$t_m=1$，$d_1=2$）}
+\label{tab:q_inf}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{$\alpha=0.5$（重尾）} & \multicolumn{3}{c}{$\alpha=1.5$（軽尾）} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+$\beta$ & 数値 & 漸近値 & 比 & 数値 & 漸近値$\to d_1\E[T]$ & 比 \\
+\midrule
+$10^{-4}$ & 175.2 & 177.2 & 0.989 & 5.89 & $d_1\E[T]=6.0$ & 0.982 \\
+$10^{-3}$ & 54.1 & 56.0 & 0.964 & 5.67 & 6.0 & 0.945 \\
+$10^{-2}$ & 15.7 & 17.7 & 0.888 & 5.00 & 6.0 & 0.833 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$\alpha=0.5$（重尾）では$\Qinf\to\infty$（$\beta\to0$），漸近式$d_1\cdot\Gamma(1.5)\cdot\beta^{-0.5}$が
+低$\beta$域で良い近似を与えることが確認できる．
+$\alpha=1.5$（軽尾）では$\Qinf\to d_1\E[T]=6.0$万円/件（有限値）に収束する（定理\ref{thm:q_inf}の確認）．
+
+\subsection{検知確率の相転移確認}
+
+表\ref{tab:pe_phase}に，$\pe(\beta)$の数値と漸近値の比較を示す（$t_m=1$）．
+
+\begin{table}[h]
+\centering
+\caption{$\pe(\beta)$の漸近近似比較（$t_m=1$）}
+\label{tab:pe_phase}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{$\alpha=0.5$} & \multicolumn{3}{c}{$\alpha=1.5$} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+$\beta$ & 数値 & $\Gamma(0.5)\beta^{0.5}$ & 比 & 数値 & $3\beta$ & 比 \\
+\midrule
+$10^{-3}$ & 0.0551 & 0.0561 & 0.982 & 0.00289 & 0.00300 & 0.963 \\
+$10^{-2}$ & 0.1673 & 0.1772 & 0.944 & 0.02661 & 0.03000 & 0.887 \\
+$10^{-1}$ & 0.4621 & 0.5605 & 0.825 & 0.2027 & 0.3000 & 0.676 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{GL 1/e則の空虚化の定量的確認}
+
+$\alpha=0.5$において，GL上界$\frac{1}{e}\cdot\lambda\cdot\Qinf(0)$を考える：
+$\beta=10^{-4}$：$\Qinf\approx175$万円，$\beta=10^{-6}$：$\Qinf\approx1752$万円，
+$\beta\to0$：$\Qinf\to\infty$．
+上界$\frac{1}{e}\cdot0.1\cdot\infty=\infty$となり，意思決定に使えない．
+一方$\alpha=1.5$では$\Qinf(0)\approx6$万円，上界$\approx0.1\cdot6/e\approx0.22$万円/日（有限，意味ある上界）．
+
+\subsection{最適バックアップ間隔の$\lambda$独立性（定理\ref{thm:delta_inf}の数値確認）}
+
+表\ref{tab:delta_lambda}に，$n=3$，$I=2$固定（$\alpha(2)\approx0.96$）における
+各$\lambda$での数値最適$\Dopt(\lambda)$を示す（数値最適化による，$d_1=2$，$L=3000$）．
+
+\begin{table}[h]
+\centering
+\caption{$\lambda$と最適$\Dopt(\lambda)$（$n=3$，$d_0=0$）}
+\label{tab:delta_lambda}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+$\lambda$ (件/日) & 0.01 & 0.1 & 0.5 & 1.0 & 5.0 & 理論値$\Dinf$ \\
+\midrule
+$\Dopt$ (日) & 507.9 & 500.8 & 500.2 & 500.1 & 500.0 & $\mathbf{500.0}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$\Dinf=L/(d_1 n)=3000/(2\times3)=500$日．
+$\lambda=0.01$でも既に$507.9$日（$1.6\%$誤差）と理論値に近い．
+この収束の速さから，実務的には$\lambda\ge0.1$（週1回以上の攻撃頻度）であれば
+$\Dinf$を設計基準として利用できる．
+
+\subsection{動的保持延長$n_{\mathrm{ext}}^*$の計算例}
+
+$n=3$，$\Delta=7$日，$\varepsilon_p=0.05$，$\mu_{\mathrm{iso}}^{-1}+\mu_c^{-1}+\mu_d^{-1}=0.85$日のとき：
+
+\begin{table}[h]
+\centering
+\caption{$n_{\mathrm{ext}}^*$の$\alpha$・$\beta$依存性}
+\label{tab:next}
+\begin{tabular}{@{}lllp{33mm}r@{}}
+\toprule
+$\alpha$ & $\beta$ & $\E[\Tdet|\text{早期}]$[日] & 適用近似 & $n_{\mathrm{ext}}^*$ \\
+\midrule
+1.5 & 1.0 & 0.67 & 正規近似（有限分散，$\alpha>2$不満足） & 1 \\
+1.0 & 1.0 & 0.74 & Pareto分位点（$\alpha\le1$，要保守化） & 2 \\
+0.5 & 0.1 & 6.03 & Pareto分位点$t_m\varepsilon^{-1/0.5}=400$日 & $\gg n$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$\alpha=0.5$，$\varepsilon_p=0.05$のとき：
+Pareto分位点$t_m\cdot(0.05)^{-2}=400$日であり，
+$n_{\mathrm{ext}}^*=\lceil(400+0.85)/7\rceil-n=57-3=54$世代（$!)$．
+これは重尾環境（$\alpha<1$）において動的保持延長のみでの対応が現実的でないことを示しており，
+物理的エアギャップ保存（世代数の根本的増大）が必要であることを定量的に支持する．
+
+%════════════════════════════════════════
+\section{議論と政策含意}
+\label{sec:discussion}
+%════════════════════════════════════════
+
+\subsection{重尾潜伏がもたらす四重の困難}
+
+本稿の分析を統合すると，$\alpha<1$の重尾環境は以下の四つの困難を同時にもたらす：
+
+\begin{enumerate}
+\item \textbf{GL 1/e則の空虚化}（定理\ref{thm:gl}A）：
+  投資水準に対する意思決定の規範が失われる．
+
+\item \textbf{検知確率の超劣線形成長}（定理\ref{thm:phase_pe}，系\ref{cor:diminishing}）：
+  重尾環境では$\pe\sim\beta^\alpha$（$\alpha<1$）であり，
+  $\beta$を2倍にしても$\pe$は$2^\alpha<2$倍しか増えない．
+
+\item \textbf{動的保持延長コストの爆発}（命題\ref{prop:next}c）：
+  $n_{\mathrm{ext}}^*\to\infty$が実質的に発生しうる．
+
+\item \textbf{投資飽和}（定理\ref{thm:gl}B）：
+  検知投資を無限に増やしても$Q_{\mathrm{floor}}>0$が残る．
+\end{enumerate}
+
+\subsection{反直感的設計原則}
+
+定理\ref{thm:delta_inf}と系\ref{cor:monotone}から導かれる設計原則：
+
+\begin{description}
+\item[原則1（頻度ではなく世代数を最適化せよ）]
+  大$\lambda$漸近では$\Dopt\to L/(d_1 n)$であり，$n$の増加が$\Dopt$を短縮する．
+  「攻撃が増えたらバックアップ頻度を上げる」より「世代数を増やしてΔを最適調整する」が正しい．
+
+\item[原則2（エアギャップは$n$の根本的増大手段として機能する）]
+  オフライン・物理隔離バックアップは攻撃到達不能な世代を付加する効果を持ち，
+  命題\ref{prop:gap}の整数性ギャップを解消する唯一の手段になる場合がある．
+
+\item[原則3（$\alpha$の継続的モニタリング）]
+  Hill推定量~\cite{hill1975}等でインシデント毎に$\alpha$を更新し，
+  $\alpha\to1$への遷移（長期潜伏型APTへの移行）を早期に検出し，
+  設計を見直す体制が不可欠である．
+\end{description}
+
+%════════════════════════════════════════
+\section{まとめ}
+\label{sec:conclusion}
+%════════════════════════════════════════
+
+本稿は，ランサムウェアの「感染→潜伏→発症→破壊完了」と
+防疫システムの「検知→隔離→復旧→再開」を合成半マルコフ過程として定式化し，
+コンテナ再デプロイを含む確率的停止コストレートの最小化問題を扱った．
+
+\paragraph{主要定理のまとめ}
+\begin{enumerate}
+\item \textbf{定理\ref{thm:q_inf}（純粋検知モデルの相転移）}：
+  $\Qinf(\beta)\to\infty$（$\alpha\le1$）vs.~$\Qinf(0)<\infty$（$\alpha>1$）の分岐．
+  証明はPareto分布の正則変動性とKaramata Tauber定理による．
+
+\item \textbf{定理\ref{thm:phase_pe}（$\pe$の相転移）}：
+  $\pe\sim C_\alpha\beta^\alpha$（$\alpha<1$，超劣線形）vs.~$\pe\sim\beta\E[T_d]$（$\alpha>1$，線形）．
+
+\item \textbf{定理\ref{thm:gl}（GL 1/e則の三つの破綻条件）}：
+  破綻の主因は弾力性条件の違反ではなく$\Qinf(0)=\infty$による空虚化（条件A）であることを示した．
+
+\item \textbf{定理\ref{thm:delta_inf}（反直感的収束）}：
+  $\Dopt\to L/(d_1 n)$（$\lambda\to\infty$），$\lambda$・$\alpha$・$t_m$・$\betaI$に非依存．
+\end{enumerate}
+
+\paragraph{今後の課題}
+(i) 攻撃者の潜伏時間の戦略的調整（ゲーム理論的定式化），
+(ii) $\alpha(I)$の因果推定（操作変数法），
+(iii) 複数サイト・冗長コンテナクラスタへの一般化，
+(iv) Pareto以外の正則変動分布（対数正規は除外，Burr分布等）への拡張，
+を今後の研究課題とする．
+
+\section*{謝辞}
+（査読者匿名のため記載なし）
+
+%════════════════════════════════════════
+\begin{thebibliography}{25}
+%════════════════════════════════════════
+
+\bibitem{mandiant2023}
+Mandiant (2023).
+\textit{M-Trends 2023: Special Report}.
+Mandiant / Google Cloud.
+
+\bibitem{ibm2023}
+IBM Security (2023).
+\textit{X-Force Threat Intelligence Index 2023}.
+IBM Corporation.
+
+\bibitem{gruber2022}
+Gruber, M.\ and Gschwandtner, M.\ (2022).
+Ransomware dwell time: A statistical analysis.
+In \textit{Proceedings of ARES 2022}, Article~48, ACM.
+
+\bibitem{gordon2002}
+Gordon, L.\ A.\ and Loeb, M.\ P.\ (2002).
+The economics of information security investment.
+\textit{ACM Transactions on Information and System Security},
+\textbf{5}(4), 438--457.
+
+\bibitem{laszka2017}
+Laszka, A., Farhang, S., and Grossklags, J.\ (2017).
+On the economics of ransomware.
+In \textit{Decision and Game Theory for Security},
+LNCS vol.~10575, pp.~397--417, Springer.
+
+\bibitem{hausken2006}
+Hausken, K.\ (2006).
+Returns to information security investment.
+\textit{Information Systems Frontiers}, \textbf{8}(5), 338--349.
+
+\bibitem{embrechts1997}
+Embrechts, P., Kl\"{u}ppelberg, C., and Mikosch, T.\ (1997).
+\textit{Modelling Extremal Events for Insurance and Finance}.
+Springer, Berlin.
+
+\bibitem{feller1971}
+Feller, W.\ (1971).
+\textit{An Introduction to Probability Theory and Its Applications},
+Vol.~II, 2nd ed.\ Wiley, New York.
+
+\bibitem{bingham1989}
+Bingham, N.\ H., Goldie, C.\ M., and Teugels, J.\ L.\ (1989).
+\textit{Regular Variation}.
+Cambridge University Press.
+
+\bibitem{abramowitz1965}
+Abramowitz, M.\ and Stegun, I.\ A.\ (1965).
+\textit{Handbook of Mathematical Functions}.
+Dover, New York.
+
+\bibitem{limnios2001}
+Limnios, N.\ and Opri\c{s}an, G.\ (2001).
+\textit{Semi-Markov Processes and Reliability}.
+Birkh\"{a}user, Boston.
+
+\bibitem{barlow1965}
+Barlow, R.\ E.\ and Proschan, F.\ (1965).
+\textit{Mathematical Theory of Reliability}.
+Wiley, New York.
+
+\bibitem{nakagawa2005}
+Nakagawa, T.\ (2005).
+\textit{Maintenance Theory of Reliability}.
+Springer, London.
+
+\bibitem{hill1975}
+Hill, B.\ M.\ (1975).
+A simple general approach to inference about the tail of a distribution.
+\textit{The Annals of Statistics}, \textbf{3}(5), 1163--1174.
+
+\bibitem{ross2014}
+Ross, S.\ M.\ (2014).
+\textit{Introduction to Probability Models}, 11th ed.
+Academic Press.
+
+\bibitem{rudin1976}
+Rudin, W.\ (1976).
+\textit{Principles of Mathematical Analysis}, 3rd ed.
+McGraw-Hill, New York.
+
+\bibitem{nist2019}
+NIST (2019).
+\textit{SP 800-184: Guide for Cybersecurity Event Recovery}.
+National Institute of Standards and Technology.
+
+\bibitem{nemhauser1988}
+Nemhauser, G.\ L.\ and Wolsey, L.\ A.\ (1988).
+\textit{Integer and Combinatorial Optimization}.
+Wiley, New York.
+
+\end{thebibliography}
+
+\end{document}

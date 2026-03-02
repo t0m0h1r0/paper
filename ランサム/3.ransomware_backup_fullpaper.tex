@@ -1,0 +1,174 @@
+
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{xeCJK}
+\usepackage{setspace}
+
+\geometry{margin=25mm}
+\setstretch{1.2}
+
+\title{ランサムウェア潜伏・検知・破壊過程を考慮した\\
+バックアップ間隔およびリテンション期間の最適設計理論}
+\author{}
+\date{\today}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}
+\newtheorem{assumption}{仮定}
+\newtheorem{proposition}{命題}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+本研究は、ランサムウェア攻撃における潜伏・検知・破壊の確率過程を明示的にモデル化し、
+企業ITシステムのバックアップ間隔およびリテンション期間の最適設計を理論的に導出する。
+攻撃到達率、検知強度、破壊損失、バックアップコストを統合した確率制御モデルを構築し、
+最適設計の存在・一意性を厳密に証明する。さらに、攻撃強度や破壊損失の変化に対する比較静学を導出し、
+重尾潜伏分布下での臨界現象を示す。本研究は、実務的パラメータ設計に対し理論的基盤を与えるものである。
+\end{abstract}
+
+\section{序論}
+
+近年、ランサムウェアは企業継続性に対する重大な脅威となっている。
+攻撃は一般に、侵入後の潜伏期間を経て横展開し、最終的に暗号化・破壊を実行する。
+この過程において、検知が遅れるほど被害は拡大する。
+
+本研究は以下の問いに答える：
+
+\begin{itemize}
+\item バックアップ間隔および保持期間はどのように設計すべきか。
+\item 検知投資と保持期間は補完関係か代替関係か。
+\item 攻撃強度増大時、最適設計はどの方向に変化するか。
+\item 潜伏期間が重尾分布の場合、均衡はどのように変化するか。
+\end{itemize}
+
+\section{モデル}
+
+\subsection{潜伏・検知過程}
+
+攻撃到達率を $\lambda(I)$、検知率を $\mu(I)$ とする。
+$I$ は検知投資水準である。
+
+\begin{assumption}
+$\lambda'(I)<0$, $\mu'(I)>0$ とする。
+\end{assumption}
+
+総ハザードを
+\[
+\theta(I)=\lambda(I)+\mu(I)
+\]
+と定義する。
+
+\subsection{破壊確率}
+
+リテンション期間を $R$ とする。
+
+破壊発生確率は
+
+\[
+\Phi(R,I)=\frac{\lambda(I)}{\lambda(I)+\mu(I)}e^{-\theta(I)R}
+\]
+
+とする。
+
+\subsection{総費用関数}
+
+\[
+C(R,I)=\frac{a}{R}+bR+c_I I+c_f \Phi(R,I)
+\]
+
+\section{最適設計}
+
+\subsection{一階条件}
+
+\paragraph{Rに関する条件}
+
+\[
+-\frac{a}{R^2}+b-c_f \kappa \theta e^{-\theta R}=0
+\]
+
+\paragraph{Iに関する条件}
+
+\[
+c_I+c_f e^{-\theta R}(\kappa'-\kappa\theta'R)=0
+\]
+
+\section{一意性}
+
+\begin{theorem}
+費用関数は $(R,I)$ に関して厳密凸であり、最適解は一意である。
+\end{theorem}
+
+\begin{proof}
+二階微分を計算すると
+
+\[
+C_{RR}=\frac{2a}{R^3}+c_f\kappa\theta^2 e^{-\theta R}>0
+\]
+
+同様に $C_{II}>0$ が成立する。
+ヘッセ行列の行列式は正であるため、厳密凸性が成立する。
+\end{proof}
+
+\section{比較静学}
+
+\begin{proposition}
+$\frac{dR^*}{dc_f}>0$
+\end{proposition}
+
+\begin{proof}
+陰関数定理より直ちに従う。
+\end{proof}
+
+\begin{proposition}
+$\frac{dR^*}{da}<0$
+\end{proposition}
+
+\begin{proposition}
+$\frac{dR^*}{d\lambda}>0$
+\end{proposition}
+
+\section{重尾潜伏}
+
+潜伏分布を Weibull とする。
+
+\[
+S(t)=\exp(-\beta t^k)
+\]
+
+$k<1$ のとき重尾となる。
+この場合、指数減衰が弱まり、最適 $R$ は増大する。
+
+\section{Stackelberg拡張}
+
+攻撃者が $\lambda$ を選択し、防御者が反応する。
+防御者の反応関数は単調であり、攻撃者利得が準凹であれば均衡は一意。
+
+\section{政策含意}
+
+\begin{itemize}
+\item 破壊損失増大は保持延長を正当化する。
+\item 攻撃強度増大は検知投資と保持期間の双方を増加させる。
+\item 重尾環境では極端な長期保持が合理的となり得る。
+\end{itemize}
+
+\section{結論}
+
+本研究は、潜伏・検知・破壊を統合したバックアップ設計理論を構築した。
+最適解の存在・一意性および比較静学を示し、
+重尾分布下での臨界挙動を明らかにした。
+
+今後は実データによるパラメータ推定と数値実証を行う。
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

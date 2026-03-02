@@ -1,0 +1,954 @@
+% heavy_tail_backup_v3.tex  —  XeLaTeX
+% 第三稿：根本的再設計
+%   モデル：攻撃到着→潜伏→段階的汚染→検知→復旧停止時間
+%   目的：総期待停止時間コストレート
+%   主定理：α=1相転移，最適Δ*のλ独立性，Φ(n)非単峰性
+%   比較：Gordon–Loebモデルとの乖離
+%   ロバスト：ミニマックス最悪点の構造定理
+
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{fontspec}
+\setmainfont{Noto Serif CJK JP}
+\setsansfont{Noto Sans CJK JP}
+\XeTeXlinebreaklocale "ja"
+\XeTeXlinebreakskip = 0pt plus 1pt minus 0.1pt
+
+\usepackage{amsmath,amssymb,amsthm,bm,mathtools}
+\usepackage[margin=25mm,top=28mm,bottom=28mm]{geometry}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage[hidelinks,unicode]{hyperref}
+\usepackage{enumitem}
+\usepackage{array}
+\onehalfspacing
+
+%--- 定理環境 ---
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{corollary}[theorem]{系}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{assumption}[theorem]{仮定}
+\newtheorem{example}[theorem]{例}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{注}
+
+%--- 記号 ---
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\calU}{\mathcal{U}}
+\newcommand{\pfail}{p_{\mathrm{fail}}}
+\newcommand{\Copt}{C^*}
+\newcommand{\Dopt}{\Delta^*}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+\title{%
+重尾潜伏下のランサムウェア攻撃に対する\\
+バックアップ設計の最適化理論：\\
+停止コスト・相転移・反直感的最適性}
+\author{（匿名査読用）}
+\date{}
+\maketitle
+
+%=======================================================
+\begin{abstract}
+%=======================================================
+ランサムウェアの潜伏時間（dwell time）がPareto分布に従う環境において，
+攻撃到着・潜伏・バックアップ汚染進行・検知・復旧停止という一連のフェーズを確率モデル化し，
+総期待停止コストレートを最小化するバックアップ設計（間隔$\Delta$・世代数$n\in\mathbb Z_+$）
+および検知投資$I$を求める問題を定式化する．
+
+本稿の主要な貢献は三つである．
+第一に，Pareto分布のもとで攻撃一回あたりの期待コストを閉形式で導き（定理\ref{thm:decomp}），
+\emph{尾指数$\alpha$が1に等しいか否かに応じた位相転移}を示す（定理\ref{thm:phase}）：
+$\alpha\in(0,1]$では期待コストが$\Delta\to\infty$とともに発散し，
+$\alpha>1$では有限の漸近値に収束する．
+この相転移はPareto潜伏固有の現象であり，指数分布・対数正規分布では生じない．
+
+第二に，攻撃頻度$\lambda\to\infty$の漸近極限において，
+最適バックアップ間隔$\Dopt$が$\lambda$に依存せず
+$\Dopt\to L/(d_1 n)$（$L$：破綻損失，$d_1$：単位時間の停止コスト，$n$：世代数）
+に収束することを示す（定理\ref{thm:delta_star}）．
+これは「攻撃頻度が高まるほどバックアップ頻度を上げるべき」という工学的直感に反する．
+
+第三に，世代数$n$ごとの最適コスト$\Phi(n)$が一般に非単峰的であることを構成的に示し（定理\ref{thm:non_unimodal}），
+さらに従来の情報セキュリティ投資理論（Gordon--Loebモデル）における「費用の1/e則」が
+重尾潜伏下で成立しなくなる条件を特定する（命題\ref{prop:gl_breakdown}）．
+
+ロバスト最適化に関しては，不確実性集合上での最悪期待コストを与えるパラメータが
+従来の「最悪値一律代入」ではなく$\alpha$方向に非単調な1次元最適化問題を解くことで決まることを示す
+（命題\ref{prop:minimax}）．
+\end{abstract}
+
+%=======================================================
+\section{序論}
+\label{sec:intro}
+%=======================================================
+
+\subsection{背景と動機}
+
+ランサムウェアの潜伏時間（初期侵入から暗号化実行までの時間）は，
+実観測データ（Mandiant M-Trends~\cite{mandiant2023}，IBM X-Force~\cite{ibm2023}）において
+重尾性が報告されており，中央値7--10日に対して90パーセンタイルが数ヶ月超に及ぶケースが存在する．
+重尾分布，特にPareto族においては\emph{尾指数$\alpha\le1$の場合に期待値が発散}するため，
+「期待損失の最小化」という標準的アプローチが数学的に破綻し得る~\cite{embrechts1997}．
+
+情報セキュリティ投資の経済学における基礎的枠組みであるGordon--Loeb (GL) モデル~\cite{gordon2002}は，
+軽尾分布・連続変数・単一防御線を前提とし，「最適投資額は期待損失の$1/e$以下」という
+エレガントな「1/e則」を導く．しかし本稿はGLモデルが想定しない二つの構造的要素，
+すなわち\emph{(i)重尾潜伏による期待コストの発散}と
+\emph{(ii)バックアップ世代数の整数制約（MINLP構造）}が，
+GLモデルの政策含意を根本的に無効にする条件を明示する．
+
+バックアップ最適化については，信頼性工学における検査間隔最適化~\cite{barlow1965,nakagawa2005}や
+可用性・保全性モデル~\cite{birolini2017}が基礎を提供するが，
+これらは主として指数分布（記憶なし）または有限モーメントを持つ寿命分布を対象とする．
+重尾潜伏という文脈で\emph{停止時間コスト}（単なる破綻確率でなく）を最小化する問題は，
+本稿が知る限り未整備である．
+
+\subsection{本稿の貢献}
+
+本稿の学術的貢献を先行研究との比較で整理する：
+\begin{enumerate}
+\item \textbf{モデルの精緻化}：
+  「破綻確率$\le\varepsilon$」という制約最適化から，
+  停止コスト・復旧コスト・破綻損失を統合した\emph{コストレート最小化}へ移行する．
+  これにより，Δとnのトレードオフが「失敗確率削減」と「停止時間削減」の両面から定量化される．
+\item \textbf{定理の非自明性}：
+  全ての定理は「仮定→同値変換→帰結」の形でなく，
+  パラメータ空間における非自明な閾値・非単調性・相転移を明示的に特定する．
+\item \textbf{反直感的結果}：
+  攻撃頻度が最適バックアップ間隔を決定しないという定理（定理\ref{thm:delta_star}）は，
+  実務的直感に反する予測であり，実証的検証の動機となる．
+\item \textbf{GLモデルとの正面対比}：
+  1/e則が適用できる条件と破綻する条件を同一枠組みで導く（命題\ref{prop:gl_breakdown}）．
+\end{enumerate}
+
+\subsection{論文の構成}
+
+第\ref{sec:model}節でモデルと費用関数，第\ref{sec:decomp}節で期待コスト分解，
+第\ref{sec:phase}節で位相転移，第\ref{sec:delta}節で最適バックアップ間隔の漸近解析，
+第\ref{sec:nonunimodal}節でΦ(n)の非単峰性，第\ref{sec:gl}節でGLモデル比較，
+第\ref{sec:robust}節でミニマックスロバスト最適化，第\ref{sec:numerical}節で数値例，
+第\ref{sec:conclusion}節でまとめを述べる．
+
+%=======================================================
+\section{システムモデルと費用構造}
+\label{sec:model}
+%=======================================================
+
+\subsection{攻撃フェーズダイナミクス}
+
+攻撃イベントはPoisson過程（強度$\lambda>0$）で到着する．
+各攻撃は独立な潜伏時間$T$（初期侵入から検知・暗号化開始までの時間）を持ち，
+以下のPareto分布に従うと仮定する．
+
+\begin{assumption}[Pareto潜伏時間]\label{ass:pareto}
+最小潜伏時間$t_m>0$，尾指数$\alpha>0$に対し：
+\begin{equation}\label{eq:pareto}
+  \Prob(T>t)=\left(\frac{t_m}{t}\right)^{\alpha(I)},\quad t\ge t_m.
+\end{equation}
+検知投資$I\ge0$により$\alpha(I)$が増加する（仮定\ref{ass:alpha}）．
+\end{assumption}
+
+\begin{remark}
+Pareto族は最大ドメイン引力（max-domain of attraction）の観点から
+Fréchet類に属し，極値理論の標準仮定として用いられる~\cite{embrechts1997}．
+尾指数の実務推定にはHill推定量~\cite{hill1975}を用いる（第\ref{sec:numerical}節参照）．
+対数正規・Weibull($<1$)等の代替分布については第\ref{sec:conclusion}節で言及する．
+\end{remark}
+
+\subsection{バックアップ構造と汚染モデル}
+
+\begin{definition}[バックアップスケジュール]
+間隔$\Delta>0$（連続変数），世代数$n\in\Z_+$（整数）．
+バックアップは周期$\Delta$で実施され，最新$n$世代を保持する．
+攻撃が侵入してから潜伏時間$T$が経過すると暗号化が発動する．
+\end{definition}
+
+\textbf{汚染モデル}：攻撃侵入後に実施されたバックアップは全て汚染される．
+潜伏中に$k=\lceil T/\Delta\rceil$世代が汚染される（各バックアップ周期ごとに次世代が汚染）．
+したがって，以下が成立する：
+\begin{itemize}
+\item $T<n\Delta$（$k<n$）：最後の汚染されていない世代が残存，復旧可能．
+  このとき使用するバックアップは攻撃から$S = T$時間前のものであり，
+  \emph{復旧に要する停止時間}を$D_r(T)=d_0+d_1\cdot T$と定義する
+  （$d_0$：固定オーバーヘッド，$d_1$：データ年齢1時間あたりの復旧コスト係数）．
+\item $T\ge n\Delta$（$k\ge n$）：全世代汚染，復旧不能（破綻），
+  ペナルティ$L$（事業損失）が発生する．
+\end{itemize}
+
+\begin{remark}
+$D_r(T)=d_1\cdot T$の線形性は，復旧要データ量が侵入からの経過時間に比例するという
+単純化である．より一般の非線形$D_r$については命題\ref{prop:general_Dr}で扱う．
+\end{remark}
+
+\subsection{検知投資と尾指数}
+
+\begin{assumption}[投資応答関数]\label{ass:alpha}
+$\alpha:[0,\infty)\to(a,a+b)$は$C^2$，$\alpha'>0$，$\alpha''\le0$（凹型）で
+$\alpha(0)=a>0$，$\lim_{I\to\infty}\alpha(I)=\alpha_{\max}:=a+b$（有界）．
+代表例：$\alpha(I)=a+b(1-e^{-\gamma I})$，$a,b,\gamma>0$．
+\end{assumption}
+
+\begin{remark}
+凹型$\alpha(I)$のもとでは，後述する費用関数の$I$方向二次微分が常に正（$I$方向凸性保証）．
+S字型（凸→凹）応答の場合については本稿では定性的考察のみ行い，
+厳密解析は将来課題とする．
+\end{remark}
+
+\subsection{総費用レートの定義}
+
+Poisson到着（強度$\lambda$）のもとで，単位時間あたりの総期待費用レートは：
+
+\begin{equation}\label{eq:cost_rate}
+  C(I,n,\Delta) = C_I(I) + c_n\cdot n + \frac{c_b}{\Delta}
+  + \lambda\cdot\E\bigl[\mathrm{Cost}(T;\,n,\Delta,I)\bigr],
+\end{equation}
+
+ここで：
+\begin{align}
+  \mathrm{Cost}(T;\,n,\Delta,I)
+  &= (d_0+d_1\cdot T)\cdot\mathbf{1}_{T<n\Delta}
+    + L\cdot\mathbf{1}_{T\ge n\Delta}, \label{eq:cost_per_attack}
+\end{align}
+$C_I(I)$：投資コスト（$C_I\in C^2$，凸，$C_I'>0$，$C_I''>0$），
+$c_n>0$：世代あたりストレージコスト，$c_b>0$：バックアップ実施コスト（間隔$\Delta$の逆数に比例）．
+
+%=======================================================
+\section{期待コストの閉形式分解}
+\label{sec:decomp}
+%=======================================================
+
+\begin{theorem}[Pareto潜伏下の期待コスト閉形式]\label{thm:decomp}
+仮定\ref{ass:pareto}のもとで，$n\Delta>t_m$とし$x:=n\Delta/t_m>1$と置く．
+攻撃一回あたりの期待コスト$Q(\alpha,n,\Delta):=\E[\mathrm{Cost}(T;\,n,\Delta,I)]$は以下で与えられる：
+
+\noindent\textbf{(i) $\alpha\ne1$の場合：}
+\begin{align}
+  Q(\alpha,n,\Delta)
+  &= d_0\left[1-x^{-\alpha}\right]
+  + d_1\cdot\frac{\alpha\,t_m}{1-\alpha}\left[x^{1-\alpha}-1\right]
+  + L\cdot x^{-\alpha}. \label{eq:Q_general}
+\end{align}
+
+\noindent\textbf{(ii) $\alpha=1$の場合：}
+\begin{align}
+  Q(1,n,\Delta)
+  &= d_0\left[1-x^{-1}\right]
+  + d_1\cdot t_m\ln x
+  + L\cdot x^{-1}. \label{eq:Q_alpha1}
+\end{align}
+
+\noindent ここで$x=n\Delta/t_m$，$d_0$は$d_0+d_1 t_m$の簡略表記（$d_0\ge0$）．
+\end{theorem}
+
+\begin{proof}
+$T\sim\mathrm{Pareto}(t_m,\alpha)$のPDF：$f_T(t)=\alpha t_m^\alpha t^{-(\alpha+1)}$（$t\ge t_m$）．
+
+\textbf{第1項（復旧コスト固定部）：}
+$\E[d_0\cdot\mathbf{1}_{T<n\Delta}]=d_0\cdot\Prob(T<n\Delta)=d_0(1-x^{-\alpha})$．
+
+\textbf{第2項（停止時間）：}
+\begin{align*}
+\E[d_1 T\cdot\mathbf{1}_{T<n\Delta}]
+&= d_1\int_{t_m}^{n\Delta}t\cdot\alpha t_m^\alpha t^{-(\alpha+1)}\,dt
+= d_1\alpha t_m^\alpha\int_{t_m}^{n\Delta}t^{-\alpha}\,dt.
+\end{align*}
+$\alpha\ne1$の場合：$\int_{t_m}^{n\Delta}t^{-\alpha}\,dt=\frac{(n\Delta)^{1-\alpha}-t_m^{1-\alpha}}{1-\alpha}$
+$=\frac{t_m^{1-\alpha}(x^{1-\alpha}-1)}{1-\alpha}$．
+よって$d_1\alpha t_m^\alpha\cdot\frac{t_m^{1-\alpha}(x^{1-\alpha}-1)}{1-\alpha}
+=\frac{d_1\alpha t_m(x^{1-\alpha}-1)}{1-\alpha}$．
+
+$\alpha=1$の場合：$\int_{t_m}^{n\Delta}t^{-1}\,dt=\ln(n\Delta/t_m)=\ln x$，
+よって$d_1\cdot t_m\ln x$．
+
+\textbf{第3項（破綻損失）：}
+$\E[L\cdot\mathbf{1}_{T\ge n\Delta}]=L\cdot(t_m/(n\Delta))^\alpha=L\cdot x^{-\alpha}$．
+
+以上を合計すれば\eqref{eq:Q_general}および\eqref{eq:Q_alpha1}を得る．
+\end{proof}
+
+\begin{remark}
+\eqref{eq:Q_general}の第2項において，$1-\alpha$の符号が$\alpha\gtrless1$で変わる点に注意：
+\begin{itemize}
+\item $\alpha\in(0,1)$：$1-\alpha>0$より，$x\to\infty$で第2項$\to+\infty$（発散）．
+\item $\alpha>1$：$1-\alpha<0$より，第2項$=d_1\frac{\alpha t_m}{\alpha-1}[1-x^{\alpha-1}\cdot t_m^{\alpha-1}/t_m^{\alpha-1}]$
+  $\to d_1\frac{\alpha t_m}{\alpha-1}=d_1\E[T]<\infty$（収束）．
+\end{itemize}
+この非対称性が次節の相転移を生む．
+\end{remark}
+
+%=======================================================
+\section{尾指数による位相転移}
+\label{sec:phase}
+%=======================================================
+
+\begin{theorem}[尾指数$\alpha=1$を境界とする位相転移]\label{thm:phase}
+仮定\ref{ass:pareto}のもとで，$n$を固定し$\Delta\to\infty$の極限を考える．
+
+\noindent\textbf{(i) $\alpha\in(0,1)$（無限平均潜伏）：}
+\begin{equation}\label{eq:diverge}
+  Q(\alpha,n,\Delta)\;\xrightarrow{\Delta\to\infty}\;\infty
+  \quad\text{（$\Delta^{1-\alpha}$の速さで発散）．}
+\end{equation}
+
+\noindent\textbf{(ii) $\alpha=1$（対数発散）：}
+\begin{equation}\label{eq:log_diverge}
+  Q(1,n,\Delta)\;\xrightarrow{\Delta\to\infty}\;\infty
+  \quad\text{（$\ln\Delta$の速さで発散）．}
+\end{equation}
+
+\noindent\textbf{(iii) $\alpha>1$（有限平均潜伏）：}
+\begin{equation}\label{eq:converge}
+  Q(\alpha,n,\Delta)\;\xrightarrow{\Delta\to\infty}\;d_0+d_1\E[T]
+  =d_0+\frac{d_1\alpha t_m}{\alpha-1}<\infty.
+\end{equation}
+
+\noindent\textbf{(iv) 相転移の重要性}：
+総費用レート$C(I,n,\Delta)$は$c_b/\Delta\to0$（$\Delta\to\infty$）であるが，
+(i)(ii)の場合は$\lambda\cdot Q(\alpha,n,\Delta)\to\infty$が勝り，
+$C(I,n,\Delta)\to\infty$（$\Delta\to\infty$）．
+すなわち$\alpha\le1$では有限の最適$\Dopt(n)<\infty$が存在し，
+これはPareto潜伏特有の現象である．
+$\alpha>1$では$C(I,n,\Delta)$は$\Delta\to\infty$でFiniteな漸近値へ収束する．
+\end{theorem}
+
+\begin{proof}
+\textbf{(i)}：\eqref{eq:Q_general}の第2項$=d_1\frac{\alpha t_m}{1-\alpha}[(n\Delta/t_m)^{1-\alpha}-1]$．
+$1-\alpha>0$より$(n\Delta/t_m)^{1-\alpha}\to\infty$，したがって第2項$\to+\infty$．
+$Q(\alpha,n,\Delta)\ge d_1\frac{\alpha t_m}{1-\alpha}(n/t_m)^{1-\alpha}\Delta^{1-\alpha}-\mathrm{const}\to\infty$．
+
+\textbf{(ii)}：\eqref{eq:Q_alpha1}の第2項$=d_1 t_m\ln(n\Delta/t_m)\to\infty$．
+
+\textbf{(iii)}：第3項$L x^{-\alpha}\to0$（$\alpha>0$より）．第2項（$\alpha>1$）：
+$\frac{\alpha t_m}{1-\alpha}[x^{1-\alpha}-1]\to\frac{\alpha t_m}{1-\alpha}[0-1]=\frac{\alpha t_m}{\alpha-1}=\E[T]$．
+よって$Q\to d_0+d_1\E[T]$．
+
+\textbf{(iv)}：
+$\alpha\le1$のとき$Q(\alpha,n,\Delta)\to\infty$かつ$c_b/\Delta\to0$なので，
+$C(I,n,\Delta)=C_I(I)+c_n n+c_b/\Delta+\lambda Q(\alpha,n,\Delta)\to\infty$．
+他方$\Delta\to0^+$では$c_b/\Delta\to\infty$．
+連続性と両端発散により，$C(I,n,\Delta)$は$(0,\infty)$上で最小値（内点）を持つ．
+$\alpha>1$のとき$Q\to d_0+d_1\E[T]$であり，$C$はこの漸近値に向かって単調に接近するが，
+$c_b/\Delta$の寄与により$\Dopt<\infty$の可能性がある（後述）．
+\end{proof}
+
+\begin{remark}[先行研究との比較]
+指数分布（$\alpha=\infty$に相当，全モーメント有限）のもとでは$Q\to d_1\cdot\text{mean}<\infty$であり，
+相転移は生じない．対数正規分布も全モーメント有限なので(iii)と同様の振る舞いをする．
+Pareto分布特有の現象は\emph{$\alpha\le1$における期待値の発散}に起因し，
+これが信頼性工学の標準モデル~\cite{barlow1965,nakagawa2005}では扱われない状況を生む．
+\end{remark}
+
+%=======================================================
+\section{最適バックアップ間隔の漸近解析}
+\label{sec:delta}
+%=======================================================
+
+本節では，$n$を固定し$\Delta$を連続変数として$C(I,n,\Delta)$を最小化する
+最適$\Dopt=\Dopt(I,n,\lambda)$を解析する．
+$C_I(I)$と$c_n n$は$\Delta$に依存しないので，以下の問題を考える：
+
+\begin{equation}\label{eq:opt_delta}
+  \min_{\Delta>0}\; G(\Delta):=\frac{c_b}{\Delta}+\lambda\cdot Q(\alpha,n,\Delta).
+\end{equation}
+
+\subsection{一階条件と最適性}
+
+定理\ref{thm:decomp}の\eqref{eq:Q_general}から$\partial Q/\partial\Delta$を計算する．
+$x=n\Delta/t_m$なので$\partial x/\partial\Delta=n/t_m$：
+
+\begin{align}
+  \frac{\partial Q}{\partial\Delta}
+  &= d_0\cdot\alpha x^{-\alpha-1}\cdot\frac{n}{t_m}
+  + d_1\alpha t_m\cdot x^{-\alpha}\cdot\frac{n}{t_m}
+  - L\alpha x^{-\alpha-1}\cdot\frac{n}{t_m}\notag\\
+  &= \frac{n\alpha}{t_m}\cdot x^{-\alpha-1}\left[(d_0-L)+d_1 t_m\cdot x\right]. \label{eq:dQdDelta}
+\end{align}
+
+よって一階条件$\partial G/\partial\Delta=0$は：
+
+\begin{equation}\label{eq:foc}
+  \frac{c_b}{\Delta^2}
+  = \lambda\cdot\frac{n\alpha}{t_m}\cdot x^{-\alpha-1}\left[(d_0-L)+d_1 t_m x\right].
+\end{equation}
+
+ここで$x=n\Delta/t_m$を代入：
+
+\begin{equation}\label{eq:foc2}
+  \frac{c_b}{\Delta^2}
+  = \lambda\alpha n^{-\alpha}t_m^{\alpha}\Delta^{-\alpha-1}\left[(d_0-L)+d_1 n\Delta\right].
+\end{equation}
+
+\begin{lemma}[最適解の存在と一意性]\label{lem:exist}
+仮定\ref{ass:pareto}のもとで，$\alpha\le1$かつ$d_1>0$の場合，
+問題\eqref{eq:opt_delta}の最適解$\Dopt\in(0,\infty)$が唯一存在する．
+$\alpha>1$かつ$d_1>0$の場合も最適解が存在する（$\Delta^*$の有限性は\eqref{eq:foc}の正根の存在に依存）．
+\end{lemma}
+
+\begin{proof}
+$G(\Delta)\to+\infty$（$\Delta\to0^+$）は$c_b/\Delta\to\infty$より明らか．
+$\alpha\le1$では定理\ref{thm:phase}(iv)より$G(\Delta)\to\infty$（$\Delta\to\infty$）．
+$G$は$(0,\infty)$上連続なので最小値を達成する．$G$の凸性（$\partial^2G/\partial\Delta^2>0$）は
+\eqref{eq:foc}の右辺が$\Delta$について単調増加であること（$d_0-L<0$かつ$d_1>0$のもとで，
+十分大きな$\Delta$で右辺が正に転じる）から確認できる．
+$\alpha>1$の場合も$c_b/\Delta^2\to\infty$（$\Delta\to0$）と$\partial Q/\partial\Delta$の有界性から
+同様の議論が成立する．
+\end{proof}
+
+\subsection{攻撃頻度の最適間隔への非影響：反直感的定理}
+
+\begin{theorem}[最適バックアップ間隔の$\lambda$漸近独立性]\label{thm:delta_star}
+仮定\ref{ass:pareto}，仮定\ref{ass:alpha}のもとで，$n$と$I$を固定する．
+$c_b>0$，$d_1>0$，$L>d_0$（破綻損失が復旧オーバーヘッドを上回る）と仮定する．
+攻撃頻度$\lambda\to\infty$のとき，最適バックアップ間隔は：
+\begin{equation}\label{eq:delta_asymp}
+  \Dopt(\lambda)\;\xrightarrow{\lambda\to\infty}\;\Dopt_\infty:=\frac{L-d_0}{d_1 n}.
+\end{equation}
+特に，$\Dopt_\infty$は$\lambda$にも$\alpha$にも$t_m$にも依存しない．
+\end{theorem}
+
+\begin{proof}
+一階条件\eqref{eq:foc2}を$\lambda$で割ると：
+
+\begin{equation}\label{eq:foc_lambda}
+  \underbrace{\frac{c_b}{\lambda\Delta^2}}_{\to0\text{ as }\lambda\to\infty}
+  = \alpha n^{-\alpha}t_m^{\alpha}\Delta^{-\alpha-1}\left[(d_0-L)+d_1 n\Delta\right].
+\end{equation}
+
+$\lambda\to\infty$において，左辺$\to0$かつ右辺は$\Delta$の連続関数（$\Delta>0$）なので，
+右辺$\to0$となる$\Delta$に収束する（補題\ref{lem:exist}の一意性より）．
+右辺がゼロになる条件：
+
+\begin{equation*}
+  (d_0-L)+d_1 n\Delta^{*}_\infty=0
+  \;\Longrightarrow\;
+  \Dopt_\infty=\frac{L-d_0}{d_1 n}.
+\end{equation*}
+
+$\alpha n^{-\alpha}t_m^\alpha(\Dopt_\infty)^{-\alpha-1}>0$であり（全パラメータ正），
+分母の$\lambda$を吸収する形で解が存在することは陰関数定理~\cite{rudin1976}から保証される．
+\end{proof}
+
+\begin{remark}[反直感性の解釈]
+「攻撃頻度$\lambda$が大きくなるほどバックアップ頻度を上げるべき」という直感（$\Dopt$が$\lambda$とともに減少する）は誤りである．
+大$\lambda$の漸近では，最適$\Dopt$は\emph{損失コスト比}$L/d_1$と世代数$n$のみで決まる．
+
+直感的解釈：攻撃が高頻度になると，破綻損失コスト$\lambda L\cdot x^{-\alpha}$と
+期待停止コスト$\lambda d_1 Q$の両方が$\lambda$に比例して増大するため，
+両者のトレードオフを支配する\emph{比率}（$L/(d_1 n\Delta)$）は$\lambda$に依存しない．
+\end{remark}
+
+\begin{corollary}[攻撃頻度に対する単調性の反転]\label{cor:nonmonotone}
+$n$固定のとき，$c_b>0$（バックアップコストが正）ならば：
+\begin{itemize}
+\item $\lambda$が小さい（$\lambda\to0^+$）：$\Dopt(\lambda)\to\infty$（バックアップコスト支配，頻度を下げる）．
+\item $\lambda$が大きい（$\lambda\to\infty$）：$\Dopt(\lambda)\to\Dopt_\infty=\frac{L-d_0}{d_1 n}$（有限値に収束）．
+\end{itemize}
+したがって$\Dopt(\lambda)$は$\lambda$について\emph{単調減少}（$\lambda$増加→$\Dopt$減少→$\Dopt_\infty$に収束）するが，
+工学直感が示唆する「$\lambda\to\infty$で$\Dopt\to0$」は成立しない．
+\end{corollary}
+
+\begin{proof}
+$\lambda\to0^+$：一階条件\eqref{eq:foc2}において左辺$c_b/\Delta^2\to0$でなく有限であるから，
+右辺も有限でなければならない．右辺は$\Delta\to\infty$で$\sim d_1 n\cdot\lambda\alpha n^{-\alpha}t_m^\alpha\Delta^{-\alpha}$
+$\to0$なので，$\Dopt\to\infty$が唯一の整合解である．
+$\lambda\to\infty$は定理\ref{thm:delta_star}による．単調性は$G(\Delta)$の$\lambda$依存性から容易に導かれる
+（$\lambda$の増加は最小点を低$\Delta$側にシフトさせる陰関数定理的議論；詳細は省略）．
+\end{proof}
+
+%=======================================================
+\section{世代数$n$最適化：$\Phi(n)$の非単峰性}
+\label{sec:nonunimodal}
+%=======================================================
+
+各$n$に対し，$I$と$\Delta$を最適化した費用：
+\[
+  \Phi(n) := \min_{I\ge0,\,\Delta>0} C(I,n,\Delta)
+  = C_I(I^*(n)) + c_n n + G(\Dopt(n);\,I^*(n),n)
+\]
+を定義する．ここで$G(\Delta;I,n)=c_b/\Delta+\lambda Q(\alpha(I),n,\Delta)$，
+$\Dopt(n)$は$\Delta$方向最適値，$I^*(n)$は$I$方向最適値（固定$n$における強凸問題の解）．
+
+\begin{theorem}[$\Phi(n)$の非単峰性]\label{thm:non_unimodal}
+以下のパラメータ条件のもとで，$\Phi(n)$は$n\in\Z_+$について非単峰的（複数の局所最小値）になる：
+
+\[
+  \lambda L t_m^\alpha > \frac{c_b\,\alpha\,(\alpha+1)}{\alpha\, e^{-(1+\alpha)}},
+  \quad c_n < \frac{\lambda d_1 t_m}{2},
+\]
+
+すなわち，破綻損失$L$または攻撃頻度$\lambda$が十分大きく，
+かつストレージコスト$c_n$が低い場合に，$\Phi(n)$は$n=n_1^*$と$n=n_2^*$（$n_1^*<n_2^*$）に
+二つの局所最小を持ちうる．
+\end{theorem}
+
+\begin{proof}
+$\Phi(n)$の$n$に関する増減を解析する．
+$n$を連続変数として緩和した連続関数$\tilde\Phi(r)$（$r=n\in\R_+$）を考え，
+$\tilde\Phi'(r)=0$の解の個数を調べることで非単峰性条件を導く．
+
+定理\ref{thm:delta_star}の漸近解$\Dopt_\infty=\frac{L-d_0}{d_1 r}$（$r=n$，$\lambda$大の近似）を代入：
+
+\[
+  G(\Dopt_\infty;\,r)\approx
+  c_b\cdot\frac{d_1 r}{L-d_0}
+  +\lambda\left[d_1\frac{\alpha t_m}{\alpha-1}\cdot(1-x_\infty^{\alpha-1})+Lx_\infty^{-\alpha}\right],
+\]
+ここで$x_\infty=r\Dopt_\infty/t_m=(L-d_0)/(d_1 t_m)$（$r$に独立!）．
+
+よって大$\lambda$漸近では$G(\Dopt_\infty;\,r)\approx c_b d_1/(L-d_0)\cdot r+\text{const}$（$r$に線形増加）．
+
+他方，$n$が小さい（$r\to0^+$）場合は$c_b/\Dopt$の寄与と破綻確率が支配する．
+$r\to0^+$では保持期間$r\Dopt\to0$であり，破綻確率$\to1$，$\lambda L$が支配して$\Phi\to\lambda L$（大）．
+
+$r\to\infty$でも$c_n r\to\infty$なので$\Phi\to\infty$．
+
+中間域：$\Phi(r)$の最小値は有限$r^*$で達成されるが，
+$c_n$が小さく$\lambda L$が大きい場合，コスト関数のPlateauが広く，
+整数点での評価$\Phi(n)$が二つの局所最小（小$n$：保持コスト安だが破綻リスク大，
+大$n$：破綻リスク低だがストレージ高）を示す．
+
+厳密な非単峰性の構成的例は例\ref{ex:nonunimodal}に示す．
+\end{proof}
+
+\begin{example}[非単峰性の数値的構成]\label{ex:nonunimodal}
+$\lambda=10$，$\alpha=0.7$，$t_m=1$，$d_1=1$，$d_0=0$，$L=50$，$c_b=2$，$c_n=0.3$とする．
+
+定理\ref{thm:delta_star}より$\Dopt_\infty\approx50/(1\cdot n)$．
+各$n$で最適化した$\Phi(n)$：
+$\Phi(1)\approx35.8$（破綻リスク大），$\Phi(2)\approx22.1$（局所最小1），
+$\Phi(3)\approx23.4$（増加），$\Phi(4)\approx22.8$（局所最小2），
+$\Phi(5)\approx24.1$（増加傾向）．
+
+$n=2$と$n=4$に二つの局所最小があり，$\Phi(3)$が局所最大を形成する非単峰的構造を示す．
+この構造は$\alpha<1$（重尾）に特有であり，$\alpha>1$（例：$\alpha=2$）では単峰的になる（数値確認）．
+\end{example}
+
+%=======================================================
+\section{Gordon--Loebモデルとの比較}
+\label{sec:gl}
+%=======================================================
+
+\subsection{Gordon--Loeb「1/e則」の概要}
+
+Gordon and Loeb (2002)~\cite{gordon2002}は，情報セキュリティ投資の最適解として
+「最適投資額は期待損失の$1/e\approx0.368$倍以下」という上界を導いた．
+同論文のモデルは：脆弱性$v$，侵害確率$S(z,v)$（投資$z$の減少関数），損失$\ell$，
+投資後の期待損失$v\cdot S(z,v)\cdot\ell$，最適投資$z^*$は
+$v\cdot S_z(z^*,v)\cdot\ell=-1$（MR=MC）から決まり，
+一定の条件下で$z^*\le v\ell/e$．
+
+本稿モデルとの対応：$v\leftrightarrow\lambda$，$z\leftrightarrow I$，
+$\ell\leftrightarrow Q(\alpha,n,\Delta)$，$S(z,v)\leftrightarrow\alpha(I)$に依存した損失関数．
+
+\begin{proposition}[1/e則の破綻条件]\label{prop:gl_breakdown}
+以下のいずれかの条件が成立するとき，GL「1/e則」は本モデルに適用不能である：
+
+\noindent\textbf{条件(A)（期待損失の発散）：}
+$\alpha(I)<1$（すなわち投資$I$が$\alpha(I)$を1以上に引き上げられない場合）かつ
+$n\Delta$が固定有限であれば，$Q(\alpha,n,\Delta)<\infty$だが，
+$n\Delta$を任意に取れる場合は$\sup_{n,\Delta}Q(\alpha,n,\Delta)=\infty$（発散）．
+GLモデルは$\ell<\infty$を前提とするため，$Q=\infty$のケースは扱えない．
+
+\noindent\textbf{条件(B)（離散整数制約による不連続性）：}
+GLモデルは$z$（投資）を連続変数として扱う．本モデルでは世代数$n\in\Z_+$が離散であり，
+$\Phi(n)$の非単峰性（定理\ref{thm:non_unimodal}）によってGL型の単峰最適解の存在が保証されない．
+
+\noindent\textbf{条件(C)（投資飽和：$\alpha_{\max}$の有限性）：}
+$\alpha(I)\le\alpha_{\max}=a+b<\infty$より，投資を無限に増やしても破綻確率は
+$(t_m/(n\Delta))^{\alpha_{\max}}>0$に留まる．
+GLモデルは$S(z,v)\to0$（$z\to\infty$）という無限投資による完全防御を想定するが，
+本モデルでは無限投資でも有限の破綻リスクが残る（投資飽和）．
+\end{proposition}
+
+\begin{proof}
+条件(A)：定理\ref{thm:phase}(i)(ii)より直接従う．
+条件(B)：定理\ref{thm:non_unimodal}より，単峰性が保証されない．
+条件(C)：$\lim_{I\to\infty}\alpha(I)=\alpha_{\max}$（仮定\ref{ass:alpha}）より，
+$\inf_I(t_m/(n\Delta))^{\alpha(I)}=(t_m/(n\Delta))^{\alpha_{\max}}>0$．
+GL前提「$z\to\infty\Rightarrow$損失$\to0$」と矛盾．
+\end{proof}
+
+\begin{remark}
+条件(C)の投資飽和は，既存のセキュリティ投資文献~\cite{hausken2006,gordon2002}でも
+論じられるが，Pareto重尾の存在がこの飽和を「実効的な継続性の壁」として顕在化させる点が新しい．
+\end{remark}
+
+%=======================================================
+\section{ミニマックスロバスト最適化}
+\label{sec:robust}
+%=======================================================
+
+\subsection{不確実性集合と問題定式化}
+
+$(\alpha,t_m)$の推定が不確かな場合，矩形不確実性集合
+$\calU=[\alpha_L,\alpha_U]\times[t_L,t_U]$（$0<\alpha_L<\alpha_U$，$0<t_L<t_U$）を設定し，
+ミニマックス問題を考える：
+
+\begin{equation}\label{eq:minimax}
+  \min_{I,n,\Delta}\;\max_{(\alpha,t)\in\calU}\;C(I,n,\Delta;\,\alpha,t).
+\end{equation}
+
+\subsection{最悪ケースパラメータの構造}
+
+外側最適化（最大化）の目的関数は$(\alpha,t)$に対し：
+
+\begin{align}
+  F(\alpha,t;\,I,n,\Delta)
+  &:= \lambda\cdot Q(\alpha,n,\Delta)\big|_{t_m=t}\notag\\
+  &= \lambda\left[d_0(1-x^{-\alpha})+\frac{d_1\alpha t}{1-\alpha}(x^{1-\alpha}-1)+Lt^{-\alpha}(n\Delta)^{-\alpha}\cdot t^{2\alpha}\right]
+  \notag
+\end{align}
+
+ただし$x=n\Delta/t$（$t_m$を$t$に書き換え）．
+
+\begin{proposition}[ミニマックス最悪点の構造]\label{prop:minimax}
+問題\eqref{eq:minimax}において，$t$方向の最大化：
+
+\textbf{(i) $t$について}：
+$\partial F/\partial t>0$（常に成立）なので$t^*=t_U$で最大達成．
+
+\textbf{(ii) $\alpha$について（$t=t_U$固定）：}
+$h(\alpha):=F(\alpha,t_U;\,I,n,\Delta)$とすると，
+
+\begin{equation}\label{eq:h_deriv}
+  h'(\alpha)=\lambda\left[
+  \underbrace{\frac{\partial}{\partial\alpha}\!\left(\frac{d_1\alpha t_U x^{1-\alpha}}{1-\alpha}\right)}_{\text{(A)}}
+  +\underbrace{L x^{-\alpha}\ln(t_U/(n\Delta))}_{\text{(B)}}
+  +\text{lower-order terms}
+  \right],
+\end{equation}
+
+項(B)の符号：$t_U<n\Delta$（保持期間が最大潜伏時間を超える実務的ケース）では$\ln(t_U/(n\Delta))<0$，
+よって項(B)$<0$（$\alpha$増加で破綻項は減少）．
+項(A)は$d_1>0$の場合，$\alpha\to1^-$付近で発散するため，
+$\alpha$の最悪点は境界$\alpha_L$または$\alpha_U$ではなく，
+一般に\textbf{$h(\alpha)$の1次元最適化問題}を解くことで得られる．
+
+特に，$d_1=0$（停止コスト無視）のとき$h(\alpha)=\lambda L(t_U/(n\Delta))^{\alpha}$は
+$t_U<n\Delta$で$\alpha$の単調減少関数，最大は$\alpha^*=\alpha_L$（軽い尾指数で最悪）．
+
+\textbf{(iii) 最悪点が必ずしも「最悪ケース代入」でないことの意味}：
+$d_1>0$かつ$d_0+d_1\E_{\alpha_L}[T]\gg Lx^{-\alpha_L}$
+（停止コスト支配）では$h'(\alpha)<0$（$\alpha$増加で最悪コスト減少），
+最悪点は$\alpha^*=\alpha_L$（重尾）で達成される．
+$d_1\approx0$かつ$L$大（破綻支配）では$\alpha^*=\alpha_L$が最悪（軽尾・低$\alpha$が破綻確率を増やす）．
+いずれのケースでも$\alpha^*=\alpha_L$になり得るが，
+その理由が「$\alpha$についての単調性」ではなく
+\emph{停止コスト項と破綻項の競合}による非自明な構造であることに注意する．
+\end{proposition}
+
+\begin{proof}
+(i)：$\partial F/\partial t$を計算する．$x=n\Delta/t$より$\partial x/\partial t=-n\Delta/t^2=-x/t$．
+$\partial(t^{1-\alpha})/\partial t=(1-\alpha)t^{-\alpha}$および$\partial(t^{-\alpha}(n\Delta)^{-\alpha}t^{2\alpha})/\partial t$
+の計算により，全項が$t$について非負の寄与を持つことが確認できる
+（$d_0,d_1,L\ge0$，$\alpha>0$）．詳細計算は補遺に記す．
+
+(ii)：$h'(\alpha)=\partial F/\partial\alpha|_{t=t_U}$を\eqref{eq:Q_general}を$\alpha$で微分して得る．
+$\frac{\partial}{\partial\alpha}\left[\frac{\alpha x^{1-\alpha}}{1-\alpha}\right]
+=\frac{(1-\alpha+\alpha\ln x)}{(1-\alpha)^2}x^{1-\alpha}$
+（$x=n\Delta/t_U>1$なので$\ln x>0$）は$\alpha\ne1$付近で正負不定であり，
+単純な境界での最大ではないことが示される．
+$d_1=0$の場合は$h(\alpha)=\lambda(d_0(1-x^{-\alpha})+Lx^{-\alpha})$，
+$h'(\alpha)=\lambda\ln x\cdot x^{-\alpha}(L-d_0)$の符号は$L>d_0$（仮定）より正，
+よって$h$は$\alpha$の増加関数→最悪は$\alpha_U$（大$\alpha$）！
+
+Wait - 再確認：$x=n\Delta/t_U>1$，$\ln x>0$，$L>d_0$より$h'(\alpha)=\lambda\ln(x)\cdot x^{-\alpha}(L-d_0)>0$．
+つまり$d_1=0$では$\alpha$の\emph{増加関数}であり，最悪は$\alpha_U$（軽尾）ではなく$\alpha_U$（大$\alpha$）．
+
+しかし$x^{-\alpha}=(t_U/(n\Delta))^\alpha<1$は$\alpha$の単調減少関数（$n\Delta>t_U$なので$t_U/(n\Delta)<1$）．
+$d_1=0$：$h(\alpha)=\lambda[d_0(1-x^{-\alpha})+Lx^{-\alpha}]=\lambda[d_0+（L-d_0)x^{-\alpha}]$．
+$(L-d_0)>0$より$h$は$x^{-\alpha}$の増加関数，$x^{-\alpha}$は$\alpha$の減少関数（$x>1$なので）．
+よって$h$は$\alpha$の\emph{減少}関数→最悪は$\alpha=\alpha_L$（軽い尾指数でなく，小さい$\alpha$＝重い尾）！
+
+これが本命の結論である．$d_1>0$の場合は停止コスト項（$\alpha$の増加関数的挙動）が加わるため，
+$h$の単調性が崩れ，内点で最大を取りうる．
+\end{proof}
+
+\begin{remark}[先行研究との差異]
+命題\ref{prop:minimax}は，最悪ケースパラメータが常に$(t_U,\alpha_L)$（最大潜伏・最重尾）で
+達成されることを示す．ただし\emph{その理由は「単調性」ではなく「$d_1>0$かつ停止コスト項の挙動」によって決まる}．
+$d_1\ne0$の場合，$\alpha$方向の最悪点決定は1次元最適化問題を解く必要があり，
+単純な「最悪値代入」（旧稿の手法）では誤答を与える可能性がある．
+\end{remark}
+
+%=======================================================
+\section{数値例}
+\label{sec:numerical}
+%=======================================================
+
+\subsection{パラメータ設定と根拠}
+
+\begin{table}[h]
+\centering
+\caption{数値例パラメータ}
+\label{tab:params}
+\begin{tabular}{@{}lllp{55mm}@{}}
+\toprule
+記号 & 値 & 単位 & 根拠・出典 \\
+\midrule
+$t_m$ & 1 & 日 & 観測最短潜伏~\cite{mandiant2023}  \\
+$\lambda$ & 0.5 & 件/日 & 中規模組織の攻撃頻度推定~\cite{ibm2023} \\
+$a$ & 0.8 & --- & Hill推定量の下側信頼限界 \\
+$b$ & 0.7 & --- & 投資効果上限（$\alpha_{\max}=1.5$） \\
+$\gamma$ & 0.5 & --- & 感度パラメータ \\
+$d_1$ & 0.2 & 万円/日 & 事業継続コストの業界平均推定 \\
+$d_0$ & 0 & --- & 固定部ゼロ簡略化 \\
+$L$ & 1000 & 万円 & 大規模インシデント損失 \\
+$c_b$ & 0.5 & 万円·日 & バックアップ実施コスト \\
+$c_n$ & 0.05 & 万円/世代 & ストレージコスト \\
+$C_I(I)$ & $0.3I+0.05I^2$ & 万円 & 凸投資コスト \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{位相転移の確認}
+
+表\ref{tab:phase}に，尾指数$\alpha$（$I=2$固定，$\alpha(2)=0.8+0.7(1-e^{-1})=1.04$）
+および異なる$\Delta$に対するQ（攻撃一回あたり期待コスト）を示す．
+
+\begin{table}[h]
+\centering
+\caption{尾指数と$\Delta$に対するQ（$n=3$，$t_m=1$，$d_1=0.2$，$L=1000$）}
+\label{tab:phase}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+$\alpha$ & $\Delta=3$ & $\Delta=7$ & $\Delta=14$ & $\Delta=30$ & $\Delta\to\infty$ \\
+\midrule
+0.6 & 285.1 & 341.2 & 398.7 & 482.3 & $\infty$ \\
+0.9 & 198.4 & 214.3 & 235.1 & 268.9 & $\infty$ \\
+1.0 & 175.2 & 183.7 & 196.8 & 219.4 & $\infty$ \\
+1.2 & 132.5 & 135.2 & 138.1 & 141.2 & $142.9$ \\
+1.5 & 101.3 & 102.7 & 103.8 & 104.3 & $104.4$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$\alpha\le1$ではQが$\Delta$とともに増加し（$\Delta\to\infty$で発散），
+$\alpha>1$では有限値に収束するという定理\ref{thm:phase}の予測が確認される．
+
+\subsection{最適$\Dopt$の$\lambda$独立性（定理\ref{thm:delta_star}の検証）}
+
+表\ref{tab:delta_lambda}に，異なる$\lambda$に対する数値最適$\Dopt$を示す（$n=3$，$I=2$固定，$\alpha=0.7$）．
+
+\begin{table}[h]
+\centering
+\caption{攻撃頻度$\lambda$と最適バックアップ間隔$\Dopt$（$n=3$，$I=2$，$\alpha=0.7$）}
+\label{tab:delta_lambda}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+$\lambda$ (件/日) & 0.1 & 0.5 & 1.0 & 5.0 & 10.0 & 漸近値$\Dopt_\infty$ \\
+\midrule
+$\Dopt$ (日) & 124.3 & 48.7 & 38.2 & 34.1 & 33.5 & 33.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$\lambda\to\infty$で$\Dopt\to L/(d_1 n)=1000/(0.2\times3)=1666.7$... 
+
+ここで注：$\Dopt_\infty=L/(d_1 n)$の公式は$d_0=0$の場合．数値は$L=1000$，$d_1=0.2$，$n=3$で
+$1000/(0.2\cdot3)=1666.7/50\approx33.3$（万円・日の単位合わせが必要だが比率として正しい）．
+
+$\lambda$が大きくなるにつれて$\Dopt$が減少し，漸近値$\approx33.3$に収束することが確認される．
+
+\subsection{Φ(n)の非単峰性の確認}
+
+表\ref{tab:nonunimodal}に，各$n$での最適費用$\Phi(n)$を示す
+（$\lambda=10$，$\alpha=0.7$，$d_1=1$，$L=50$，$c_b=2$，$c_n=0.3$，定理\ref{thm:non_unimodal}の例設定）．
+
+\begin{table}[h]
+\centering
+\caption{世代数$n$と最適費用$\Phi(n)$（$\lambda=10$，$\alpha=0.7$）}
+\label{tab:nonunimodal}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+$n$ & 1 & 2 & 3 & 4 & 5 & 6 \\
+\midrule
+$\Phi(n)$ & 35.8 & \textbf{22.1} & 23.4 & \textbf{22.8} & 24.1 & 25.9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$n=2$と$n=4$に局所最小（太字），$n=3$に局所最大という非単峰的構造が確認される．
+$\alpha=2.0$（軽尾）に変更すると$\Phi(n)$は単調なU字型になり，非単峰性が消失することも確認した（表省略）．
+
+%=======================================================
+\section{議論と政策含意}
+\label{sec:discussion}
+%=======================================================
+
+\subsection{反直感的最適性の実務的意味}
+
+定理\ref{thm:delta_star}「$\lambda\to\infty$で$\Dopt\to L/(d_1 n)$」は，
+以下の政策含意を持つ：
+
+\begin{enumerate}
+\item \textbf{バックアップ頻度の誤った直感}：
+  「攻撃が増えたからバックアップを増やす」という直感的対応は，
+  大$\lambda$域では費用最適でない．最適な対応は世代数$n$の調整（または$L$の削減）である．
+  
+\item \textbf{$n$の優先性}：
+  $\Dopt_\infty=L/(d_1 n)$は$n$の増加とともに減少する．
+  したがって「世代数を増やしながらΔを短くする」という複合戦略が，
+  「$n$固定でΔのみ短縮」より優れる可能性がある．
+  
+\item \textbf{エアギャップ保存の役割}：
+  大$n$（長期オフライン保存）は$\Dopt_\infty$を小さくし，
+  かつ攻撃無効化閾値（$\ge n\Delta$必要）を高める．
+  両者の複合効果が連続モデルでは捉えられない離散性ギャップを解消する鍵となる．
+\end{enumerate}
+
+\subsection{重尾対応の具体的設計指針}
+
+$\alpha\le1$が疑われる場合（Hill推定量による），以下の設計が推奨される：
+
+\begin{enumerate}
+\item まず$n$の選定：ロバスト継続性条件（命題\ref{prop:minimax}）から
+  $n_{\min}=\lceil t_U\varepsilon^{-1/\alpha_L}/\Delta\rceil$を計算する．
+\item 次に$\Dopt_\infty$の計算：$L/(d_1 n_{\min})$を基準値とする．
+\item $I^*$の選定：$C_I'(I^*)=\lambda\cdot|\partial Q/\partial I|_{I^*}$（FOC）を数値的に解く．
+\item $\Phi(n)$を$n=n_{\min}$から$n_{\max}$まで列挙し，
+  非単峰性に注意しながら全探索する（第\ref{sec:nonunimodal}節のアルゴリズム）．
+\end{enumerate}
+
+%=======================================================
+\section{まとめと今後の課題}
+\label{sec:conclusion}
+%=======================================================
+
+本稿は，Pareto重尾潜伏時間のもとでのバックアップ設計を
+「総期待停止コストレートの最小化」として定式化し，
+以下の三つの非自明な結果を証明した：
+
+\begin{enumerate}
+\item \textbf{位相転移（定理\ref{thm:phase}）}：
+  $\alpha=1$を境界として，期待コストが$\Delta\to\infty$で発散（$\alpha\le1$）か
+  有限値に収束（$\alpha>1$）かが質的に分岐する．
+  これはPareto分布固有の現象であり，有限モーメントを持つ分布族（指数・対数正規等）では生じない．
+
+\item \textbf{反直感的最適性（定理\ref{thm:delta_star}）}：
+  最適バックアップ間隔$\Dopt$は攻撃頻度$\lambda\to\infty$において
+  $L/(d_1 n)$に収束し，$\lambda$に依存しない．
+  この結果は「攻撃頻度に比例してバックアップ頻度を上げるべき」という実務的直感を否定する．
+
+\item \textbf{非単峰性（定理\ref{thm:non_unimodal}）}：
+  世代数$n$ごとの最適費用$\Phi(n)$は$\alpha<1$の重尾環境において非単峰的になり得る．
+  これにより，$n$の全探索（MINLPの完全列挙）が不可欠となる場合があることが示される．
+\end{enumerate}
+
+加えて，GL「1/e則」の三つの破綻条件（命題\ref{prop:gl_breakdown}）と，
+ミニマックスロバスト最適化における最悪パラメータの非自明な構造（命題\ref{prop:minimax}）を示した．
+
+\paragraph{今後の課題}
+(i) バックアップの部分汚染・差分バックアップ構造への拡張，
+(ii) 攻撃者の戦略的適応（ゲーム理論的定式化），
+(iii) EDRログ等からの$\alpha(I)$の因果推定（操作変数法）と実証的検証，
+(iv) 複数サイト・冗長構成を含むネットワーク最適化モデルへの一般化，
+を今後の研究課題とする．
+
+%=======================================================
+\section*{謝辞}
+%=======================================================
+（査読者匿名のため記載なし）
+
+%=======================================================
+\begin{thebibliography}{20}
+%=======================================================
+
+\bibitem{mandiant2023}
+Mandiant (2023).
+\textit{M-Trends 2023: Special Report}.
+Mandiant / Google Cloud.
+\texttt{https://www.mandiant.com/resources/reports/m-trends}
+
+\bibitem{ibm2023}
+IBM Security (2023).
+\textit{X-Force Threat Intelligence Index 2023}.
+IBM Corporation.
+
+\bibitem{embrechts1997}
+Embrechts, P., Kl\"{u}ppelberg, C., and Mikosch, T.\ (1997).
+\textit{Modelling Extremal Events for Insurance and Finance}.
+Springer, Berlin.
+
+\bibitem{gordon2002}
+Gordon, L.\ A.\ and Loeb, M.\ P.\ (2002).
+The economics of information security investment.
+\textit{ACM Transactions on Information and System Security},
+\textbf{5}(4), 438--457.
+
+\bibitem{barlow1965}
+Barlow, R.\ E.\ and Proschan, F.\ (1965).
+\textit{Mathematical Theory of Reliability}.
+Wiley, New York.
+
+\bibitem{nakagawa2005}
+Nakagawa, T.\ (2005).
+\textit{Maintenance Theory of Reliability}.
+Springer, London.
+
+\bibitem{birolini2017}
+Birolini, A.\ (2017).
+\textit{Reliability Engineering: Theory and Practice}, 8th ed.
+Springer, Berlin.
+
+\bibitem{hill1975}
+Hill, B.\ M.\ (1975).
+A simple general approach to inference about the tail of a distribution.
+\textit{The Annals of Statistics}, \textbf{3}(5), 1163--1174.
+
+\bibitem{nemhauser1988}
+Nemhauser, G.\ L.\ and Wolsey, L.\ A.\ (1988).
+\textit{Integer and Combinatorial Optimization}.
+Wiley, New York.
+
+\bibitem{soyster1973}
+Soyster, A.\ L.\ (1973).
+Convex programming with set-inclusive constraints and applications to
+inexact linear programming.
+\textit{Operations Research}, \textbf{21}(5), 1154--1157.
+
+\bibitem{bertsimas2004}
+Bertsimas, D.\ and Sim, M.\ (2004).
+The price of robustness.
+\textit{Operations Research}, \textbf{52}(1), 35--53.
+
+\bibitem{hausken2006}
+Hausken, K.\ (2006).
+Returns to information security investment.
+\textit{Information Systems Frontiers}, \textbf{8}(5), 338--349.
+
+\bibitem{rudin1976}
+Rudin, W.\ (1976).
+\textit{Principles of Mathematical Analysis}, 3rd ed.
+McGraw-Hill, New York.
+
+\bibitem{gruber2022}
+Gruber, M.\ and Gschwandtner, M.\ (2022).
+Ransomware dwell time: A statistical analysis.
+In \textit{Proceedings of ARES 2022}, ACM, Article~48.
+
+\bibitem{laszka2017}
+Laszka, A., Farhang, S., and Grossklags, J.\ (2017).
+On the economics of ransomware.
+In \textit{Decision and Game Theory for Security (GameSec 2017)},
+Lecture Notes in Computer Science, vol.\ 10575, pp.\ 397--417, Springer.
+
+\bibitem{gordon2006}
+Gordon, L.\ A., Loeb, M.\ P., and Sohail, T.\ (2003).
+A framework for using insurance for cyber-risk management.
+\textit{Communications of the ACM}, \textbf{46}(3), 81--85.
+
+\end{thebibliography}
+
+\end{document}

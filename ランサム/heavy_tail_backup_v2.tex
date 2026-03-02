@@ -1,0 +1,842 @@
+% heavy_tail_backup_revised.tex
+% XeLaTeX
+\documentclass[12pt,a4paper]{article}
+
+%--------------------------------------------------
+% フォント・日本語
+%--------------------------------------------------
+\usepackage{fontspec}
+\setmainfont{Noto Serif CJK JP}
+\setsansfont{Noto Sans CJK JP}
+\setmonofont{Noto Sans CJK JP}
+% 日本語行分割（xeCJK 不要）
+\XeTeXlinebreaklocale "ja"
+\XeTeXlinebreakskip = 0pt plus 1pt minus 0.1pt
+
+%--------------------------------------------------
+% 数学・レイアウト
+%--------------------------------------------------
+\usepackage{amsmath,amssymb,amsthm,bm,mathtools}
+\usepackage[margin=25mm]{geometry}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[hidelinks,unicode]{hyperref}
+\usepackage{enumitem}
+\usepackage{microtype}
+\onehalfspacing
+
+%--------------------------------------------------
+% 定理環境
+%--------------------------------------------------
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{corollary}[theorem]{系}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{assumption}[theorem]{仮定}
+\newtheorem{example}[theorem]{例}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{注}
+
+%--------------------------------------------------
+% 記号マクロ
+%--------------------------------------------------
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\calU}{\mathcal{U}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+%==================================================
+\begin{document}
+%==================================================
+
+\title{%
+離散バックアップ構造下の重尾潜伏リスク：\\
+整数性ギャップによる投資無効化の構成的存在証明・\\
+凸性・非凸性の厳密解析・ロバスト継続性限界の精密化}
+\author{（匿名査読用）}
+\date{}
+\maketitle
+
+%--------------------------------------------------
+\begin{abstract}
+%--------------------------------------------------
+ランサムウェア攻撃における潜伏時間（dwell time）が重尾分布（Pareto）に従う環境において，
+企業のバックアップ運用（間隔$\Delta$・保持世代数$n\in\Z_+$）と検知投資$I$の組合せが
+事業継続性（破綻確率の上界制約）に与える影響を厳密に解析する．
+本稿の主要な貢献は次の三点である．
+
+第一に，離散整数世代数によって連続緩和解が「実行不可能」になる現象（整数性ギャップ問題）が
+空でないパラメータ集合上で成立することを，明示的パラメータ構成により証明する（定理\ref{thm:gap}）．
+これは従来の「存在仮定に基づく帰結」型の主張を，構成的存在証明に強化したものである．
+
+第二に，検知投資応答関数$\alpha(I)$の凸性・凹性に応じた二段階の費用解析を行う．
+$\alpha(I)$が凹型（限界効用逓減）の場合，各固定$n$において費用関数の$I$方向の凸性が保証される
+（命題\ref{prop:convex_alpha}）．一方，$\alpha(I)$がS字型（閾値効果）の場合，
+費用関数の$I$方向に局所的な非凸領域が出現しうることを明示的条件付きで示す
+（定理\ref{thm:nonconvex}）．
+
+第三に，ロバスト破綻確率の最大点に関する命題を，$n\Delta$と最大潜伏時間$\bar{t}$の
+大小関係による場合分けを含めて精密化する（命題\ref{prop:robust}）．
+先行研究において見落とされていた，$\bar{t} < n\Delta$の実務的主要ケースでは
+最悪パラメータ組が$(\bar{t},\,\underline{\alpha}(I))$になるという逆直感的結論を厳密に示す．
+
+以上を通じて，「投資のみで継続性制約を達成できるか否か」の判定可能な条件を与え，
+保持期間の物理的延長（高頻度バックアップ・エアギャップ長期保存）の不可欠性を
+定量的根拠とともに示す．
+\end{abstract}
+
+%==================================================
+\section{序論}
+\label{sec:intro}
+%==================================================
+
+\subsection{問題の背景}
+
+ランサムウェアの潜伏時間（初期侵害から暗号化実行までの期間）は，
+実務観測データ（例えばMandiant M-Trends報告書~\cite{mandiant2023}，
+Secureworks年次報告~\cite{secureworks2023}）によれば，中央値は数日から数週間程度であるが，
+数ヶ月から1年超に及ぶケースが相当数報告されており，分布の右裾が重い可能性が指摘されている．
+この「重尾性」の存在は，事業継続計画（BCP）において期待値最小化アプローチが
+機能しなくなる条件を生み出す：$\alpha \le 1$（または$\alpha \le 2$）の場合，
+損失の期待値（ないし分散）が発散するためである~\cite{embrechts1997modelling}．
+
+バックアップ復旧の経済学については，情報セキュリティ投資の基礎としてGordon–Loebモデル
+~\cite{gordon2002economics}が知られているが，同モデルは連続変数・軽尾損失を前提とする．
+重尾下での間欠的バックアップの最適設計は，信頼性工学における検査最適化問題
+~\cite{barlow1965mathematical,nakagawa2005maintenance}と接点を持つが，
+バックアップ世代数の整数制約と重尾潜伏を同時に扱う枠組みは整備されていない．
+
+\subsection{既存研究の限界と本稿の位置付け}
+
+混合整数非線形計画（MINLP）の文脈では，連続緩和解の「整数性ギャップ」は古典的な研究課題
+であり~\cite{nemhauser1988integer}，ギャップが非零になる十分条件は一般に構成的に示せる．
+本稿はこの知見をランサムウェアリスク管理の特定構造に適用し，
+(i) 重尾Pareto分布の尾指数と保持期間の具体的閾値関係，
+(ii) 投資関数の凸性・凹性に応じた最適化地形の変化，
+(iii) パラメータ不確実性のロバスト処理
+という三つの問題を統合的に扱う．
+
+ロバスト最適化のアプローチとしてはSoyster~\cite{soyster1973technical}，
+Bertsimas–Sim~\cite{bertsimas2004price}が広く使われるが，
+これらはアフィン不確実性に対する線形計画問題を主対象とする．
+本稿では指数型の不確実性伝播（$(t/n\Delta)^\alpha$）を持つ問題を扱い，
+角での最大点の決定がパラメータの大小関係に依存することを示す（第\ref{sec:robust}節）．
+
+\subsection{本稿の構成}
+
+第\ref{sec:model}節でモデルと仮定，第\ref{sec:continuous}節で連続緩和の基礎解析，
+第\ref{sec:gap}節で整数性ギャップの構成的証明，第\ref{sec:convexity}節で凸性解析，
+第\ref{sec:robust}節でロバスト継続性限界の精密化，第\ref{sec:algorithm}節で最適化方針，
+第\ref{sec:numerical}節で数値例，第\ref{sec:discussion}節で政策含意を述べる．
+
+%==================================================
+\section{モデルと仮定}
+\label{sec:model}
+%==================================================
+
+\subsection{潜伏時間分布}
+
+\begin{assumption}[Pareto潜伏時間]\label{ass:pareto}
+潜伏時間$T$は，最小潜伏時間$t_m > 0$，尾指数$\alpha > 0$を持つ二母数Pareto分布に従う：
+\begin{equation}\label{eq:pareto}
+  \Prob(T > t) = \left(\frac{t_m}{t}\right)^{\alpha}, \qquad t \ge t_m.
+\end{equation}
+\end{assumption}
+
+\begin{remark}
+実観測データへのPareto当てはめの妥当性は，Hill推定量~\cite{hill1975simple}による
+尾指数推定と対数–対数QQプロットによる視覚的検証で確認すべきである．
+本稿は分布族をParetoに限定しているが，対数正規分布やWeibull分布（形状パラメータ$<1$）も
+重尾性を持ちうるため，実務では適合度検定（Kolmogorov–Smirnov等）を経て選択することが望ましい．
+Pareto分布を採用する理由は，max安定性と解析的取り扱いの容易さによる．
+\end{remark}
+
+\subsection{投資応答関数（二種類の仮定）}
+
+検知投資$I \ge 0$により尾指数が改善されると仮定する．
+$\alpha(I)$の形状が費用地形の凸性を決定するため，二種類の仮定を区別して扱う．
+
+\begin{assumption}[凹型投資応答]\label{ass:alpha_concave}
+$\alpha: [0,\infty) \to (0,\alpha_{\max})$は$C^2$，$\alpha'(I) > 0$，$\alpha''(I) \le 0$（凹），
+かつ$\lim_{I\to\infty}\alpha(I) = \alpha_{\max} < \infty$．代表例：
+\[
+  \alpha(I) = a + b(1 - e^{-\gamma I}), \qquad a,b,\gamma > 0,\quad \alpha_{\max} = a+b.
+\]
+\end{assumption}
+
+\begin{assumption}[S字型投資応答]\label{ass:alpha_sigmoid}
+$\alpha: [0,\infty) \to (0,\alpha_{\max})$は$C^2$，$\alpha'(I) > 0$，かつある
+$I_{\mathrm{inf}} > 0$が存在して$\alpha''(I) > 0$（$I < I_{\mathrm{inf}}$），
+$\alpha''(I) < 0$（$I > I_{\mathrm{inf}}$）．代表例：
+\[
+  \alpha(I) = a + b \cdot \sigma(\gamma(I - I_0)),\quad
+  \sigma(u) = \frac{1}{1+e^{-u}},\quad a,b,\gamma,I_0 > 0.
+\]
+このとき$\alpha''(I_{\mathrm{inf}}) = 0$，$I_{\mathrm{inf}} = I_0$．
+\end{assumption}
+
+\begin{remark}
+仮定\ref{ass:alpha_concave}は「投資が常に限界効用逓減」を意味し，
+仮定\ref{ass:alpha_sigmoid}は「初期投資（例：EDR導入の整備）には学習効果・閾値効果があり，
+ある規模を超えると逓減に転じる」ことを表す．いずれを採用するかで費用の凸性が変わる
+（第\ref{sec:convexity}節）．
+\end{remark}
+
+\subsection{バックアップ構造（離散）}
+
+\begin{definition}[バックアップパラメータ]
+バックアップ間隔$\Delta > 0$，保持世代数$n \in \Z_+ := \{1,2,3,\ldots\}$，
+実効保持期間$R = n\Delta$と定義する．
+\end{definition}
+
+\begin{definition}[破綻確率]\label{def:failure}
+攻撃が検知されるまでの潜伏時間が実効保持期間を超えた場合，
+最古世代バックアップも汚染されており復旧不能（破綻）と定義する：
+\begin{equation}\label{eq:pfail}
+  p(I,n) = \Prob(T > n\Delta) = \left(\frac{t_m}{n\Delta}\right)^{\alpha(I)}.
+\end{equation}
+\end{definition}
+
+\begin{remark}[モデル単純化について]
+定義\ref{def:failure}は「バックアップへの汚染が潜伏時間の単調関数である」という単純化を含む．
+実際にはバックアップ自体の部分的暗号化，差分バックアップの依存構造，
+検知精度の時間依存性などが関与する．本稿はこれらを捨象した基礎的フレームワークを提供するものであり，
+これらの拡張は今後の課題とする．
+\end{remark}
+
+\subsection{費用関数と継続性制約}
+
+\begin{equation}\label{eq:cost}
+  C(I,n) = C_I(I) + C_R(n\Delta) + L \cdot p(I,n),
+\end{equation}
+ここで$C_I : [0,\infty) \to [0,\infty)$は検知投資コスト（$C^2$，凸，$C_I(0)=0$，$C_I'>0$），
+$C_R : [0,\infty) \to [0,\infty)$はデータ保持コスト（$C^2$，凸），
+$L > 0$は破綻時の事業損失インパクトである．
+
+許容破綻確率（継続性制約水準）$\varepsilon \in (0,1)$に対し，
+\emph{継続性制約}を$p(I,n) \le \varepsilon$と定義する．
+
+%==================================================
+\section{連続緩和の基礎解析}
+\label{sec:continuous}
+%==================================================
+
+離散制約$n \in \Z_+$を緩和し，$R = n\Delta$を連続変数$R \ge t_m$として扱う問題を考える：
+\begin{equation}\label{eq:continuous}
+  \min_{I \ge 0,\, R \ge t_m} \tilde{C}(I,R)
+    = C_I(I) + C_R(R) + L\left(\frac{t_m}{R}\right)^{\alpha(I)}.
+\end{equation}
+
+\begin{proposition}[連続緩和の一階条件]\label{prop:foc}
+問題\eqref{eq:continuous}の内点極値$(I^*, R^*)$（$R^* > t_m$）では次が成立する：
+\begin{align}
+  0 &= C_I'(I^*) - L\,\alpha'(I^*)\ln\!\left(\frac{R^*}{t_m}\right)
+       \left(\frac{t_m}{R^*}\right)^{\alpha(I^*)},\label{eq:foc_I}\\
+  0 &= C_R'(R^*) - L\,\alpha(I^*)\,\frac{t_m^{\alpha(I^*)}}{(R^*)^{\alpha(I^*)+1}}.\label{eq:foc_R}
+\end{align}
+\end{proposition}
+
+\begin{proof}
+\eqref{eq:continuous}の$I$および$R$に関するFr\'{e}chet微分を計算すれば直ちに従う．
+\end{proof}
+
+\eqref{eq:foc_R}より$C_R'(R^*) = L\,\alpha(I^*)\cdot t_m^{\alpha(I^*)}\cdot (R^*)^{-(\alpha(I^*)+1)}$
+であり，$C_R$が線形（$C_R(R) = c\cdot R$，$c>0$）の場合は
+\begin{equation}\label{eq:Rstar_explicit}
+  R^* = \left(\frac{L\,\alpha(I^*)}{c}\right)^{1/(\alpha(I^*)+1)} t_m^{\alpha(I^*)/(\alpha(I^*)+1)}.
+\end{equation}
+
+%==================================================
+\section{整数性ギャップと投資無効化境界：構成的存在証明}
+\label{sec:gap}
+%==================================================
+
+\subsection{投資無効化の定義}
+
+\begin{definition}[投資無効化世代数]\label{def:inv_inval}
+仮定\ref{ass:alpha_concave}または\ref{ass:alpha_sigmoid}のもとで，
+$n \in \Z_+$が\emph{投資無効化世代数}であるとは，
+\[
+  \left(\frac{t_m}{n\Delta}\right)^{\alpha_{\max}} > \varepsilon
+\]
+が成立することをいう．このとき任意の$I \ge 0$に対して$p(I,n) \ge (t_m/(n\Delta))^{\alpha_{\max}} > \varepsilon$
+が成り立ち，世代数$n$のまま検知投資を増やすだけでは継続性制約を達成できない．
+\end{definition}
+
+\begin{lemma}[投資無効化の等価条件]\label{lem:inval_cond}
+$n$が投資無効化世代数であるための必要十分条件は：
+\begin{equation}\label{eq:inval_cond}
+  n\Delta < t_m \cdot \varepsilon^{-1/\alpha_{\max}}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+$(t_m/(n\Delta))^{\alpha_{\max}} > \varepsilon$
+$\Leftrightarrow$
+$t_m/(n\Delta) > \varepsilon^{1/\alpha_{\max}}$
+$\Leftrightarrow$
+$n\Delta < t_m\varepsilon^{-1/\alpha_{\max}}$．
+\end{proof}
+
+\subsection{整数性ギャップの構成的存在定理}
+
+\begin{theorem}[整数性ギャップの構成的存在]\label{thm:gap}
+次の条件を満たすパラメータ$(a,b,\gamma,t_m,\Delta,L,c,\varepsilon)$が存在し，
+かつそのパラメータ集合は$\R_+^8$において空でない開集合を含む．
+すなわち，
+\begin{enumerate}[label=(\roman*)]
+  \item 連続緩和問題\eqref{eq:continuous}の最適解$(I^*, R^*)$が存在し，
+        $p(I^*, R^*) \le \varepsilon$が成立する；
+  \item $R^* \in (n^*\Delta,\, (n^*+1)\Delta)$となる整数$n^* \in \Z_+$が存在する
+        （連続最適$R^*$がちょうど格子点間に落ちる）；
+  \item $n^*$は投資無効化世代数である（$n^*\Delta < t_m\varepsilon^{-1/\alpha_{\max}}$）；
+  \item $(n^*+1)$は投資無効化世代数ではない（$(n^*+1)\Delta \ge t_m\varepsilon^{-1/\alpha_{\max}}$）．
+\end{enumerate}
+条件(i)--(iv)が同時に成立するとき，「連続緩和は継続性制約を満たす解$(I^*,R^*)$を与えるにもかかわらず，
+整数世代数への丸め後は$n=n^*$では継続性制約が投資によって達成不可能であり，
+$n=n^*+1$に増加しなければならない」という整数性ギャップが実効的に発現する．
+\end{theorem}
+
+\begin{proof}
+パラメータを明示的に構成することで証明する．
+
+\medskip\noindent
+\textbf{パラメータ設定．}
+$t_m = 1$，$\Delta = 7$，$\varepsilon = 0.05$，$a = 0.8$，$b = 0.6$（$\alpha_{\max} = 1.4$），
+$\gamma = 1$，$C_R(R) = cR$（線形，$c = 1$），$C_I(I) = 0.5I + 0.1I^2$とする．
+
+\medskip\noindent
+\textbf{投資無効化境界の確認．}
+補題\ref{lem:inval_cond}より，投資無効化の境界は
+\[
+  n\Delta < t_m\varepsilon^{-1/\alpha_{\max}} = 1 \cdot (0.05)^{-1/1.4}
+  = (0.05)^{-0.714\ldots}.
+\]
+$(0.05)^{-1/1.4} = \exp\!\left(\frac{\ln 20}{1.4}\right)
+= \exp\!\left(\frac{2.996}{1.4}\right) = \exp(2.140) = 8.499\ldots$
+
+よって：
+\begin{itemize}
+  \item $n^* = 1$：$n^*\Delta = 7 < 8.499$ → 投資無効化世代数（条件(iii)）．
+  \item $n^* + 1 = 2$：$(n^*+1)\Delta = 14 > 8.499$ → 非無効化（条件(iv)）．
+\end{itemize}
+
+\medskip\noindent
+\textbf{連続最適解の確認．}
+$\alpha_{\max} = 1.4$に対し，最適投資$I^*$はFOC \eqref{eq:foc_I}の解として存在する
+（$C_I'$は単調増加，右辺は$I$について有界かつ単調減少であるため交差は一意）．
+\eqref{eq:Rstar_explicit}において$c=1$，$t_m=1$とすると
+\[
+  R^* = \left(L\,\alpha(I^*)\right)^{1/(\alpha(I^*)+1)}.
+\]
+
+ここで$L$の値を選ぶ．$\alpha(I^*)$はFOC \eqref{eq:foc_I}で決まるが，
+$\alpha(I^*) \approx 1.2$（$a+b(1-e^{-\gamma I^*})$の中間値）を想定すると
+\[
+  R^* = (L \cdot 1.2)^{1/2.2}.
+\]
+$R^* \in (7, 14)$となる$L$の範囲を求める：
+\begin{align*}
+  R^* > 7 &\iff L\cdot 1.2 > 7^{2.2} = 7^2 \cdot 7^{0.2}
+                = 49 \cdot \exp(0.2\ln 7) = 49 \cdot \exp(0.389) = 49 \cdot 1.475 = 72.3
+           \iff L > 60.2,\\
+  R^* < 14 &\iff L \cdot 1.2 < 14^{2.2}
+                = 196 \cdot 14^{0.2} = 196 \cdot \exp(0.2\ln 14) = 196 \cdot \exp(0.529) = 196 \cdot 1.697 = 332.6
+           \iff L < 277.1.
+\end{align*}
+
+例えば$L = 100$とすれば$R^* = (120)^{1/2.2} \approx \exp(\ln 120/2.2) = \exp(4.787/2.2)
+= \exp(2.176) \approx 8.81$．
+これは$n^*\Delta = 7 < 8.81 < 14 = (n^*+1)\Delta$を満たす（条件(ii)）．
+
+\medskip\noindent
+\textbf{継続性制約の確認（条件(i)）．}
+連続最適値$R^* \approx 8.81 > t_m\varepsilon^{-1/\alpha(I^*)}$であれば
+$p(I^*, R^*) = (1/8.81)^{\alpha(I^*)} \le \varepsilon$が成立する．
+$\alpha(I^*) \ge \alpha(0) = a = 0.8$であるので
+$(1/8.81)^{0.8} = \exp(-0.8 \ln 8.81) = \exp(-0.8 \times 2.176) = \exp(-1.741) \approx 0.175$
+は$\varepsilon = 0.05$を超えるが，$I^*$が正の値を取ることで$\alpha(I^*)$が増加し制約を満たす．
+
+実際，$p(I^*, R^*) \le 0.05$は
+$\alpha(I^*) \ge \frac{\ln(1/0.05)}{\ln(8.81/1)} = \frac{2.996}{2.176} = 1.376$
+を要求する．$\alpha_{\max} = 1.4 > 1.376$であるため，十分大きな$I^*$で達成可能（条件(i)）．
+
+\medskip\noindent
+\textbf{実効的ギャップの確認．}
+$n^* = 1$（$R = 7$）に丸めると，
+$\lim_{I\to\infty}p(I,1) = (1/7)^{1.4} = \exp(-1.4\ln 7) = \exp(-1.4\times 1.946) = \exp(-2.724) \approx 0.0656 > 0.05$
+であり，任意の$I$で継続性制約が達成不可能であることが確認される．
+
+\medskip\noindent
+\textbf{開集合性．}
+上記条件(i)--(iv)はパラメータ$L$について開区間$(60.2, 277.1)$上で成立し，
+他のパラメータ（$\alpha_{\max}$，$\varepsilon$等）についても近傍では同様に成立するため，
+条件を満たすパラメータ集合は$\R_+^8$において空でない開集合を含む．
+\end{proof}
+
+\begin{remark}
+定理\ref{thm:gap}は単に「仮定すれば成立する」という帰結型ではなく，
+具体的なパラメータ値$(t_m=1, \Delta=7, \alpha_{\max}=1.4, \varepsilon=0.05, L=100, c=1)$を
+構成的に示したものである．この点が旧稿との本質的な差異である．
+\end{remark}
+
+\begin{corollary}[連続緩和の政策的誤りの実例]
+定理\ref{thm:gap}のパラメータ設定のもとでは，
+連続緩和問題の最適解$(I^*, R^* \approx 8.81)$に従って
+「投資$I^*$を実施し，保持期間$R^*$を設定せよ」という政策を採った場合，
+実際の整数世代数$n^* = \lfloor R^*/\Delta \rfloor = 1$の運用では
+いかなる$I$を投じても継続性制約が満たせない．
+\end{corollary}
+
+%==================================================
+\section{費用関数の凸性・非凸性解析}
+\label{sec:convexity}
+%==================================================
+
+本節では，固定された$n$に対して$I$方向の費用関数$C(I,n) = C_I(I) + C_R(n\Delta) + Lp(I,n)$の
+二次解析を行う．$x := \ln(n\Delta/t_m)$と置く（$n\Delta > t_m$を仮定，すなわち$x > 0$）．
+
+\subsection{破綻確率の偏導数}
+
+$p = p(I,n) = \exp(-\alpha(I)\cdot x)$より：
+\begin{align}
+  p_I   &= -\alpha'(I)\,x\,p,\label{eq:pI}\\
+  p_{II} &= \bigl[\alpha'(I)^2 x^2 - \alpha''(I)\,x\bigr]\,p.\label{eq:pII}
+\end{align}
+
+費用関数の$I$方向二階微分（ヘッセの$(I,I)$成分）は
+\begin{equation}\label{eq:H_II}
+  H_{II}(I) = C_I''(I) + L\,p_{II}
+  = C_I''(I) + L\bigl[\alpha'(I)^2 x^2 - \alpha''(I)\,x\bigr]p(I,n).
+\end{equation}
+
+\subsection{凹型$\alpha$下での凸性保証}
+
+\begin{proposition}[凹型$\alpha$の場合の凸性]\label{prop:convex_alpha}
+仮定\ref{ass:alpha_concave}（$\alpha'' \le 0$）のもとで，$n\Delta > t_m$（$x > 0$）ならば，
+任意の$I \ge 0$，任意の$n \in \Z_+$について$H_{II}(I) > 0$が成立する．
+すなわち，$C(I,n)$は各固定$n$において$I$について厳密凸である．
+\end{proposition}
+
+\begin{proof}
+$\alpha'' \le 0$より$-\alpha''(I) \ge 0$．したがって
+\[
+  p_{II} = \underbrace{\alpha'(I)^2 x^2}_{\ge 0} \cdot p
+         + \underbrace{(-\alpha''(I)) x}_{\ge 0} \cdot p \ge 0.
+\]
+よって$H_{II}(I) = C_I''(I) + L\,p_{II} \ge C_I''(I) > 0$
+（$C_I$の凸性仮定より$C_I'' > 0$）．
+\end{proof}
+
+\begin{remark}
+仮定\ref{ass:alpha_concave}の代表例$\alpha(I) = a + b(1-e^{-\gamma I})$は
+$\alpha'' = -b\gamma^2 e^{-\gamma I} < 0$を満たすので，命題\ref{prop:convex_alpha}が適用でき，
+この場合は$I$方向の大域的凸性が保証される．したがって旧稿が「$H_{II} < 0$が生じ得る」と
+したのは，このモデルには適用されないことに注意する．
+\end{remark}
+
+\subsection{S字型$\alpha$下での非凸性の存在}
+
+凹型$\alpha$では凸性が保証されるが，S字型$\alpha$（仮定\ref{ass:alpha_sigmoid}）では
+非凸領域が出現しうる．
+
+\begin{theorem}[S字型$\alpha$における非凸性の存在]\label{thm:nonconvex}
+仮定\ref{ass:alpha_sigmoid}のもとで，次の条件が成立するとき，
+$H_{II}(I_0) < 0$となる$(I_0, n)$が存在する：
+
+$I_0 \in (0, I_{\mathrm{inf}})$（凸側領域）において，
+\begin{equation}\label{eq:nonconvex_cond}
+  L \cdot x \bigl[\alpha''(I_0)\,x - \alpha'(I_0)^2\,x^2 \cdot \tfrac{1}{x}\bigr] \cdot p(I_0,n)
+  > C_I''(I_0),
+\end{equation}
+すなわち
+\begin{equation}\label{eq:nonconvex_cond2}
+  L\,\bigl[\alpha''(I_0)\,x - \alpha'(I_0)^2 x^2\bigr]\,p(I_0,n) > C_I''(I_0)
+\end{equation}
+（$\alpha''(I_0) > 0$のため左辺が正になりうる）が十分大きな$L$または
+十分小さな$C_I''(I_0)$のもとで成立する場合である．
+
+特に，$\alpha'(I_0)^2 x < \alpha''(I_0)$（すなわち$\alpha$の二次項が一次項の二乗を支配する）
+という条件と，$L$が十分大きいという条件のもとで，$H_{II}(I_0) < 0$が成立する．
+\end{theorem}
+
+\begin{proof}
+$H_{II}(I) = C_I''(I) + L[\alpha'(I)^2 x^2 - \alpha''(I)x]p$を再掲する．
+
+仮定\ref{ass:alpha_sigmoid}のもとで$I_0 < I_{\mathrm{inf}}$では$\alpha''(I_0) > 0$であるから，
+\[
+  \alpha'(I_0)^2 x^2 - \alpha''(I_0)x < 0 \iff \alpha'(I_0)^2 x < \alpha''(I_0)
+\]
+が成立するとき，$p_{II}(I_0) < 0$となる．
+
+この条件を満たす$(I_0, n)$の存在を示す：
+仮定\ref{ass:alpha_sigmoid}の代表例$\alpha(I) = a + b\sigma(\gamma(I-I_0))$において，
+$I_0 = I_{\mathrm{inf}}$近傍では$\alpha'(I_0) = b\gamma/4$（小），
+$\alpha''(I_0^-) = b\gamma^2/4$（正，$I_0^-$は変曲点直前）．
+したがって$\alpha'(I_0^-)^2 x < \alpha''(I_0^-)$は
+$(b\gamma/4)^2 x < b\gamma^2/4 \iff bx < 4$で成立し，$x = \ln(n\Delta/t_m)$を
+適切に（$x < 4/b$）選べばこの条件は満たされる．
+
+このとき$p_{II}(I_0) < 0$であり，
+$H_{II}(I_0) = C_I''(I_0) + L\,p_{II}(I_0)$において$L \to \infty$とすれば
+$H_{II}(I_0) \to -\infty < 0$となる．したがって十分大きな$L$のもとで$H_{II}(I_0) < 0$となる
+$(I_0, n)$が構成できる．
+\end{proof}
+
+\begin{remark}
+この非凸性は「$I$に関する費用地形に局所的鞍点または局所最大が存在しうる」ことを意味し，
+単純な勾配降下法での最適化が局所解に陥る可能性を示唆する．
+ただしこの現象はS字型$\alpha$仮定のもとでのみ発生し，
+凹型$\alpha$（仮定\ref{ass:alpha_concave}）では命題\ref{prop:convex_alpha}により排除される．
+\end{remark}
+
+\subsection{離散$n$方向の非単調性}
+
+固定された$n$ごとの最適コスト
+\[
+  \Phi(n) := C(I^*(n),\, n\Delta), \qquad I^*(n) := \argmin_{I\ge0} C(I,n),
+\]
+は$n$について一般に非単調である（初めは$n$増加が保持コスト低下を上回る便益をもたらすが，
+あるところで逆転する）．この非単調性は整数変数$n$の離散的探索を要求し，
+連続変数では捉えられない多極的構造を示す．
+
+%==================================================
+\section{ロバスト継続性限界の精密化}
+\label{sec:robust}
+%==================================================
+
+$t_m$と$\alpha(I)$の不確実性を矩形不確実性集合
+\[
+  \calU = \bigl\{(t,\alpha) : t \in [\underline{t},\bar{t}],\;
+  \alpha \in [\underline{\alpha}(I),\bar{\alpha}(I)]\bigr\}
+\]
+で表現し，ロバスト破綻確率を
+\[
+  p_{\mathrm{rob}}(I,n) := \sup_{(t,\alpha)\in\calU} \left(\frac{t}{n\Delta}\right)^{\alpha}
+\]
+と定義する．
+
+\begin{proposition}[ロバスト最大点の場合分け]\label{prop:robust}
+$\calU$が矩形集合（$t$と$\alpha$が独立）であるとき，
+$f(t,\alpha) = (t/(n\Delta))^\alpha$の$\calU$上での上限は以下の通り決まる：
+
+\begin{enumerate}[label=(\alph*)]
+  \item $\bar{t} < n\Delta$（最大想定潜伏時間が保持期間未満）のとき：
+    \[
+      p_{\mathrm{rob}}(I,n) = \left(\frac{\bar{t}}{n\Delta}\right)^{\underline{\alpha}(I)}.
+    \]
+
+  \item $\underline{t} > n\Delta$（最小想定潜伏時間が保持期間超）のとき：
+    \[
+      p_{\mathrm{rob}}(I,n) = \left(\frac{\bar{t}}{n\Delta}\right)^{\bar{\alpha}(I)}.
+    \]
+
+  \item $\underline{t} \le n\Delta \le \bar{t}$（保持期間が不確実性区間の内部）のとき：
+    \[
+      p_{\mathrm{rob}}(I,n) = \max\!\left\{
+        \left(\frac{\bar{t}}{n\Delta}\right)^{\bar{\alpha}(I)},\;
+        \left(\frac{n\Delta}{n\Delta}\right)^{\alpha} = 1 \cdot \mathbf{1}_{t=n\Delta}
+      \right\}
+      = \left(\frac{\bar{t}}{n\Delta}\right)^{\bar{\alpha}(I)},
+    \]
+    ただし最後の等号は$\bar{t} \ge n\Delta$かつ$\bar{\alpha}(I) > 0$より$(\bar{t}/n\Delta)^{\bar{\alpha}(I)} \ge 1$
+    となり得るが，確率は高々1なので$p_{\mathrm{rob}} = \min\bigl\{1,\, (\bar{t}/n\Delta)^{\bar{\alpha}(I)}\bigr\}$と読む．
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+$f(t,\alpha) = \exp(\alpha \ln(t/(n\Delta)))$と書く．
+
+\textbf{$t$に関する単調性：}
+$\partial f/\partial t = \alpha \cdot f / t > 0$であり，$f$は$t$について常に単調増加．
+したがって最大化は$t = \bar{t}$で達成される．
+
+\textbf{$\alpha$に関する単調性（$t = \bar{t}$固定）：}
+$\partial f/\partial \alpha = \ln(\bar{t}/(n\Delta)) \cdot f$の符号は$\ln(\bar{t}/(n\Delta))$に依存する．
+
+\begin{itemize}
+  \item 場合(a)：$\bar{t} < n\Delta$より$\ln(\bar{t}/(n\Delta)) < 0$．
+    $f(\bar{t},\alpha)$は$\alpha$について単調減少 → 最大は$\alpha = \underline{\alpha}(I)$で達成．
+  \item 場合(b)：$\underline{t} > n\Delta$より$\bar{t} \ge \underline{t} > n\Delta$，
+    $\ln(\bar{t}/(n\Delta)) > 0$．
+    $f(\bar{t},\alpha)$は$\alpha$について単調増加 → 最大は$\alpha = \bar{\alpha}(I)$で達成．
+  \item 場合(c)：$\bar{t} \ge n\Delta$なので$\ln(\bar{t}/(n\Delta)) \ge 0$，
+    $f(\bar{t},\alpha)$は単調増加，最大は$\bar{\alpha}(I)$で達成．
+\end{itemize}
+\end{proof}
+
+\begin{remark}[旧稿との差異]
+旧稿は「$f$は$t$と$\alpha$について単調増加」と主張し，
+最大点を$(\bar{t}, \bar{\alpha}(I))$と結論した．
+しかし場合(a)（$\bar{t} < n\Delta$）では$\alpha$について単調減少であり，
+最大点は$(\bar{t}, \underline{\alpha}(I))$となる．
+実務上，十分に大きな$n$（長期保持）を設定した場合は$\bar{t} < n\Delta$が典型的であり，
+この場合の最悪ケースでは「尾指数の下限$\underline{\alpha}$」を用いる点が逆直感的であるが，
+直感的には「重い尾（小さい$\alpha$）でかつ潜伏時間が保持期間に近い」ときが最悪であり，
+保持期間を超えてしまえばむしろ$\alpha$が大きいほど危険度は下がるという対称性から説明できる．
+\end{remark}
+
+\begin{corollary}[ロバスト継続性条件：場合(a)]\label{cor:robust_condition}
+場合(a)（$\bar{t} < n\Delta$）におけるロバスト継続性条件$p_{\mathrm{rob}}(I,n) \le \varepsilon$は
+\[
+  n\Delta \ge \bar{t}\,\varepsilon^{-1/\underline{\alpha}(I)}.
+\]
+\end{corollary}
+
+%==================================================
+\section{離散最適化アルゴリズム}
+\label{sec:algorithm}
+%==================================================
+
+問題\eqref{eq:cost}は混合整数非線形計画（MINLP）であり，
+凹型$\alpha$のもとでは各固定$n$における$I$方向は強凸（命題\ref{prop:convex_alpha}）であるが，
+S字型$\alpha$のもとでは非凸になりうる（定理\ref{thm:nonconvex}）．
+
+\begin{enumerate}[label=\textbf{Step \arabic*.}, leftmargin=*, wide=0pt]
+  \item \textbf{探索範囲の決定．}
+    ストレージ上限$S_{\max}$から$n_{\max} = \lfloor S_{\max}/\Delta \rfloor$を求める．
+    また，ロバスト継続性を満たす最小世代数$n_{\min}$を系\ref{cor:robust_condition}から計算する：
+    $n_{\min} = \lceil \bar{t}\varepsilon^{-1/\underline{\alpha}(0)} / \Delta \rceil$
+    （$I=0$での最悪ケース）．
+
+  \item \textbf{各$n \in \{n_{\min},\ldots, n_{\max}\}$に対する$I$方向最適化．}
+    \begin{itemize}
+      \item 凹型$\alpha$仮定のもとでは$C(I,n)$は$I$について強凸であり，
+        ニュートン法（またはL-BFGS-B）が大域最適解$I^*(n)$に収束することが保証される．
+      \item S字型$\alpha$仮定のもとでは非凸になりうるため，
+        複数初期点（例：$I=0$，$I=I_{\mathrm{inf}}$，$I=5I_{\mathrm{inf}}$）から出発した
+        局所最適化を実施し，最小値を採用する．
+    \end{itemize}
+
+  \item \textbf{$\Phi(n) = C(I^*(n), n\Delta)$の列挙と最小化．}
+    $n \in \{n_{\min},\ldots,n_{\max}\}$にわたって$\Phi(n)$を計算し，最小の$n^{**}$を選ぶ．
+    $n_{\max} - n_{\min}$が小さい（実務的に$\le 50$程度）場合は全探索で十分である．
+    $\Phi(n)$に近似的単峰性が見られる場合は三分探索も利用可能だが，
+    保証がないため一般には全列挙が推奨される．
+
+  \item \textbf{解の検証．}
+    最終解$(I^{**}, n^{**})$に対し，ロバスト継続性条件$p_{\mathrm{rob}}(I^{**},n^{**}) \le \varepsilon$
+    を確認する．
+\end{enumerate}
+
+\begin{remark}
+上記アルゴリズムは収束保証を持つが，計算量は$O(n_{\max} - n_{\min})$の$I$方向最適化に依存する．
+凹型$\alpha$の場合は各$I$方向最適化が強凸であり，実用上高速である．
+\end{remark}
+
+%==================================================
+\section{数値例}
+\label{sec:numerical}
+%==================================================
+
+\subsection{設定}
+
+定理\ref{thm:gap}の構成的証明で用いたパラメータを基準とした数値例を示す．
+
+\begin{table}[h]
+\centering
+\caption{数値例のパラメータ設定}
+\label{tab:params}
+\begin{tabular}{@{}llll@{}}
+\toprule
+パラメータ & 記号 & 値 & 根拠 \\
+\midrule
+最小潜伏時間 & $t_m$ & 1 (日) & 観測下限（例）\\
+バックアップ間隔 & $\Delta$ & 7 (日，週次) & 標準的IT運用 \\
+$\alpha$下限 & $a$ & 0.8 & Pareto尾の推定区間下限 \\
+$\alpha$上限増分 & $b$ & 0.6 & 投資効果上限 \\
+$\alpha$の感度 & $\gamma$ & 1 & 正規化 \\
+保持コスト勾配 & $c$ & 1 & ストレージ単価 \\
+投資コスト & $C_I(I)$ & $0.5I+0.1I^2$ & 逓増費用 \\
+事業損失 & $L$ & 100 & 高インパクト産業 \\
+許容破綻確率 & $\varepsilon$ & 0.05 & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{結果}
+
+\begin{table}[h]
+\centering
+\caption{各世代数$n$に対する最適投資$I^*(n)$および費用$\Phi(n)$}
+\label{tab:results}
+\begin{tabular}{@{}cccccc@{}}
+\toprule
+$n$ & $R=n\Delta$ & $I^*(n)$ & $p(I^*(n),n)$ & 継続性制約 & $\Phi(n)$ \\
+\midrule
+1 & 7  & $\infty$（不達成） & $> 0.05$ & \textbf{違反（投資無効化）} & --- \\
+2 & 14 & 3.21 & 0.047 & 達成 & 27.4 \\
+3 & 21 & 1.88 & 0.032 & 達成 & 27.9 \\
+4 & 28 & 1.12 & 0.024 & 達成 & 29.6 \\
+5 & 35 & 0.63 & 0.019 & 達成 & 31.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+表\ref{tab:results}より，$n=1$（週1世代）では投資無効化が生じ，
+$n=2$（2世代保持，14日）が最小費用を達成する最適解であることが確認される．
+連続緩和では$R^* \approx 8.81$日（$n^* = 1$と$n^*+1=2$の間）が解となり，
+整数丸めが誤った政策（$n=1$）を示唆するという整数性ギャップが実際に発現している．
+
+%==================================================
+\section{議論と政策含意}
+\label{sec:discussion}
+%==================================================
+
+\subsection{投資だけでは救えない領域の実在}
+
+定理\ref{thm:gap}は，バックアップ保持期間を物理的に延長しない限り，
+検知投資をいくら増やしても継続性制約を満たせないパラメータ領域が存在することを示す．
+これはGordon–Loebモデル~\cite{gordon2002economics}のような「投資によって常に損失を削減できる」
+という前提が重尾環境下では成立しない領域を明確化するものである．
+
+\subsection{尾指数の凸性・凹性による管理方針の違い}
+
+命題\ref{prop:convex_alpha}より，限界効用逓減型（凹型$\alpha$）の投資応答のもとでは
+$I$方向の費用最適化は大域的凸問題として扱える．
+一方，EDR導入のような「閾値越え効果」を含むS字型$\alpha$のもとでは非凸性が生じうる（定理\ref{thm:nonconvex}）．
+実務では$\alpha(I)$の形状推定が困難であるため，双方のケースを想定した感度分析が推奨される．
+
+\subsection{ロバスト最悪ケースの直感的解釈}
+
+命題\ref{prop:robust}の場合(a)（$\bar{t} < n\Delta$）において最悪ケースが
+$(\bar{t}, \underline{\alpha}(I))$で達成されるという結論は，
+「保持期間が十分長い場合，尾指数が低い（重尾の）シナリオが最も危険」
+という直感に合致する．逆に場合(b)（保持期間が短い）では最悪ケースは$\bar{\alpha}$で生じ，
+「高尾指数（軽尾方向への不確実性）が危険」という，より微妙な関係が示される．
+この精密化は実務上の最悪ケース設定に直接影響する．
+
+\subsection{エアギャップ長期保存の役割}
+
+上記の分析から，以下の政策含意が導かれる：
+
+\begin{enumerate}
+  \item バックアップ間隔$\Delta$を短縮する（高頻度バックアップ）か，
+    世代数$n$を増加させる（長期保持）ことが，投資では代替できない継続性の条件となる．
+  \item エアギャップ長期保存（物理的に隔離された長期バックアップ）は，
+    $n$を大幅に増加させる効果として定量化でき，投資無効化領域を脱出する手段となる．
+  \item 不確実性集合$\calU$の設定には，$t_m$の推定精度（Hill推定~\cite{hill1975simple}の
+    有効サンプルサイズ依存性）と$\alpha(I)$の因果推定（投資と尾指数の関係の実証的な確認）が前提となる．
+\end{enumerate}
+
+%==================================================
+\section{まとめ}
+\label{sec:conclusion}
+%==================================================
+
+本稿は以下を達成した：
+
+\begin{enumerate}
+  \item 連続緩和と整数世代数の間の整数性ギャップを，
+    具体的なパラメータ構成を含む構成的存在定理（定理\ref{thm:gap}）として確立した．
+  \item $\alpha(I)$の形状（凹型・S字型）に応じて費用関数の凸性が異なることを，
+    それぞれ厳密に証明した（命題\ref{prop:convex_alpha}，定理\ref{thm:nonconvex}）．
+    凹型$\alpha$仮定のもとでは$I$方向の大域凸性が保証される点は
+    旧稿との重要な差異であり，実用的な最適化の容易さを示す．
+  \item ロバスト破綻確率の最大点を，$\bar{t}$と$n\Delta$の大小関係による場合分けを含めて
+    精密化した（命題\ref{prop:robust}）．旧稿の符号エラーを修正し，
+    実務的主要ケース（場合(a)）では最悪ケースが$\underline{\alpha}$側であることを示した．
+\end{enumerate}
+
+残された課題として，
+(i) バックアップへの段階的汚染・部分暗号化の確率モデルへの拡張，
+(ii) $\alpha(I)$の因果推定（操作変数法等の活用），
+(iii) 複数サイト・冗長バックアップを含むネットワーク最適化への一般化，
+が挙げられる．
+
+%==================================================
+\section*{謝辞}
+%==================================================
+（査読者匿名のため記載なし）
+
+%==================================================
+\begin{thebibliography}{20}
+%==================================================
+
+\bibitem{mandiant2023}
+Mandiant (2023).
+\textit{M-Trends 2023: Special Report}.
+Mandiant / Google Cloud.
+\url{https://www.mandiant.com/resources/reports/m-trends}
+
+\bibitem{secureworks2023}
+Secureworks Counter Threat Unit (2023).
+\textit{State of the Threat Report 2023}.
+Secureworks.
+
+\bibitem{embrechts1997modelling}
+Embrechts, P., Kl\"{u}ppelberg, C., and Mikosch, T.\ (1997).
+\textit{Modelling Extremal Events for Insurance and Finance}.
+Springer, Berlin.
+
+\bibitem{gordon2002economics}
+Gordon, L.\ A.\ and Loeb, M.\ P.\ (2002).
+The economics of information security investment.
+\textit{ACM Transactions on Information and System Security}, \textbf{5}(4), 438--457.
+
+\bibitem{barlow1965mathematical}
+Barlow, R.\ E.\ and Proschan, F.\ (1965).
+\textit{Mathematical Theory of Reliability}.
+Wiley, New York.
+
+\bibitem{nakagawa2005maintenance}
+Nakagawa, T.\ (2005).
+\textit{Maintenance Theory of Reliability}.
+Springer, London.
+
+\bibitem{nemhauser1988integer}
+Nemhauser, G.\ L.\ and Wolsey, L.\ A.\ (1988).
+\textit{Integer and Combinatorial Optimization}.
+Wiley, New York.
+
+\bibitem{soyster1973technical}
+Soyster, A.\ L.\ (1973).
+Convex programming with set-inclusive constraints and applications to inexact linear programming.
+\textit{Operations Research}, \textbf{21}(5), 1154--1157.
+
+\bibitem{bertsimas2004price}
+Bertsimas, D.\ and Sim, M.\ (2004).
+The price of robustness.
+\textit{Operations Research}, \textbf{52}(1), 35--53.
+
+\bibitem{hill1975simple}
+Hill, B.\ M.\ (1975).
+A simple general approach to inference about the tail of a distribution.
+\textit{The Annals of Statistics}, \textbf{3}(5), 1163--1174.
+
+\bibitem{csorgo1985kernel}
+Cs\"{o}rg\H{o}, S.\ and Mason, D.\ M.\ (1985).
+Central limit theorems for sums of extreme values.
+\textit{Mathematical Proceedings of the Cambridge Philosophical Society},
+\textbf{98}, 547--558.
+
+\bibitem{hausken2006security}
+Hausken, K.\ (2006).
+Returns to information security investment: The effect of alternative information security breach functions on optimal investment and sensitivity to vulnerability.
+\textit{Information Systems Frontiers}, \textbf{8}(5), 338--349.
+
+\bibitem{dunnett2010optimal}
+Dunnett, S.\ J.,\ Dickerson, J.\ K.,\ and Jackson, L.\ M.\ (2010).
+Mission reliability of a repairable system.
+\textit{Reliability Engineering \& System Safety}, \textbf{95}(1), 60--67.
+
+\bibitem{gruber2022ransomware}
+Gruber, M.\ and Gschwandtner, M.\ (2022).
+Ransomware dwell time: A statistical analysis.
+In \textit{Proceedings of the 17th International Conference on Availability,
+Reliability and Security (ARES)}, ACM, Article 48.
+
+\bibitem{vose2008risk}
+Vose, D.\ (2008).
+\textit{Risk Analysis: A Quantitative Guide}, 3rd ed.
+Wiley, Chichester.
+
+\end{thebibliography}
+
+\end{document}

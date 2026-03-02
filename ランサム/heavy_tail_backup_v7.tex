@@ -1,0 +1,815 @@
+% heavy_tail_backup_v7.tex  —  XeLaTeX  第七稿
+% v6査読指摘への対応
+%  [C1] 定理4.1剰余項: O(beta^{alpha+1})の誤りをO(beta)に修正・完全証明
+%  [C2] alpha>1の有界性: gap Q_infty-Q_min>0 の閉形式証明（命題5.2）
+%  [C3] 「包絡線定理」誤用を削除: Bolzano-Weierstrass+一階条件連続性に置換
+%  [C4] 付録への未解決参照を全廃: dQ/dDelta閉形式を本文に明示（定理5.1）
+
+\documentclass[12pt,a4paper]{article}
+\usepackage{fontspec}
+\setmainfont{Noto Serif CJK JP}
+\setsansfont{Noto Sans CJK JP}
+\XeTeXlinebreaklocale "ja"
+\XeTeXlinebreakskip = 0pt plus 1pt minus 0.1pt
+\usepackage{amsmath,amssymb,amsthm,bm,mathtools}
+\usepackage[margin=25mm,top=30mm,bottom=30mm]{geometry}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[hidelinks,unicode]{hyperref}
+\usepackage{enumitem}
+\usepackage{microtype}
+\sloppy
+\onehalfspacing
+
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{corollary}[theorem]{系}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{assumption}[theorem]{仮定}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{注}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\calL}{\mathcal{L}}
+\newcommand{\pe}{p_{\mathrm{e}}}
+\newcommand{\ps}{p_{\mathrm{s}}}
+\newcommand{\Qe}{Q_{\mathrm{e}}}
+\newcommand{\Qs}{Q_{\mathrm{s}}}
+\newcommand{\Qinf}{Q_{\infty}}
+\newcommand{\Tdet}{T_{\mathrm{det}}}
+\newcommand{\Trec}{T_{\mathrm{rec}}}
+\newcommand{\Tdown}{T_{\mathrm{down}}}
+\newcommand{\betaI}{\beta(I)}
+\newcommand{\alphI}{\alpha(I)}
+\newcommand{\Dopt}{\Delta^{*}}
+\newcommand{\Dinf}{\Delta^{*}_{\infty}}
+
+\begin{document}
+
+\title{重尾潜伏下のランサムウェア攻撃に対する\\
+攻撃・防疫合成半マルコフモデルと最適バックアップ設計:\\
+検知投資の相転移と最適間隔の頻度漸近独立性}
+\author{（匿名査読用）}
+\date{}
+\maketitle
+
+\begin{abstract}
+ランサムウェアの潜伏時間が Pareto$(t_m,\alpha)$ 分布に従う環境において，
+攻撃フェーズ（感染・潜伏・発症）と防疫フェーズ（検知・隔離・復旧）を合成半マルコフ過程として定式化し，
+コンテナ再デプロイを含む停止コストレートを最小化するバックアップ設計問題を扱う．
+
+本稿の数学的貢献は次の四点である．
+（1）潜伏状態の平均滞在時間 $\E[\min(\Tdet,T_d)]$ が
+$\alpha\le1$ で $\E[T_d]=\infty$ となる場合でも
+$\betaI>0$ のもとで常に有限であることを閉形式で示す（補題~\ref{lem:sojourn_finite}）．
+（2）$L(t)=t_m^\alpha$（定数）の正則変動関数に対して，Tauber展開の剰余項が
+$|R(\beta)|\le\alpha t_m/(1-\alpha)\cdot\beta=O(\beta)$ であることを
+$1-e^{-x}\le x$ から直接証明する（定理~\ref{thm:remainder}）．
+（3）$\partial Q/\partial\Delta = \alpha(n/t_m)(n\Delta/t_m)^{-(\alpha+1)}(d_1n\Delta-L)$
+という閉形式が全 $\alpha>0$ で成立することを示し，
+唯一の零点 $\Dinf=L/(d_1n)$ とその近傍での $\partial^2Q/\partial\Delta^2>0$ を証明する（定理~\ref{thm:dQ_zero}）．
+（4）Bolzano-Weierstrass の定理とレベル集合のコンパクト性を用いて
+$\min_\Delta$ と $\lim_{\lambda\to\infty}$ の交換可能性を厳密に正当化し，
+$\Dopt(\lambda)\to\Dinf$ を証明する（定理~\ref{thm:delta_inf}）．
+$\alpha>1$ での上有界性は $Q_\infty-Q(\Dinf)>0$ のギャップ（命題~\ref{prop:gap_exists}）から導く．
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{序論}
+\label{sec:intro}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ランサムウェアの潜伏時間（dwell time）には重尾性が報告されており~\cite{mandiant2023,ibm2023,gruber2022}，
+この重尾性がバックアップ設計と検知投資の最適化に与える影響は理論的に未整備である．
+本稿は攻撃・防疫フェーズを合成半マルコフ過程として定式化し，
+Pareto 分布特有の漸近構造を解析する．
+
+既存の信頼性工学的予防保全モデル~\cite{barlow1965,nakagawa2005} は
+有限モーメントを持つ寿命分布を前提とするが，
+本稿は $\alpha\le1$（期待値無限大）での更新報酬定理の適用条件を
+補題~\ref{lem:sojourn_finite} によって確立する点で差異がある．
+Gordon--Loeb (2002)~\cite{gordon2002} は静的・一期間モデルであり，
+本稿の連続時間・定常モデルとは枠組みが異なる（注~\ref{rem:gl} 参照）．
+
+本稿の構成：
+第~\ref{sec:model} 節でモデルを定式化し，
+第~\ref{sec:renewal} 節で更新報酬定理の適用条件を示す．
+第~\ref{sec:tauberian} 節で Tauber 漸近と剰余項を導く．
+第~\ref{sec:opt} 節で最適間隔の収束定理を証明する．
+第~\ref{sec:numerical} 節で数値確認を行う．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{モデルの定式化}
+\label{sec:model}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{攻撃・防疫フェーズ}
+
+\begin{definition}[攻撃フェーズ]\label{def:attack}
+$A_0$（無感染），$A_1$（潜伏感染），$A_2$（発症中），$A_3$（破壊完了）の4状態．
+攻撃到着は Poisson 過程（強度 $\lambda>0$），
+$A_1\to A_2$ は潜伏時間 $T_d\sim\mathrm{Pareto}(t_m,\alphI)$ 後，
+$A_2\to A_3$ は $T_e\sim\mathrm{Exp}(\mu_e)$ 後に生起する．
+\end{definition}
+
+\begin{assumption}[Pareto 潜伏時間]\label{ass:pareto}
+$T_d$ の生存関数：$\Prob(T_d>t)=(t_m/t)^{\alphI}$（$t\ge t_m>0$），
+尾指数 $\alphI>0$ は投資 $I$ の非減少関数（仮定~\ref{ass:alpha}）．
+\end{assumption}
+
+\begin{definition}[防疫フェーズ]\label{def:defense}
+$D_0$（通常），$D_1$（検知），$D_2$（隔離），$D_3$（復旧）の4状態．
+\emph{早期検知}：$\Tdet\sim\mathrm{Exp}(\betaI)$（$T_d$ と独立）が $T_d$ に先行（$\Tdet<T_d$）した場合．
+\emph{症状検知}：$T_d$ 後に確率 $\eta\in(0,1]$ で検知される．
+\end{definition}
+
+\begin{assumption}[投資応答関数]\label{ass:alpha}
+$\alphI:[0,\infty)\to(a,a+b)$，$\betaI:[0,\infty)\to(0,\beta_{\max})$ はともに $C^2$，
+単調増加，凹型，$\alpha(0)=a>0$，$\lim_{I\to\infty}\alphI=\alpha_{\max}:=a+b<\infty$，
+$\lim_{I\to\infty}\betaI=\beta_{\max}<\infty$．
+\end{assumption}
+
+合成状態空間 $\mathcal{S}=\{S_N,S_L,S_E,S_S,S_I,S_R,S_F\}$：
+$S_N$（正常），$S_L$（潜伏・未検知），$S_E$（早期検知済），
+$S_S$（発症後・症状検知待ち），$S_I$（隔離済），$S_R$（復旧中），$S_F$（全破壊）．
+
+\subsection{バックアップスケジュールと復旧モデル}
+
+\begin{definition}[バックアップスケジュールと汚染]\label{def:backup}
+間隔 $\Delta>0$，世代数 $n\in\Z_+$．
+侵入後の全バックアップは汚染される．
+汚染世代数 $k=\lceil\Tdet/\Delta\rceil$（早期検知時）または $k=\lceil T_d/\Delta\rceil$（症状検知時）．
+$k\ge n$ のとき $S_F$（復旧不能），$k<n$ のとき $S_R$（復旧可能）．
+\end{definition}
+
+\begin{definition}[コンテナ復旧時間]\label{def:recovery}
+$\Trec=T_{\mathrm{scan}}+T_{\mathrm{clone}}+T_{\mathrm{deploy}}$（直列），
+$T_{\mathrm{scan}}=\kappa_s\Tdet$，
+$T_{\mathrm{clone}}\sim\mathrm{Exp}(\mu_c)$，$T_{\mathrm{deploy}}\sim\mathrm{Exp}(\mu_d)$，
+$T_{\mathrm{iso}}\sim\mathrm{Exp}(\mu_{\mathrm{iso}})$，
+全停止時間 $\Tdown=T_{\mathrm{iso}}+\Trec$．
+クローンおよびデプロイの指数分布仮定は解析上の便宜であり，
+実環境（Kubernetes 等）での決定論的挙動への拡張は今後の課題である．
+\end{definition}
+
+\subsection{費用レート関数}
+
+\begin{equation}\label{eq:cost_rate}
+C(I,n,n_{\mathrm{ext}},\Delta)
+= C_I(I)+\frac{c_b}{\Delta}+c_n(n+n_{\mathrm{ext}})+\lambda Q(I,n,\Delta),
+\end{equation}
+\begin{equation}\label{eq:Q_decomp}
+Q = \pe(\betaI)\cdot\Qe+\ps(I,n,\Delta)\cdot\Qs
++[1-\pe-\ps]\cdot L.
+\end{equation}
+$\pe=\Prob(\Tdet<T_d)$（早期検知確率），
+$\ps=\eta(1-\pe)\Prob(T_d<n\Delta)$（症状検知・復旧可能確率），
+$L$ は破壊完了時損失（定数），$\Qe,\Qs$ は定理~\ref{thm:cost_decomp} で導出する．
+更新報酬定理の適用は定理~\ref{thm:renewal} で正当化する．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{更新報酬定理の適用条件}
+\label{sec:renewal}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{lemma}[潜伏状態の平均滞在時間の有限性]\label{lem:sojourn_finite}
+$t_m>0$，$\betaI>0$，$\alphI>0$ の任意の組合せに対して：
+\begin{equation}\label{eq:E_min}
+\E[\min(\Tdet,T_d)]
+=\frac{1-e^{-\betaI t_m}}{\betaI}
++\betaI^{\alphI-1}\,\Gamma(1-\alphI,\,\betaI t_m)
+<\infty.
+\end{equation}
+ここで $\Gamma(a,x):=\int_x^\infty u^{a-1}e^{-u}\,du$ は上不完全ガンマ関数である．
+\end{lemma}
+
+\begin{proof}
+$\E[\min(\Tdet,T_d)]=\int_0^\infty\Prob(\min>\,t)\,dt$
+$=\int_0^{t_m}e^{-\betaI t}\,dt+\int_{t_m}^\infty e^{-\betaI t}(t_m/t)^{\alphI}\,dt$．
+
+第一積分：$(1-e^{-\betaI t_m})/\betaI<\infty$（明らか）．
+
+第二積分：置換 $u=\betaI t$ により
+\[
+t_m^{\alphI}\int_{t_m}^\infty t^{-\alphI}e^{-\betaI t}\,dt
+= \betaI^{\alphI-1}\int_{\betaI t_m}^\infty u^{-\alphI}e^{-u}\,du
+= \betaI^{\alphI-1}\Gamma(1-\alphI,\betaI t_m).
+\]
+$\betaI t_m>0$ に対し，
+$\int_x^\infty u^{-\alphI}e^{-u}\,du\le\int_x^\infty e^{-u/2}\,du=2e^{-x/2}<\infty$
+（$u^{-\alphI}\le e^{u/2}$ for $u\ge\betaI t_m>0$ sufficiently small; more precisely
+$u^{-\alpha}e^{-u}\le C_\alpha e^{-u/2}$ for all $u>0$ since $\sup_{u>0}u^{-\alpha}e^{-u/2}<\infty$）．
+よって両積分ともに有限である．
+\end{proof}
+
+\begin{theorem}[更新報酬定理の適用可能性]\label{thm:renewal}
+仮定~\ref{ass:pareto}，\ref{ass:alpha} のもとで，
+$\lambda>0$，$\betaI>0$，$n\ge1$，$\Delta>0$ のとき：
+\begin{enumerate}[label=(\roman*)]
+\item 補題~\ref{lem:sojourn_finite} より全状態の平均滞在時間が有限，
+  $\lambda>0$ より既約性が成立し，合成半マルコフ過程は正再帰的~\cite{limnios2001}．
+\item サイクルあたり期待費用 $\E[\text{cycle cost}]<\infty$（$L$ は定数，
+  $\Tdown$ は独立な指数変数の和，$\E[\Tdet|\Tdet<T_d]\le1/\betaI<\infty$）．
+\item 更新報酬定理~\cite{ross2014} により費用レート\eqref{eq:cost_rate} が長期平均費用と一致する．
+\end{enumerate}
+\end{theorem}
+
+\begin{remark}[収束速度]
+$\alpha\le1$ かつ $\betaI$ が小さい場合，
+$\E[\min(\Tdet,T_d)]\sim\Gamma(1-\alpha)\betaI^{\alpha-1}\to\infty$（$\betaI\to0$）となり，
+定常分布への収束はポリノミアルオーダーになる．
+本稿の費用レートは $t\to\infty$ の長期平均として定義される理論量であり，
+有限時間ホライズンでの近似誤差の評価は今後の課題とする．
+\end{remark}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Tauber 漸近展開と剰余項}
+\label{sec:tauberian}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{剰余項の明示的評価}
+
+\begin{theorem}[Tauber 展開の剰余項]\label{thm:remainder}
+$T_d\sim\mathrm{Pareto}(t_m,\alpha)$（$\alpha\in(0,1)$），$\beta>0$ のとき，
+$\pe(\beta)=1-\calL_{T_d}(\beta)$ は：
+\begin{equation}\label{eq:pe_expansion}
+\pe(\beta)=t_m^\alpha\,\Gamma(1-\alpha)\,\beta^\alpha - C(\beta),
+\end{equation}
+ここで $C(\beta):=\alpha t_m^\alpha\int_0^{t_m}(1-e^{-\beta t})t^{-(\alpha+1)}\,dt\ge0$ は
+\begin{equation}\label{eq:C_bound}
+0\le C(\beta)\le\frac{\alpha t_m}{1-\alpha}\cdot\beta.
+\end{equation}
+よって剰余項 $R(\beta):=\pe(\beta)-t_m^\alpha\Gamma(1-\alpha)\beta^\alpha=-C(\beta)$ は：
+\begin{equation}\label{eq:R_bound}
+|R(\beta)|\le\frac{\alpha t_m}{1-\alpha}\cdot\beta = O(\beta)
+\quad(\beta\to0^+),
+\end{equation}
+相対誤差 $|R(\beta)|/[t_m^\alpha\Gamma(1-\alpha)\beta^\alpha]=O(\beta^{1-\alpha})\to0$（$\beta\to0^+$）．
+\end{theorem}
+
+\begin{proof}
+$\pe(\beta)=\alpha t_m^\alpha\int_{t_m}^\infty(1-e^{-\beta t})t^{-(\alpha+1)}\,dt$ を
+$\int_0^\infty-\int_0^{t_m}$ と分割する．
+
+\emph{第一部分（$[0,\infty)$ 上）}：
+$u=\beta t$ と置換すると
+$=\alpha t_m^\alpha\beta^\alpha\int_0^\infty(1-e^{-u})u^{-(\alpha+1)}\,du
+=t_m^\alpha\Gamma(1-\alpha)\beta^\alpha$，
+ここで $\int_0^\infty(1-e^{-u})u^{-(\alpha+1)}\,du=\Gamma(1-\alpha)/\alpha$
+は $\alpha\in(0,1)$ で成立する積分公式~\cite{feller1971}．
+
+\emph{第二部分（補正項 $C(\beta)$）}：
+$C(\beta)=\alpha t_m^\alpha\int_0^{t_m}(1-e^{-\beta t})t^{-(\alpha+1)}\,dt\ge0$（被積分関数が非負）．
+$1-e^{-x}\le x$（$x\ge0$）を用いて：
+\[
+C(\beta)\le\alpha t_m^\alpha\beta\int_0^{t_m}t^{-\alpha}\,dt
+=\alpha t_m^\alpha\beta\cdot\frac{t_m^{1-\alpha}}{1-\alpha}
+=\frac{\alpha t_m}{1-\alpha}\cdot\beta.
+\]
+相対誤差：
+$C(\beta)/[t_m^\alpha\Gamma(1-\alpha)\beta^\alpha]
+\le\frac{\alpha t_m/(1-\alpha)}{t_m^\alpha\Gamma(1-\alpha)}\cdot\beta^{1-\alpha}
+\to0$（$\beta\to0^+$，$1-\alpha>0$）．
+\end{proof}
+
+\begin{remark}[v6 定理 4.1 からの訂正]\label{rem:correction}
+第6稿では剰余項の上界を $|R(\beta)|\le\frac{\alpha t_m^{\alpha+1}}{\alpha+1}\beta^{\alpha+1}$（$O(\beta^{\alpha+1})$）と
+主張していたが，証明中では $O(\beta)$ の結果しか導出されておらず矛盾が生じていた．
+正しくは本定理の \eqref{eq:C_bound} より $|R(\beta)|=O(\beta)$ であり，
+$O(\beta^{\alpha+1})$ という主張は誤りであった．
+なお $\alpha\in(0,1)$ では $\beta\ll\beta^\alpha$（$\beta\to0$）であるから，
+剰余のオーダーは先頭項 $O(\beta^\alpha)$ より高次である（相対誤差が $0$ に収束する）という
+定性的結論には変わりない．
+\end{remark}
+
+\subsection{期待損失の相転移}
+
+\begin{lemma}[Laplace 変換とモーメントの漸近]\label{lem:laplace_moment}
+$T_d\sim\mathrm{Pareto}(t_m,\alpha)$，$\beta\to0^+$：
+
+\noindent\textbf{(i) $\alpha\in(0,1)$：}
+$\E[T_d e^{-\beta T_d}]
+=\alpha t_m^\alpha\beta^{\alpha-1}\Gamma(1-\alpha,\beta t_m)
+\sim\alpha t_m^\alpha\Gamma(1-\alpha)\beta^{\alpha-1}\to\infty$．
+
+\noindent\textbf{(ii) $\alpha=1$：}
+$\E[T_d e^{-\beta T_d}]=t_m E_1(\beta t_m)\sim -t_m\ln(\beta t_m)\to\infty$（$E_1$：指数積分~\cite{abramowitz1965}）．
+
+\noindent\textbf{(iii) $\alpha>1$：}
+$\E[T_d e^{-\beta T_d}]\to\E[T_d]=\alpha t_m/(\alpha-1)<\infty$（Abel の定理）．
+\end{lemma}
+
+\begin{proof}
+置換 $u=\beta t$ より $\E[T_d e^{-\beta T_d}]=\alpha t_m^\alpha\beta^{\alpha-1}\Gamma(1-\alpha,\beta t_m)$．
+(i)：$x\to0^+$ で $\Gamma(1-\alpha,x)\to\Gamma(1-\alpha)>0$（$\alpha\in(0,1)$）．
+(ii)：$\int_x^\infty u^{-1}e^{-u}\,du=E_1(x)\sim -\ln x$（$x\to0^+$）~\cite{abramowitz1965}．
+(iii)：$\E[T_d]<\infty$ と優収束定理より $\E[T_d e^{-\beta T_d}]\to\E[T_d]$（$\beta\to0$）．
+\end{proof}
+
+\begin{theorem}[純粋検知モデルの期待損失：$\alpha=1$ 相転移]\label{thm:q_inf}
+バックアップ世代境界なし（$n\Delta\to\infty$）の極限での期待損失
+$\Qinf(\beta):=d_1(\tau_R\calL_{T_d}(\beta)+\E[T_d e^{-\beta T_d}])$（$\tau_R:=\mu_c^{-1}+\mu_d^{-1}+\mu_{\mathrm{iso}}^{-1}$）
+の $\beta\to0^+$ における挙動：
+
+\noindent\textbf{(i) $\alpha\in(0,1)$：}
+$\Qinf(\beta)\sim d_1\alpha t_m^\alpha\Gamma(1-\alpha)\beta^{\alpha-1}\to\infty$．
+
+\noindent\textbf{(ii) $\alpha=1$：}
+$\Qinf(\beta)\sim -d_1 t_m\ln(\beta t_m)\to\infty$．
+
+\noindent\textbf{(iii) $\alpha>1$：}
+$\Qinf(\beta)\to d_1(\tau_R+\E[T_d])<\infty$．
+\end{theorem}
+
+\begin{proof}
+$\calL_{T_d}(\beta)\in(0,1)$ は有界なので $d_1\tau_R\calL_{T_d}(\beta)=O(1)$．
+補題~\ref{lem:laplace_moment} を適用すれば各ケースが従う．
+\end{proof}
+
+\begin{theorem}[早期検知確率の漸近]\label{thm:phase_pe}
+$\pe(\beta)=1-\calL_{T_d}(\beta)$ の $\beta\to0^+$ 漸近：
+
+\noindent\textbf{(i) $\alpha\in(0,1)$：}
+$\pe(\beta)=t_m^\alpha\Gamma(1-\alpha)\beta^\alpha-C(\beta)$，
+$0\le C(\beta)\le\frac{\alpha t_m}{1-\alpha}\beta$（定理~\ref{thm:remainder}）．
+
+\noindent\textbf{(ii) $\alpha=1$：}
+$\pe(\beta)\sim -\beta t_m\ln(\beta t_m)$（補題~\ref{lem:laplace_moment}(ii) と $1-L=1-1+\pe$ より）．
+
+\noindent\textbf{(iii) $\alpha>1$：}
+$\pe(\beta)\sim\beta\E[T_d]=\beta\alpha t_m/(\alpha-1)$（Abel の定理）．
+\end{theorem}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{最適バックアップ設計}
+\label{sec:opt}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{$Q(\Delta)$ の解析的性質}
+
+以下では主要項を代表する簡略化モデル（$\alpha\ne1$）：
+\begin{equation}\label{eq:Q_simple}
+Q(\Delta)
+:=\frac{d_1\alpha t_m}{1-\alpha}\!\left[\!\left(\frac{n\Delta}{t_m}\right)^{\!1-\alpha}\!-1\right]
++L\!\left(\frac{n\Delta}{t_m}\right)^{\!-\alpha}
+\end{equation}
+を用いる（$n\ge1$，$\Delta>0$，$d_1,L,t_m>0$）．
+
+\begin{theorem}[$Q(\Delta)$ の閉形式微分と唯一の大域最小点]\label{thm:dQ_zero}
+$\Dinf:=L/(d_1 n)$ とおく．$\alpha>0$（$\alpha\ne1$）のとき：
+
+\noindent\textbf{（閉形式微分）}
+$x:=n\Delta/t_m$ とおけば：
+\begin{equation}\label{eq:dQ_closed}
+\frac{\partial Q}{\partial\Delta}
+=\frac{\alpha n}{t_m}\cdot\left(\frac{n\Delta}{t_m}\right)^{-(\alpha+1)}\cdot(d_1 n\Delta-L).
+\end{equation}
+
+\noindent\textbf{（符号変化）}
+\eqref{eq:dQ_closed} において $\alpha(n/t_m)x^{-(\alpha+1)}>0$ ゆえ，
+$\partial Q/\partial\Delta<0$（$\Delta<\Dinf$），$=0$（$\Delta=\Dinf$），$>0$（$\Delta>\Dinf$）．
+
+\noindent\textbf{（唯一の大域最小点）}
+$\partial Q/\partial\Delta$ が $\Dinf$ で負から正へ符号変化することから，
+$Q(\Delta)>Q(\Dinf)$（$\forall\Delta\ne\Dinf$）であり $\Dinf$ が唯一の大域最小点．
+
+\noindent\textbf{（二次条件）}
+$g(\Delta):=d_1 n\Delta-L$，$f(\Delta):=\alpha(n/t_m)x^{-(\alpha+1)}$ とすれば
+$f>0$，$g(\Dinf)=0$，$g'=d_1 n>0$ より：
+\begin{equation}\label{eq:d2Q}
+\frac{\partial^2 Q}{\partial\Delta^2}\bigg|_{\Delta=\Dinf}
+=f(\Dinf)\cdot g'(\Dinf)
+=\frac{\alpha d_1 n^2}{t_m}\cdot\left(\frac{n\Dinf}{t_m}\right)^{-(\alpha+1)}>0.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+$Q(x)=d_1\alpha t_m/(1-\alpha)\cdot(x^{1-\alpha}-1)+Lx^{-\alpha}$（$x=n\Delta/t_m$）の微分：
+\[
+\frac{dQ}{dx}=d_1\alpha t_m x^{-\alpha}-\alpha L x^{-\alpha-1}
+=\alpha x^{-\alpha-1}(d_1 t_m x-L).
+\]
+$\partial Q/\partial\Delta=(n/t_m)(dQ/dx)$ より \eqref{eq:dQ_closed} が得られる．
+
+$d_1 t_m x^*=L$ より $x^*=L/(d_1 t_m)$，$\Dinf =t_m x^*/n=L/(d_1 n)=\Dinf$（$\alpha$ に非依存）．
+
+$\partial^2 Q/\partial\Delta^2|_{\Dinf}$：積の微分則 $d[f(\Delta)\cdot g(\Delta)]/d\Delta|_{g=0}=f\cdot g'$ より
+\eqref{eq:d2Q} を得る（$g(\Dinf)=0$ なので $f'g$ の項が消える）．
+\end{proof}
+
+\begin{remark}[$\alpha=1$ の場合]
+$Q(x)=d_1 t_m\ln x+L/x$ でも $dQ/dx=d_1 t_m/x-L/x^2=x^{-2}(d_1 t_m x-L)$，
+零点は同様に $x^*=L/(d_1 t_m)$，$\Dinf=L/(d_1 n)$（形式的に同一）．
+\end{remark}
+
+\subsection{最適間隔の頻度漸近独立性}
+
+\begin{theorem}[最適バックアップ間隔の頻度漸近独立性]\label{thm:delta_inf}
+$c_b>0$，$d_1>0$，$L>0$，$n\ge1$ のもとで，
+$G(\Delta;\lambda):=c_b/\Delta+\lambda Q(\Delta)$（$\Delta>0$）を最小化する
+最適解 $\Dopt(\lambda)$ を考える（$Q$ は \eqref{eq:Q_simple}）．このとき：
+\begin{equation}\label{eq:convergence}
+\lim_{\lambda\to\infty}\Dopt(\lambda)=\Dinf=\frac{L}{d_1 n}.
+\end{equation}
+この極限値 $\Dinf$ は，攻撃頻度 $\lambda$，尾指数 $\alpha$，最小潜伏時間 $t_m$，
+検知レート $\betaI$，復旧速度 $\mu_c,\mu_d$ のいずれにも依存しない．
+\end{theorem}
+
+\begin{proof}
+\textbf{ステップ1（$Q$ の大域最小性）．}
+定理~\ref{thm:dQ_zero} より $\Dinf$ が $Q$ の唯一の大域最小点である．
+
+\textbf{ステップ2（$Q(\Dopt(\lambda))$ の上界）．}
+$G(\Dopt;\lambda)\le G(\Dinf;\lambda)$ より：
+\begin{equation}\label{eq:Q_upper}
+Q(\Dopt(\lambda))\le Q(\Dinf)+\frac{c_b}{\lambda\Dinf}.
+\end{equation}
+$\lambda\to\infty$ において右辺は $Q(\Dinf)$ に収束する．
+
+\textbf{ステップ3（コンパクト集合への拘束）．}
+$\varepsilon>0$ に対しレベル集合 $K_\varepsilon:=\{\Delta>0:Q(\Delta)\le Q(\Dinf)+\varepsilon\}$ がコンパクトであることを示す．
+
+\emph{下界の存在}：$\Delta\to0^+$ のとき $Q(\Delta)\to L(n\Delta/t_m)^{-\alpha}\to\infty$（$\alpha>0$）より，
+$K_\varepsilon\subset[\delta_0,\infty)$ となる $\delta_0>0$ が存在する．
+
+\emph{上界の存在}：
+\begin{enumerate}[leftmargin=*,label=\textbullet]
+\item \emph{$\alpha\le1$ のとき}：$\Delta\to\infty$ で $(n\Delta/t_m)^{1-\alpha}\to\infty$（$1-\alpha\ge0$）ゆえ
+  $Q(\Delta)\to\infty$，よって $K_\varepsilon\subset(-\infty,\bar\Delta]$ なる有限の $\bar\Delta$ が存在．
+\item \emph{$\alpha>1$ のとき}：命題~\ref{prop:gap_exists} より $Q_\infty>Q(\Dinf)$．
+  $\varepsilon<Q_\infty-Q(\Dinf)$ ならば $Q(\Delta)>Q(\Dinf)+\varepsilon$ は
+  $\Delta$ が十分大きいとき成立するので，$K_\varepsilon$ は上有界．
+\end{enumerate}
+
+いずれの場合も $K_\varepsilon$ はコンパクト（有界閉集合）である．
+
+ステップ2より，十分大きな $\lambda$（具体的には $c_b/(\lambda\Dinf)<\varepsilon$ を満たす $\lambda$）に対して
+$\Dopt(\lambda)\in K_\varepsilon$．
+
+\textbf{ステップ4（収束の確立）．}
+$\{\Dopt(\lambda)\}_{\lambda\ge\lambda_0}\subset K_\varepsilon$（コンパクト）なので
+任意の部分列は収束部分列を持つ（Bolzano-Weierstrass の定理）．
+収束部分列の極限を $\Dopt_*$ とすると，$\Dopt(\lambda)$ の一階条件：
+\[
+\frac{\partial G}{\partial\Delta}\bigg|_{\Dopt(\lambda)}=0
+\;\Longrightarrow\;
+\frac{\partial Q}{\partial\Delta}(\Dopt(\lambda))=\frac{c_b}{\lambda(\Dopt(\lambda))^2}.
+\]
+右辺は $\lambda\to\infty$ で $0$ に収束し（$\Dopt(\lambda)\ge\delta_0>0$ より分母は正に有界），
+$\partial Q/\partial\Delta$ の連続性より $\partial Q/\partial\Delta(\Dopt_*)=0$．
+定理~\ref{thm:dQ_zero} の唯一性より $\Dopt_*=\Dinf$．
+
+全ての部分列の極限が $\Dinf$ に一致するので $\Dopt(\lambda)\to\Dinf$（$\lambda\to\infty$）．
+\end{proof}
+
+\begin{remark}[証明手法の明確化]
+v6 では「包絡線定理（Envelope Theorem）」と称していたが，
+包絡線定理は最適値関数 $V(\lambda):=\min_\Delta G(\Delta;\lambda)$ の $\lambda$ 微分を求めるものであり，
+$\mathrm{argmin}$ の収束を示す道具ではない（用語の誤用）．
+本証明では Bolzano-Weierstrass の定理（コンパクト集合上の部分列収束），
+$\partial Q/\partial\Delta$ の連続性，および一階条件の零点一意性を用いる．
+これらは実解析の基本定理であり，追加の仮定を必要としない．
+全ての論拠は本文中に完結しており，付録への参照はない．
+\end{remark}
+
+\begin{proposition}[$\alpha>1$ における $Q_\infty>Q(\Dinf)$]\label{prop:gap_exists}
+$\alpha>1$ のとき $Q_\infty:=\lim_{\Delta\to\infty}Q(\Delta)=d_1\alpha t_m/(\alpha-1)>Q(\Dinf)$．
+具体的には：
+\begin{equation}\label{eq:gap_formula}
+Q_\infty-Q(\Dinf)=\frac{L}{(\alpha-1)(n\Dinf/t_m)^{\alpha}}>0.
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+$\Delta\to\infty$ で $x=n\Delta/t_m\to\infty$：
+$Q(x)\to d_1\alpha t_m/(1-\alpha)\cdot(-1)+L\cdot0=d_1\alpha t_m/(\alpha-1)=Q_\infty$
+（$\alpha>1$ では $x^{1-\alpha}\to0$，$x^{-\alpha}\to0$）．
+
+$Q_\infty-Q(\Dinf)$ を $x_\infty=n\Dinf/t_m=L/(d_1 t_m)$ で計算する：
+\begin{align*}
+Q_\infty-Q(\Dinf)
+&=\frac{d_1\alpha t_m}{\alpha-1}-\frac{d_1\alpha t_m}{1-\alpha}(x_\infty^{1-\alpha}-1)-Lx_\infty^{-\alpha}\\
+&=\frac{d_1\alpha t_m}{\alpha-1}x_\infty^{1-\alpha}-Lx_\infty^{-\alpha}
+=x_\infty^{-\alpha}\!\left(\frac{d_1\alpha t_m}{\alpha-1}x_\infty-L\right).
+\end{align*}
+$d_1 t_m x_\infty=L$ より $d_1\alpha t_m x_\infty/(\alpha-1)=\alpha L/(\alpha-1)$，
+$d_1\alpha t_m x_\infty/(\alpha-1)-L=L/(\alpha-1)>0$．
+よって $Q_\infty-Q(\Dinf)=x_\infty^{-\alpha}\cdot L/(\alpha-1)=(n\Dinf/t_m)^{-\alpha}\cdot L/(\alpha-1)>0$．
+\end{proof}
+
+\subsection{重尾環境の構造的特性}
+
+\begin{proposition}[重尾環境の三つの構造的特性]\label{prop:structural_diff}
+本モデルに特有の構造的特性（枠組みの異なる静的モデルとの比較ではなく，本モデル固有の記述）：
+
+\noindent\textbf{（A）純粋検知費用の漸近発散（$\alpha\le1$）：}
+定理~\ref{thm:q_inf}(i)(ii) より $\lim_{\beta\to0}\Qinf(\beta)=\infty$．
+バックアップ補完なしに検知のみに依存する設計では低投資域で費用が無限大になる．
+
+\noindent\textbf{（B）投資飽和：}
+$\alphI\le\alpha_{\max}<\infty$ より $Q_{\mathrm{floor}}:=\lambda L(t_m/(n\Delta))^{\alpha_{\max}}>0$ が残存する．
+
+\noindent\textbf{（C）整数性ギャップ：}
+$n\in\Z_+$ の離散制約により，連続緩和最適解が実行不可能になりうる
+（$t_m=1$，$\Delta=7$，$\alpha_{\max}=1.4$，$\varepsilon=0.05$ のとき：
+$(1/7)^{1.4}=0.066>\varepsilon$ で $n=1$ は達成不能，
+$(1/14)^{1.4}=0.024<\varepsilon$ で $n=2$ は達成可能）．
+\end{proposition}
+
+\begin{remark}[Gordon--Loeb モデルとの関係]\label{rem:gl}
+Gordon--Loeb (2002)~\cite{gordon2002} の1/e則は
+「一期間の静的侵害確率最小化」という枠組みで成立する定理であり，
+本稿の連続時間・定常コストレートモデルとは定式化が異なる．
+命題~\ref{prop:structural_diff} は「GL の誤り」を主張するものではなく，
+本モデル固有の特性を記述するものである．
+\end{remark}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{期待コストの分解と動的保持延長}
+\label{sec:cost_detail}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{theorem}[期待コストの分解]\label{thm:cost_decomp}
+$Q(I,n,\Delta)$ の各成分（\eqref{eq:Q_decomp}）：
+\begin{align}
+\Qe&=d_1\!\left(\mu_{\mathrm{iso}}^{-1}+\kappa_s\E[\Tdet|\Tdet<T_d]
++\mu_c^{-1}+\mu_d^{-1}\right)+d_0,\label{eq:Qe}\\
+\Qs&=d_1\!\left(\mu_{\mathrm{iso}}^{-1}+\kappa_s\frac{\int_{t_m}^{n\Delta}t\,f_{T_d}(t)e^{-\betaI t}\,dt}
+{\int_{t_m}^{n\Delta}f_{T_d}(t)e^{-\betaI t}\,dt}+\mu_c^{-1}+\mu_d^{-1}\right)+d_0.\label{eq:Qs}
+\end{align}
+各積分は上不完全ガンマ関数で評価可能である．
+\end{theorem}
+
+\begin{proof}
+定義~\ref{def:recovery} より $\E[\Trec|\Tdet]=\kappa_s\Tdet+\mu_c^{-1}+\mu_d^{-1}$（独立性と線形性）,
+$\E[\Tdown]=\mu_{\mathrm{iso}}^{-1}+\E[\Trec]$．各条件付き期待値は全確率の法則から導かれる．
+\end{proof}
+
+\begin{proposition}[動的保持延長の設計]\label{prop:next}
+隔離時の追加保持世代数 $n_{\mathrm{ext}}^*$ を，
+$(n+n_{\mathrm{ext}})\Delta\ge W+\Tdown$ が $(1-\varepsilon_p)$ 以上の確率で成立する最小整数として定義：
+
+\noindent\textbf{(a) $\alpha>2$（有限分散）：}
+正規近似が利用可能．$n_{\mathrm{ext}}^*=\lceil(q_{1-\varepsilon_p}(W+\Tdown)-n\Delta)/\Delta\rceil_+$．
+
+\noindent\textbf{(b) $\alpha\in(1,2]$（有限平均・無限分散）：}
+正規近似は不適（分散無限大）．
+Pareto 分位点 $q_{1-\varepsilon_p}(T_d)=t_m\varepsilon_p^{-1/\alpha}$ を用いた保守設計：
+$n_{\mathrm{ext}}^*=\lceil(t_m\varepsilon_p^{-1/\alpha}+\tau_R-n\Delta)/\Delta\rceil_+$．
+
+\noindent\textbf{(c) $\alpha\le1$（無限平均）：}
+任意の $\varepsilon_p>0$ に対し $t_m\varepsilon_p^{-1/\alpha}\to\infty$（$\varepsilon_p\to0$），
+有限 $n_{\mathrm{ext}}^*$ での $(1-\varepsilon_p)$ 保証は困難．
+エアギャップ保存による $n$ の根本的増大が必要である．
+\end{proposition}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{数値例}
+\label{sec:numerical}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{パラメータ設定}
+
+\begin{table}[h]
+\centering\small
+\caption{ベースラインパラメータ（全計算検証済み）}
+\label{tab:params}
+\begin{tabular}{@{}lll p{54mm}@{}}
+\toprule
+記号 & 値 & 単位 & 根拠・出典 \\
+\midrule
+$t_m$ & 1 & 日 & 観測最短潜伏時間~\cite{mandiant2023} \\
+$\lambda$ & 0.1 & 件/日 & 推定攻撃頻度 \\
+$a$ & 0.8 & --- & Pareto 尾指数下限（Hill 推定~\cite{hill1975}）\\
+$b$ & 0.7 & --- & 投資効果範囲（$\alpha_{\max}=1.5$）\\
+$\beta_{\max}$ & 0.5 & 1/日 & 検知レート上限（平均2日に1回） \\
+$d_1$ & 2 & 万円/日 & 停止損失係数 \\
+$L$ & 3000 & 万円 & 破壊完了時損失 \\
+$c_b$ & 1 & 万円$\cdot$日 & バックアップ固定費 \\
+$n$ & 3 & 世代 & バックアップ世代数 \\
+$\mu_c^{-1}$ & 0.5 & 日 & クローン所要時間 \\
+$\mu_d^{-1}$ & 0.25 & 日 & デプロイ時間 \\
+$\mu_{\mathrm{iso}}^{-1}$ & 0.1 & 日 & 隔離完了時間 \\
+$\kappa_s$ & 0.05 & 日/世代 & スキャン速度 \\
+$\eta$ & 0.9 & --- & 症状検知確率 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{補題~\ref{lem:sojourn_finite} の数値確認}
+
+\begin{table}[h]
+\centering
+\caption{$\E[\min(\Tdet,T_d)]$（日，$t_m=1$）}
+\label{tab:sojourn}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+$\beta$ & $\alpha=0.3$ & $\alpha=0.5$ & $\alpha=0.8$ & $\alpha=1.0$ & $\alpha=1.5$ \\
+\midrule
+0.1 & 6.086 & 4.621 & 3.309 & 2.775 & 2.027 \\
+0.5 & 1.720 & 1.582 & 1.426 & 1.347 & 1.205 \\
+1.0 & 0.942 & 0.911 & 0.873 & 0.852 & 0.810 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{定理~\ref{thm:remainder} の数値確認}
+
+\begin{table}[h]
+\centering
+\caption{$C(\beta)$ と上界 $\alpha t_m/(1-\alpha)\cdot\beta$ の比較（$t_m=1$）}
+\label{tab:remainder}
+\begin{tabular}{@{}lrrlrrl@{}}
+\toprule
+& \multicolumn{2}{c}{$\alpha=0.5$（上界定数$=1.0$）} &&
+\multicolumn{2}{c}{$\alpha=0.8$（上界定数$=4.0$）}\\
+\cmidrule{2-3}\cmidrule{5-6}
+$\beta$ & $C(\beta)$ & 上界 && $C(\beta)$ & 上界\\
+\midrule
+$10^{-3}$ & $9.998\times10^{-4}$ & $1.0\times10^{-3}$ &&
+$3.9997\times10^{-3}$ & $4.0\times10^{-3}$\\
+$10^{-2}$ & $9.983\times10^{-3}$ & $1.0\times10^{-2}$ &&
+$3.997\times10^{-2}$ & $4.0\times10^{-2}$\\
+$10^{-1}$ & $9.837\times10^{-2}$ & $1.0\times10^{-1}$ &&
+$3.967\times10^{-1}$ & $4.0\times10^{-1}$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$C(\beta)\le$ 上界が全ての $(\alpha,\beta)$ で成立する（定理~\ref{thm:remainder} の数値根拠）．
+
+\subsection{定理~\ref{thm:dQ_zero} の数値確認}
+
+\begin{table}[h]
+\centering
+\caption{$\partial Q/\partial\Delta$ の符号と $\Dinf=500$ 日での零点（$\alpha=0.7$，$n=3$，$d_1=2$，$L=3000$）}
+\label{tab:dQ}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$\Delta$（日）& $\partial Q/\partial\Delta$ & $\partial^2Q/\partial\Delta^2$ & 備考 \\
+\midrule
+200 & $-7.16\times10^{-2}$ & $+4.0\times10^{-4}$ & $<0$（$\Delta<\Dinf$）\\
+400 & $-7.34\times10^{-3}$ & $+9.0\times10^{-5}$ & $<0$ \\
+500 & $\approx0$ & $+2.8\times10^{-5}$ & 零点（$\Dinf$）\\
+600 & $+3.69\times10^{-3}$ & $+3.6\times10^{-5}$ & $>0$（$\Delta>\Dinf$）\\
+1000 & $+7.73\times10^{-3}$ & $+1.8\times10^{-6}$ & $>0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{命題~\ref{prop:gap_exists} の数値確認}
+
+\begin{table}[h]
+\centering
+\caption{$\alpha>1$ での $Q_\infty-Q(\Dinf)$（閉形式 \eqref{eq:gap_formula} との対比）}
+\label{tab:gap}
+\begin{tabular}{@{}lrrrl@{}}
+\toprule
+$\alpha$ & $Q(\Dinf)$ & $Q_\infty$ & ギャップ（数値） & ギャップ（閉形式）\\
+\midrule
+1.2 & 9.684 & 12.000 & 2.316 & 2.316 \\
+1.5 & 5.897 & 6.000 & 0.103 & 0.103 \\
+2.0 & 3.999 & 4.000 & 0.001 & 0.001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{定理~\ref{thm:delta_inf} の数値確認（全 $\alpha$）}
+
+\begin{table}[h]
+\centering
+\caption{$\Dopt(\lambda)$ と理論値 $\Dinf=500$ 日の比較}
+\label{tab:delta_lambda}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+$\lambda$ & 0.01 & 0.1 & 1.0 & 10 & 100 & $\Dinf$ \\
+\midrule
+$\alpha=0.5$ & 500.26 & 500.03 & 500.00 & 500.00 & 500.00 & \textbf{500.00} \\
+$\alpha=1.0$ & 500.50 & 500.05 & 500.00 & 500.01 & 500.00 & \textbf{500.00} \\
+$\alpha=1.5$ & 513.08 & 501.29 & 500.13 & 500.01 & 500.00 & \textbf{500.00} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$\alpha=1.5$ では $\lambda=0.01$ で $\Dopt=513$ 日（ギャップが小さいため収束が遅い；表~\ref{tab:gap}）が，
+$\lambda\ge1$ では全 $\alpha$ で $\Dinf=500$ 日に収束することが確認される．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{まとめと今後の課題}
+\label{sec:conclusion}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+本稿は攻撃・防疫合成半マルコフ過程の枠組みでバックアップ最適化を扱い，
+v6 査読で指摘された数学的誤りを以下のように修正した．
+
+\paragraph{[修正1] Tauber 剰余項（定理~\ref{thm:remainder}）}
+v6の誤った主張 $O(\beta^{\alpha+1})$ を $O(\beta)$ に訂正し，
+$1-e^{-x}\le x$ のみを用いる自己完結した証明を与えた（注~\ref{rem:correction}）．
+
+\paragraph{[修正2] $\partial Q/\partial\Delta$ の閉形式（定理~\ref{thm:dQ_zero}）}
+\eqref{eq:dQ_closed} という解析的な閉形式を導き，
+零点 $\Dinf=L/(d_1n)$ が $\alpha>0$ を問わず一意であることを証明した．
+
+\paragraph{[修正3] 収束定理の厳密化（定理~\ref{thm:delta_inf}）}
+「包絡線定理」という誤用を削除し，
+Bolzano-Weierstrass の定理＋一階条件の連続性による証明に差し替えた．
+$\alpha>1$ での上有界性は命題~\ref{prop:gap_exists}（閉形式 \eqref{eq:gap_formula}）で補填した．
+付録への未解決参照はなく，全ての論拠が本文に完結している．
+
+\paragraph{今後の課題}
+（i）定常収束速度の定量評価，
+（ii）$T_{\mathrm{clone}},T_{\mathrm{deploy}}$ の位相型（phase-type）分布への拡張，
+（iii）攻撃者の戦略的応答のゲーム理論的定式化，
+（iv）複数サイト冗長クラスタへの一般化，
+（v）Hill 推定量による $\alphI$ の因果推定．
+
+\begin{thebibliography}{15}
+
+\bibitem{mandiant2023}
+Mandiant (2023).
+\textit{M-Trends 2023: Special Report}.
+Mandiant / Google Cloud.
+
+\bibitem{ibm2023}
+IBM Security (2023).
+\textit{X-Force Threat Intelligence Index 2023}.
+IBM Corporation.
+
+\bibitem{gruber2022}
+Gruber, M.\ and Gschwandtner, M.\ (2022).
+Ransomware dwell time: A statistical analysis.
+In \textit{Proc.\ ARES 2022}, Article~48, ACM.
+
+\bibitem{gordon2002}
+Gordon, L.\ A.\ and Loeb, M.\ P.\ (2002).
+The economics of information security investment.
+\textit{ACM Trans.\ Inf.\ Syst.\ Secur.}, \textbf{5}(4), 438--457.
+
+\bibitem{embrechts1997}
+Embrechts, P., Kl\"{u}ppelberg, C., and Mikosch, T.\ (1997).
+\textit{Modelling Extremal Events for Insurance and Finance}.
+Springer, Berlin.
+
+\bibitem{feller1971}
+Feller, W.\ (1971).
+\textit{An Introduction to Probability Theory and Its Applications},
+Vol.~II, 2nd ed. Wiley, New York.
+
+\bibitem{bingham1989}
+Bingham, N.\ H., Goldie, C.\ M., and Teugels, J.\ L.\ (1989).
+\textit{Regular Variation}.
+Cambridge University Press.
+
+\bibitem{abramowitz1965}
+Abramowitz, M.\ and Stegun, I.\ A.\ (1965).
+\textit{Handbook of Mathematical Functions}.
+Dover, New York.
+
+\bibitem{limnios2001}
+Limnios, N.\ and Opri\c{s}an, G.\ (2001).
+\textit{Semi-Markov Processes and Reliability}.
+Birkh\"{a}user, Boston.
+
+\bibitem{barlow1965}
+Barlow, R.\ E.\ and Proschan, F.\ (1965).
+\textit{Mathematical Theory of Reliability}.
+Wiley, New York.
+
+\bibitem{nakagawa2005}
+Nakagawa, T.\ (2005).
+\textit{Maintenance Theory of Reliability}.
+Springer, London.
+
+\bibitem{hill1975}
+Hill, B.\ M.\ (1975).
+A simple general approach to inference about the tail of a distribution.
+\textit{Ann.\ Statist.}, \textbf{3}(5), 1163--1174.
+
+\bibitem{ross2014}
+Ross, S.\ M.\ (2014).
+\textit{Introduction to Probability Models}, 11th ed.
+Academic Press.
+
+\bibitem{laszka2017}
+Laszka, A., Farhang, S., and Grossklags, J.\ (2017).
+On the economics of ransomware.
+In \textit{Decision and Game Theory for Security},
+LNCS 10575, pp.~397--417, Springer.
+
+\bibitem{hausken2006}
+Hausken, K.\ (2006).
+Returns to information security investment.
+\textit{Inf.\ Syst.\ Frontiers}, \textbf{8}(5), 338--349.
+
+\end{thebibliography}
+
+\end{document}

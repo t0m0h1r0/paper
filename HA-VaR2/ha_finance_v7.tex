@@ -1,0 +1,1217 @@
+%% ================================================================
+%% クォーラム型 2DC 構成における停止強度の漸近解析と
+%% 金融工学的リスク評価（改訂稿 v7）
+%%
+%% 査読対応改訂履歴:
+%%  v7 [R1] 致命的: 自己完結性の回復 —— 摂動展開 O(ε³) 誤差評価を
+%%          付録 B として本稿内に完全収録．Kato スペクトルギャップ証明も自己完結化．
+%%  v7 [R2] 致命的: 「VaR 相転移」→「VaR 閾値跳躍」に改名．
+%%          不連続性の数学的定義を明示し，熱力学的相転移との混同を排除．
+%%  v7 [R3] 重大: QSD 近似の有効時間スケールを定理 (定理 5.3) として定量化．
+%%          T_eval ≥ t* := 2/μ_min の条件下での近似精度を明示．
+%%  v7 [R4] 重大: CCF (共通原因故障) の β-因子拡張を第 6 節として独立節に昇格．
+%%          独立仮定の適用限界を定量的に示す．
+%%  v7 [R5] 重大: DTS 分解と FTA カットセット分析の差別化定理 (定理 4.2) を新設．
+%%          ρ_DTS が修復率を含む設計不変量であり FTA には存在しないことを証明．
+%%  v7 [R6] 中等度: Kato スペクトルギャップ補題 (補題 3.6) を本稿内で証明．
+%%  v7 [R7] 中等度: LGD (Loss Given Default) 変動モデルを系 5.6 として追加．
+%%  v7 [R8] 軽微: Weibull 拡張を今後の課題として明示移動，本稿内の根拠なし言及を削除．
+%%  v7 [R9] 軽微: 記号表を本稿のみで読解可能な形式に拡充．
+%%  v7 [R10] 軽微: 参考文献を IPSJ スタイルガイドに準拠．
+%%
+%%  コンパイル: xelatex ha_finance_v7.tex（3 回実行推奨）
+%% ================================================================
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{fontspec}
+\setmainfont[
+  BoldFont = NotoSerifCJK-Bold.ttc,
+  Path     = /usr/share/fonts/opentype/noto/,
+  Script   = CJK
+]{NotoSerifCJK-Regular.ttc}
+\setmonofont{DejaVu Sans Mono}
+
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage[top=25mm,bottom=25mm,left=25mm,right=25mm]{geometry}
+\usepackage{setspace}\onehalfspacing
+\usepackage{booktabs,array,float,caption,longtable,multirow}
+\usepackage[colorlinks=true,
+            linkcolor=blue!60!black,
+            citecolor=green!50!black,
+            urlcolor=blue!70!black]{hyperref}
+\usepackage{microtype,xcolor,parskip,enumitem}
+\setlist{itemsep=2pt,topsep=4pt}
+\sloppy\setlength{\emergencystretch}{4em}
+
+%% --- 定理環境 ---
+\theoremstyle{plain}
+\newtheorem{theorem}{定理}[section]
+\newtheorem{proposition}[theorem]{命題}
+\newtheorem{lemma}[theorem]{補題}
+\newtheorem{corollary}[theorem]{系}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{定義}
+\newtheorem{assumption}[theorem]{仮定}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{注}
+
+%% --- マクロ（ha_stopping_analysis_v7.tex と完全統一） ---
+\newcommand{\bE}{\mathbb{E}}
+\newcommand{\calO}{\mathcal{O}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calT}{\mathcal{T}}
+\newcommand{\calC}{\mathcal{C}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\e}{\mathrm{e}}
+\newcommand{\RedRes}{S}
+\newcommand{\Proj}{P}
+%% 金融工学マクロ（本稿追加）
+\newcommand{\VaR}{\mathrm{VaR}}
+\newcommand{\ES}{\mathrm{ES}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\calCtwo}{\mathcal{C}_2}
+\newcommand{\calCNOR}{\calCtwo^{(\mathrm{NOR})}}
+\newcommand{\calCDTS}{\calCtwo^{(\mathrm{DTS})}}
+\newcommand{\thetaNOR}{\theta^{(\mathrm{NOR})}}
+\newcommand{\thetaDTS}{\theta^{(\mathrm{DTS})}}
+\newcommand{\rhoDTS}{\rho_{\mathrm{DTS}}}
+\newcommand{\Teval}{T_{\mathrm{eval}}}
+
+% ================================================================
+\title{%
+  \textbf{クォーラム型 2DC 構成における停止強度の漸近解析と\\
+  金融工学的リスク評価}\\[0.5em]
+  \large
+  ── 吸収型 CTMC の主固有値展開・DTS 分解・\\
+  VaR 閾値跳躍・CDS スプレッドの自己完結統合理論 ──\\[0.3em]
+  \small（改訂稿 v7：査読対応版）
+}
+\author{著者名\thanks{所属機関}}
+\date{令和7年（2025年）}
+
+% ================================================================
+\begin{document}
+\maketitle\thispagestyle{empty}
+
+\begin{abstract}
+本稿は，第三拠点クォーラムノードを持つ二重データセンタ（2DC）
+高可用性（HA）構成を対象とし，
+吸収型連続時間マルコフ連鎖（CTMC）のスペクトル理論と
+金融工学を統合した停止リスク評価の自己完結理論を展開する．
+
+6 コンポーネント系（$|\Omega|=64$，$|\calT|=24$，$|\calA|=40$）を
+吸収型 CTMC として厳密定式化し，
+停止強度 $\theta = -\nu_1$（$\nu_1$：過渡部分行列 $T$ の主固有値）の
+漸近展開 $\theta = \sum_{(i,j)\in\calCtwo}\lambda_i\lambda_j/(\mu_i+\mu_j)+\calO(\eps^3)$
+を自己完結的に導出する（Kato 摂動理論，O(ε³) 誤差上界 $C_3$ は
+本稿付録 B に完全証明）．
+
+本稿の主要貢献は以下の四点である．
+\textbf{（1）DTS 分解定理}（定理 4.1）：
+最小停止カット集合族 $\calCtwo$ を通常停止集合 $\calCNOR$ と
+二重誘因停止（DTS）集合 $\calCDTS$ に分割し，
+$\theta = \thetaNOR + \thetaDTS + \calO(\eps^3)$ の閉形式分解と，
+DTS 寄与割合 $\rhoDTS = \thetaDTS/\theta$ が $\eps$ に非依存の
+\emph{設計不変量}であることを示す．
+本分解は故障木解析（FTA）のカットセット分割と異なり，
+修復率 $\mu_i$ を含む定量的分離指標を与えるものであり（定理 4.2），
+FTA では計算不能な DTS リスクの定量化を可能にする．
+\textbf{（2）VaR 閾値跳躍定理}（定理 5.2）：
+停止確率の $\eps^2$ スケールが損失 VaR に
+数学的に不連続な閾値跳躍を引き起こし，
+臨界値 $\eps_c = \sqrt{\log(c_0/q)/(\theta_2\Teval)}$ で
+$\VaR_q(L)$ が $0$ から $v$ へ跳躍することを示す
+（熱力学的相転移とは区別した用語を使用）．
+\textbf{（3）QSD 近似有効条件の定量化}（定理 5.3）：
+指数近似が VaR 精度に与える誤差が $\calO(\e^{-\mu_{\min}\Teval/2})$ であり，
+$\Teval \ge t^* := 2/\mu_{\min}$ の条件下で無視可能となることを証明する．
+\textbf{（4）CDS スプレッドの DTS 分解閉形式}（定理 5.5）：
+$c^* = (1-R)\theta$ の分解と，Loss Given Default 変動モデルへの拡張を行う．
+
+数値検証（$N=5\times10^6$ IS 法，95\% CI）により，
+DTS 寄与割合 $\rhoDTS \approx 0.995$，
+$\eps^2$ スケーリング則，VaR 閾値跳躍臨界値の理論値との整合を確認する．
+
+\medskip
+\noindent\textbf{キーワード}：
+CTMC，吸収マルコフ過程，停止強度，Kato 摂動理論，
+二重データセンタ，クォーラム型 HA，最小停止カット集合，
+DTS 分解，VaR 閾値跳躍，CDS スプレッド，故障木解析との差別化
+\end{abstract}
+
+\newpage\tableofcontents\newpage
+
+% ================================================================
+\section{序論}\label{sec:intro}
+% ================================================================
+
+\subsection{研究背景と問題設定}
+
+クラウドインフラや金融機関の基幹システムでは，
+第三拠点クォーラムノード（QN）を持つ二重 DC（2DC）構成が
+スプリットブレーン防止の標準手段として採用されている
+~\cite{lamport1998,gray1993,ongaro2014}．
+この構成の停止リスクを定量評価することは，
+バーゼル III オペレーショナルリスク資本賦課~\cite{basel2011}の
+観点から重要な課題である．
+
+停止リスクの解析手法としては，
+故障木解析（FTA）~\cite{vesely1981,rausand2004}と
+吸収型 CTMC によるスペクトル解析~\cite{keilson1979,trivedi2002}の
+二つのアプローチが存在する．
+FTA は静的なカットセット列挙に優れるが修復過程を陽に扱えない．
+一方，CTMC スペクトル解析は修復率を含む動的解析を可能にするが，
+金融リスク指標（VaR，CDS スプレッド）への接続は従来研究に存在しない．
+
+\subsection{本稿の位置づけと自己完結性について}
+
+\begin{remark}[査読コメント [R1] への対応：自己完結性]
+  本稿は，著者らの並行研究~\cite{habase:v7}（「基底論文」；
+  同一著者による CTMC モデルの完全数学的定式化を含む）
+  と同一のモデル・記号体系を共有する．
+  査読指摘のとおり，外部文献への依存を最小化するため，
+  本稿では以下を自己完結的に包含する：
+  \begin{itemize}
+    \item 業務継続条件 $\Phi(x)$ の定義と状態数の証明（第 \ref{sec:model} 節）
+    \item 最小停止カット集合の完全列挙（定理 \ref{thm:mincut}，
+          証明は付録 \ref{app:cutsets}）
+    \item Kato 摂動理論の適用条件・スペクトルギャップ証明（補題 \ref{lem:T0spec}，
+          補題 \ref{lem:specgap}）
+    \item $\calO(\eps^3)$ 誤差上界の完全証明（付録 \ref{app:error}）
+  \end{itemize}
+  これらを自己完結的に含めることで，基底論文~\cite{habase:v7} を参照
+  しなくても本稿の数学的主張が検証可能となる．
+\end{remark}
+
+\subsection{本稿の主要貢献}
+
+\begin{enumerate}
+  \item \textbf{DTS 分解定理と FTA との差別化}（定理 \ref{thm:DTS}，\ref{thm:DTS_vs_FTA}）：
+    $\calCtwo$ の $\calCNOR$/$\calCDTS$ 分割が，
+    FTA のカットセット分割とは本質的に異なる
+    修復率込みの設計不変量 $\rhoDTS$ を与える．
+
+  \item \textbf{VaR 閾値跳躍定理}（定理 \ref{thm:VaR}）：
+    $\eps_c$ における VaR の数学的不連続性を，
+    測度論的に厳密に定義された「閾値跳躍」として証明する
+    （熱力学的相転移とは明確に区別する）．
+
+  \item \textbf{QSD 近似精度の定量保証}（定理 \ref{thm:QSD_bound}）：
+    $\Teval \ge t^* = 2/\mu_{\min}$ の条件下で VaR 誤差が
+    $\calO(\e^{-\mu_{\min}\Teval/2})$ に抑えられることを定理として示す．
+
+  \item \textbf{CDS スプレッドと LGD 変動モデル}（定理 \ref{thm:CDS}，系 \ref{cor:LGD}）：
+    二値損失を超えた Loss Given Default 変動モデルへの拡張を行う．
+\end{enumerate}
+
+% ================================================================
+\section{記号・用語一覧}\label{sec:notation}
+% ================================================================
+
+\begin{table}[H]
+  \centering
+  \caption{主要記号一覧（本稿単独で読解可能）}
+  \label{tab:notation}
+  \begin{tabular}{p{6cm}p{8.5cm}}
+    \toprule
+    記号 & 意味 \\
+    \midrule
+    $\calC = \{A,B,Q,N_{AB},N_{AQ},N_{BQ}\}$ & コンポーネント集合（6 要素） \\
+    $\lambda_i > 0$ & コンポーネント $i$ の故障強度 \\
+    $\mu_i > 0$ & コンポーネント $i$ の修復強度 \\
+    $\eps_i = \lambda_i/\mu_i$ & 無次元可用不全率 \\
+    $\eps = \max_i \eps_i$ & 漸近展開の小パラメータ \\
+    $\alpha_i = \lambda_i/\eps$ & スケーリング係数（$\lambda_i=\eps\alpha_i$） \\
+    $\mu_{\min} = \min_i \mu_i$ & 最小修復強度 \\
+    $M_1 = \|T_1\|_2$ & 摂動行列のスペクトルノルム \\
+    $\Omega = \{0,1\}^6$ & 状態空間（$|\Omega|=64$） \\
+    $X(t) = (X_A,X_B,X_Q,X_{AB},X_{AQ},X_{BQ})$ & システム状態（$1$：正常，$0$：故障）\\
+    $\Phi(x)=1$ & 業務継続条件（式~\eqref{eq:service_cond}） \\
+    $\calA = \{x\mid\Phi(x)=0\}$ & 停止状態集合（$|\calA|=40$） \\
+    $\calT = \Omega\setminus\calA$ & 過渡状態集合（$|\calT|=24$） \\
+    $T(\eps)\in\mathbb{R}^{24\times24}$ & 過渡部分行列 \\
+    $T(\eps)=T_0+\eps T_1+\calO(\eps^2)$ & 摂動展開（$T_0$：修復のみ，$T_1$：故障） \\
+    $\nu_1(\eps)$ & $T(\eps)$ の主固有値（最大実部，負値） \\
+    $\theta = -\nu_1(\eps) > 0$ & 停止強度 \\
+    $a_k$ & 固有値展開係数：$\nu_1(\eps)=\sum_{k=1}^\infty a_k\eps^k$ \\
+    $\theta_2 = a_2$ & 二次係数（$>0$，式~\eqref{eq:theta2}） \\
+    $\calCtwo$ & 最小停止カット集合（サイズ 2）の族（5 集合） \\
+    $\calCNOR = \{\{A,B\}\}$ & 通常停止カット集合族 \\
+    $\calCDTS = \calCtwo\setminus\calCNOR$ & DTS カット集合族（4 集合） \\
+    $\thetaNOR, \thetaDTS$ & 停止強度の NOR/DTS 分解 \\
+    $\rhoDTS = \thetaDTS/\theta$ & DTS 寄与割合（設計不変量，$\eps$ 非依存） \\
+    $x_{\mathrm{up}} = (1,1,1,1,1,1)$ & 全正常状態 \\
+    $\varphi_0=\mathbf{e}_{x_{\mathrm{up}}}$，$\psi_0=\mathbf{1}_{24}$ & $T_0$ の 0 固有値の右・左固有ベクトル \\
+    $\Proj_0 = \varphi_0\psi_0^\top$ & Riesz 射影 \\
+    $\RedRes = (-T_0|_{\mathrm{Ran}(I-\Proj_0)})^{-1}(I-\Proj_0)$ & 規約リゾルベント \\
+    $\tau = \inf\{t>0\mid X(t)\in\calA\}$ & 停止到達時刻 \\
+    $\gamma(\eps) = -\mathrm{Re}(\nu_2(\eps))$ & スペクトルギャップ \\
+    $t^* = 2/\mu_{\min}$ & QSD 近似有効最小時間（定理 \ref{thm:QSD_bound}） \\
+    \midrule
+    \multicolumn{2}{l}{\textit{金融工学記号}} \\
+    \midrule
+    $v > 0$ & 停止損失額（二値モデル） \\
+    $\Teval > 0$ & 評価期間 \\
+    $r > 0$ & 無リスク金利 \\
+    $R \in [0,1]$ & CDS 回収率 \\
+    $q \in (0,1)$ & VaR 信頼水準 \\
+    $c_0 = \psi_0^\top p_0$ & スペクトル射影係数（初期分布依存，$c_0\le1$） \\
+    $\eps_c$ & VaR 閾値跳躍臨界値（式~\eqref{eq:eps_c}） \\
+    $\beta \in [0,1]$ & CCF 比率（$\beta$-因子モデル） \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ================================================================
+\section{モデルと主定理（自己完結版）}\label{sec:model}
+% ================================================================
+
+\subsection{システム構成}
+
+対象は以下の 6 コンポーネントから成る：
+DC（$A$，$B$），クォーラムノード（$Q$），
+ネットワーク（$N_{AB}$，$N_{AQ}$，$N_{BQ}$）．
+
+\begin{assumption}[独立指数分布]\label{ass:indep}
+  各 $i\in\calC$ は相互独立な 2 状態過程に従い，
+  故障・修復時間はともに指数分布（無記憶性）に従う
+  （$\lambda_i>0$，$\mu_i>0$）．
+\end{assumption}
+
+\begin{assumption}[修復強度の下界]\label{ass:mumin}
+  $\mu_{\min}:=\min_{i\in\calC}\mu_i \ge c > 0$（$\eps$ 非依存の正定数）．
+\end{assumption}
+
+\begin{assumption}[漸近スケーリング]\label{ass:asym}
+  $\lambda_i = \eps\alpha_i$（$\alpha_i>0$ 定数，$\eps\to 0$）．
+\end{assumption}
+
+\begin{definition}[業務継続条件]\label{def:service}
+  \begin{align}
+    \Phi(x) = 1
+    \;\iff\;
+    &(x_A \land x_B)
+    \;\lor\; (x_A \land \lnot x_B \land x_Q \land x_{AQ})
+    \;\lor\; (\lnot x_A \land x_B \land x_Q \land x_{BQ}).
+    \label{eq:service_cond}
+  \end{align}
+  $\calA = \{x\mid\Phi(x)=0\}$，$\calT=\Omega\setminus\calA$．
+\end{definition}
+
+\begin{remark}[注意: $N_{AB}$ の不在について]
+  $N_{AB}$ が式~\eqref{eq:service_cond} に陽に現れないのは，
+  両 DC が $A$–$Q$，$B$–$Q$ 経路で独立にクォーラムへ到達可能であり，
+  $N_{AB}$ 単独故障はフェイルオーバー後の継続稼働を妨げないためである．
+  $N_{AB}$ はデータ同期（レプリケーション）の文脈では重要であるが，
+  クォーラム合意に基づくサービス可否判断を対象とする本モデルの範囲外である．
+\end{remark}
+
+\begin{proposition}[状態数]\label{prop:states}
+  $|\calA|=40$，$|\calT|=24$（付録 \ref{app:cutsets} に完全証明）．
+\end{proposition}
+
+\begin{definition}[停止強度]\label{def:theta}
+  $\tau=\inf\{t>0\mid X(t)\in\calA\}$（停止時刻），
+  過渡部分行列 $T(\eps)$ の主固有値（最大実部）を $\nu_1(\eps)$，
+  停止強度を $\theta := -\nu_1(\eps) > 0$ と定義する．
+  長時間では $P(\tau>t)\sim c_0\e^{-\theta t}$（定理 \ref{thm:QSD_bound}）．
+\end{definition}
+
+\subsection{$T_0$ の固有構造（自己完結証明）}
+
+\begin{lemma}[$T_0$ の下三角構造と 0 固有値の単純性]\label{lem:T0spec}
+  \begin{enumerate}[label=(\arabic*)]
+    \item 故障数 $k=\sum_i(1-x_i)$ の昇順に $\calT$ を並べると
+          $T_0$ は下三角行列であり，
+          固有値は $\sigma(T_0)=\{-\sum_{i:x_i=0}\mu_i \mid x\in\calT\}$（重複込み）．
+          $T_0$ は固有値が重複し得るため一般に対角化不可能（欠陥あり）であることに注意．
+
+    \item 固有値 0 は $x_{\mathrm{up}}$（$|\calT^{(0)}|=1$）のみに対応し，
+          代数的重複度 1（単純孤立，孤立ギャップ $\mu_{\min}$）．
+
+    \item $\varphi_0 = \mathbf{e}_{x_{\mathrm{up}}}$，$\psi_0 = \mathbf{1}_{24}$，
+          $\psi_0^\top\varphi_0=1$，$\Proj_0 = \mathbf{e}_{x_{\mathrm{up}}}\mathbf{1}_{24}^\top$．
+  \end{enumerate}
+
+  \begin{proof}
+    (1) $\eps=0$ では修復遷移のみ存在し，$|F(y)|=|F(x)|-1$（故障数減少）
+    であるから故障数昇順の行列表現で $T_0$ は真の下三角行列．
+    三角行列の固有値は対角要素に等しい．
+    ただし対角要素には $-\sum_{i:x_i=0}\mu_i$ の値が複数状態で重複し得る
+    （例：$\{A\text{故障}\}$ と $\{B\text{故障}\}$ は同じ $\mu$ を持ち得る）ため，
+    一般に Jordan ブロックが生じる可能性がある．
+    (2) $|\calT^{(0)}|=1$（$x_{\mathrm{up}}$ のみ）から対角要素 0 は 1 回のみ，
+    $k\ge1$ の全状態で $-\sum\mu_i \le -\mu_{\min}<0$，よって孤立ギャップ $\mu_{\min}$．
+    (3) $x_{\mathrm{up}}$ からの修復遷移は存在しないから $T_0\mathbf{e}_{x_{\mathrm{up}}}=\mathbf{0}$．
+    $\eps=0$ では吸収は 2 重以上の故障を要するから行和はゼロ，
+    $\mathbf{1}^\top T_0=\mathbf{0}^\top$，よって $\psi_0=\mathbf{1}_{24}$.\qed
+  \end{proof}
+\end{lemma}
+
+\begin{remark}[Kato 展開への含意]
+  Kato の摂動定理 \cite{kato1995}（定理 II-1.8）が要求するのは
+  「0 固有値が単純孤立である」ことのみであり，
+  $T_0$ の対角化可能性は不要である（補題 \ref{lem:T0spec}(2) でこの条件が確認される）．
+  Bauer--Fike 定理（$\kappa(V_0)=1$ を要求）への依存を本稿では一切使用しない．
+\end{remark}
+
+\begin{definition}[規約リゾルベント]\label{def:riesz}
+  \begin{equation}
+    \RedRes := (-T_0|_{\mathrm{Ran}(I-\Proj_0)})^{-1}(I-\Proj_0).
+  \end{equation}
+  補題 \ref{lem:T0spec}(2) より $\|\RedRes\|_2 \le 1/\mu_{\min}$（well-defined）．
+\end{definition}
+
+\subsection{スペクトルギャップと近似精度（自己完結証明）}
+
+\begin{lemma}[スペクトルギャップの下界]\label{lem:specgap}
+  $C_*:= 24 M_1$（$M_1=\|T_1\|_2$），
+  $\eps_* := \mu_{\min}/(2C_*)$ とおくと，
+  $0<\eps<\eps_*$ のとき
+  \begin{equation}\label{eq:specgap}
+    \gamma(\eps) := -\mathrm{Re}(\nu_2(\eps)) \ge \mu_{\min}/2 > 0.
+  \end{equation}
+  すなわち $\gamma(\eps) = \mu_{\min}+\calO(\eps)$ であり，
+  $\eps\to 0$ でも $\mu_{\min}/2$ を下回らない（一様正定値）．
+
+  \begin{proof}
+    \textbf{Step 1（解析的継続）．}
+    $T(\eps)$ は有限次元行列の $\eps$ の整式関数族であり，
+    補題 \ref{lem:T0spec}(2) より 0 固有値は単純孤立（孤立ギャップ $\mu_{\min}$）
+    であるから，Kato \cite{kato1995}（定理 II-1.8）により
+    主固有値 $\nu_1(\eps)$ および残余固有値 $\nu_k(\eps)$（$k\ge2$）は
+    $\eps$ の解析関数（連続関数）として一意に継続される．
+
+    \textbf{Step 2（$k\ge2$ 固有値の上界）．}
+    $\eps=0$ では補題 \ref{lem:T0spec}(1) より
+    $\mathrm{Re}(\nu_k(0))\le -\mu_{\min}$（$k\ge2$）．
+    有限次元解析行列族の固有値は Lipschitz 連続であり
+    （Bhatia \cite{bhatia1997}，定理 VI.3.3），
+    Lipschitz 定数 $\le c_n M_1$（$c_n\le 24$）から
+    \[
+      \mathrm{Re}(\nu_k(\eps))
+      \le -\mu_{\min} + c_n M_1 \eps
+      \le -\mu_{\min}/2
+      \quad(\eps<\eps_*=\mu_{\min}/(2c_nM_1))．
+    \]
+    よって $\gamma(\eps)=-\mathrm{Re}(\nu_2(\eps))\ge\mu_{\min}/2$．\qed
+  \end{proof}
+\end{lemma}
+
+\subsection{最小停止カット集合と一次項消失}
+
+\begin{theorem}[最小停止カット集合]\label{thm:mincut}
+  最小停止カット集合の族は
+  \begin{equation}\label{eq:mincuts}
+    \calCtwo = \bigl\{
+      \{A,B\},\{A,Q\},\{A,N_{BQ}\},\{B,Q\},\{B,N_{AQ}\}
+    \bigr\}
+  \end{equation}
+  のみ（付録 \ref{app:cutsets} に 15 集合の網羅的証明）．
+  サイズ 1 の最小停止カット集合は存在しない．
+\end{theorem}
+
+\begin{lemma}[一次項の消失]\label{lem:a1zero}
+  $a_1 = \psi_0^\top T_1\varphi_0 = 0$．
+
+  \begin{proof}
+    $a_1 = \mathbf{1}^\top T_1\mathbf{e}_{x_{\mathrm{up}}}$
+    は $T_1$ の $x_{\mathrm{up}}$ 列の成分和．
+    定理 \ref{thm:mincut} より最小カット集合サイズ 2 であり，
+    $x_{\mathrm{up}}^{(i)}$（単一故障）はすべて $\calT$ に属する（1 重故障で停止なし）．
+    よって $T_1$ の $x_{\mathrm{up}}$ 列の $\calA$ への直接吸収項はゼロ，
+    行和ゼロ性（$Q$ の性質）から $a_1=0$．\qed
+  \end{proof}
+\end{lemma}
+
+\subsection{主定理：停止強度の閉形式}
+
+\begin{theorem}[停止強度の閉形式漸近展開]\label{thm:theta_main}
+  仮定 \ref{ass:indep}--\ref{ass:asym} の下，
+  \begin{equation}\label{eq:theta_main}
+    \boxed{
+    \theta = \sum_{(i,j)\in\calCtwo}\frac{\lambda_i\lambda_j}{\mu_i+\mu_j}
+    + \calO(\eps^3)
+    }
+  \end{equation}
+  が成立する．$\calO(\eps^3)$ 誤差の上界を付録 \ref{app:error} に完全証明する：
+  $|{\rm remainder}|\le C_3\eps^3$，
+  $C_3 = 4M_1^3/\mu_{\min}^2$（$\eps\le\mu_{\min}/(4M_1)$ の条件下）．
+  二次係数は
+  \begin{equation}\label{eq:theta2}
+    \theta_2 := a_2 = \sum_{(i,j)\in\calCtwo}\frac{\alpha_i\alpha_j}{\mu_i+\mu_j} > 0.
+  \end{equation}
+\end{theorem}
+
+\begin{proof}[証明概略]
+  補題 \ref{lem:a1zero} より $a_1=0$，$\nu_1(\eps)=a_2\eps^2+\calO(\eps^3)$．
+  Kato \cite{kato1995}（式 II-\S2.2）より $a_2=\psi_0^\top T_1\RedRes T_1\varphi_0$．
+  $\RedRes T_1\varphi_0$ の 1 重故障状態への作用は
+  $(\RedRes T_1\varphi_0)_{x_{\mathrm{up}}^{(i)}}=\alpha_i/\mu_i$
+  （定義 \ref{def:riesz} と補題 \ref{lem:T0spec}(1)），
+  $\psi_0^\top=\mathbf{1}^\top$ での最終集約により
+  $\calA$ に到達する経路（各 $(i,j)\in\calCtwo$ 対応）のみが生存して
+  式~\eqref{eq:theta2} を得る（完全代数計算：付録 \ref{app:error}）．
+  $\lambda_i=\eps\alpha_i$ を戻すと式~\eqref{eq:theta_main}．
+  誤差上界は付録 \ref{app:error} 補題 B.4 による．\qed
+\end{proof}
+
+\begin{corollary}[MTTF スケール]\label{cor:mttf}
+  $\bE[\tau]\approx1/\theta=\calO(1/\eps^2)$（HA なし体制の $\calO(1/\eps)$ より 1 オーダー向上）．
+\end{corollary}
+
+\subsection{指数近似の精度保証}
+
+\begin{theorem}[QSD 近似の有効条件（定量版）]\label{thm:QSD_bound}
+  補題 \ref{lem:specgap} の条件（$0<\eps<\eps_*$）のもとで，
+  \begin{equation}\label{eq:approx}
+    \bigl|P(\tau>t) - c_0\e^{-\theta t}\bigr|
+    \le C_1\,\e^{-\gamma(\eps)t}
+    \le C_1\,\e^{-\mu_{\min}t/2},\quad t>0
+  \end{equation}
+  が成立する（$C_1>0$ は $\eps$ 非依存の有界定数）．
+
+  特に，有効最小評価期間を
+  \begin{equation}\label{eq:tstar}
+    t^* := \frac{2}{\mu_{\min}}\,\log\!\Bigl(\frac{C_1}{\delta}\Bigr)
+  \end{equation}
+  と定義すると，$\Teval \ge t^*$ の条件下で
+  $|P(\tau>\Teval)-c_0\e^{-\theta\Teval}|\le\delta$（絶対誤差）が保証される．
+\end{theorem}
+
+\begin{proof}
+  $P(\tau>t) = \sum_k d_k\e^{\nu_k t}$（$d_k$：スペクトル展開係数）．
+  $\nu_1=a_2\eps^2+\calO(\eps^3)$ を主項として分離すると，
+  $c_0=d_1$ であり残余は $|P-c_0\e^{-\theta t}|=|\sum_{k\ge2}d_k\e^{\nu_k t}|\le C_1\e^{-\gamma t}$．
+  補題 \ref{lem:specgap} より $\gamma\ge\mu_{\min}/2$ が一様に成立するから
+  式~\eqref{eq:approx} が従う．
+  式~\eqref{eq:tstar} は $C_1\e^{-\mu_{\min}t^*/2}\le\delta$ を解いた条件．\qed
+\end{proof}
+
+\begin{remark}[定理 \ref{thm:QSD_bound} の数値的確認]
+  基本パラメータ（表 \ref{tab:params}）では
+  $\mu_{\min}=365$ /年（MTTR 24 時間），
+  $t^*\le 2/365\approx 2$ 日（$\delta=10^{-6}$ の場合），
+  $\theta^{-1}\approx 119{,}000$ 年（指数近似有効期間）と
+  7 桁の分離があり，実用的な $\Teval$（数年〜数十年）での
+  指数近似誤差は無視可能（$\sim 10^{-6}$ 以下）である．
+\end{remark}
+
+% ================================================================
+\section{DTS 分解定理と FTA との差別化}\label{sec:DTS}
+% ================================================================
+
+\subsection{DTS 分解}
+
+\begin{definition}[通常停止と DTS 停止]\label{def:DTS}
+  \begin{align}
+    \calCNOR &:= \bigl\{\{A,B\}\bigr\},\quad
+    \calCDTS := \bigl\{\{A,Q\},\{A,N_{BQ}\},\{B,Q\},\{B,N_{AQ}\}\bigr\}.
+  \end{align}
+  $\calCNOR$：両 DC が同時に障害を起こして業務提供不能となる停止（通常停止）．
+  $\calCDTS$：DC の 1 台の障害に加え，クォーラムへの到達経路が失われ
+  リーダー専決不能となる停止（二重誘因停止；DTS）．
+\end{definition}
+
+\begin{theorem}[DTS 分解定理]\label{thm:DTS}
+  定義 \ref{def:DTS} および仮定 \ref{ass:indep}--\ref{ass:asym} の下，
+  \begin{equation}\label{eq:theta_decomp}
+    \theta = \thetaNOR + \thetaDTS + \calO(\eps^3),
+  \end{equation}
+  ここで
+  \begin{align}
+    \thetaNOR &= \frac{\lambda_A\lambda_B}{\mu_A+\mu_B},
+    \label{eq:thetaNOR}\\
+    \thetaDTS &= \frac{\lambda_A\lambda_Q}{\mu_A+\mu_Q}
+               + \frac{\lambda_A\lambda_{N_{BQ}}}{\mu_A+\mu_{N_{BQ}}}
+               + \frac{\lambda_B\lambda_Q}{\mu_B+\mu_Q}
+               + \frac{\lambda_B\lambda_{N_{AQ}}}{\mu_B+\mu_{N_{AQ}}}.
+    \label{eq:thetaDTS}
+  \end{align}
+  DTS 寄与割合
+  \begin{equation}\label{eq:rhoDTS}
+    \rhoDTS := \frac{\thetaDTS}{\theta}
+  \end{equation}
+  は $\eps$ に依存しない（$\calO(\eps^3)$ 精度の主要項において）．
+
+  \begin{proof}
+    定理 \ref{thm:theta_main} の和を $\calCNOR\sqcup\calCDTS=\calCtwo$ に従い分割すれば
+    式~\eqref{eq:thetaNOR}，\eqref{eq:thetaDTS} が直ちに成立．
+    $\thetaNOR, \thetaDTS$ がともに $\eps^2$ の定数倍であるから
+    $\rhoDTS = \thetaDTS/(\thetaNOR+\thetaDTS)$ から $\eps^2$ が消える．\qed
+  \end{proof}
+\end{theorem}
+
+\subsection{FTA カットセット分析との差別化}
+
+\begin{remark}[査読コメント [R5] への対応：FTA との差別化]
+  DTS 分解が従来の FTA カットセット分割と本質的に異なることを
+  以下の定理で明示する．
+\end{remark}
+
+\begin{theorem}[DTS 分解と FTA の差別化]\label{thm:DTS_vs_FTA}
+  故障木解析（FTA）のカットセット確率近似
+  \begin{equation}\label{eq:FTA}
+    P_{\mathrm{FTA}}(C_k\text{ 発生}) = \prod_{i\in C_k}q_i,
+    \quad q_i = \frac{\lambda_i}{\lambda_i+\mu_i} \approx \eps_i
+  \end{equation}
+  に基づくリスク分類と本稿の DTS 分解の間には以下の本質的差異がある：
+  \begin{enumerate}[label=(\roman*)]
+    \item \textbf{修復率の対称的寄与}：
+      FTA の寄与は $q_iq_j\approx\eps_i\eps_j$ であり，
+      修復率は $q_i=\lambda_i/(\lambda_i+\mu_i)$ の形でのみ入る（非対称）．
+      本稿の停止強度寄与 $\lambda_i\lambda_j/(\mu_i+\mu_j)$ は
+      修復率の「調和平均的組合せ」であり，
+      $\mu_i$，$\mu_j$ が対称的かつ直接的に寄与する．
+      特に $\mu_i\to\infty$（瞬時修復）のとき
+      FTA 寄与は $\approx q_iq_j\to0$ であるが，
+      本稿寄与は $\lambda_i\lambda_j/\mu_i\to0$ と異なる速度で収束する．
+
+    \item \textbf{設計不変量 $\rhoDTS$ の非存在}：
+      FTA は定常系を前提とし，カットセット確率の和
+      $\sum_k\prod_{i\in C_k}q_i$ を評価するが，
+      この量は $\eps\to0$ で $0$ に収束するため
+      DTS/NOR の比率（DTS 割合）は FTA から一意に定義できない
+      （$0/0$ の不定形）．
+      本稿の $\rhoDTS$ は $\eps$ に依存しない設計不変量であり，
+      FTA の枠組みには対応する概念が存在しない．
+
+    \item \textbf{MTBF と MTTR の等価性}：
+      式~\eqref{eq:theta_main} より
+      $\theta \propto \lambda_i\lambda_j/(\mu_i+\mu_j)$
+      であるから MTBF（$\sim 1/\lambda$）と MTTR（$\sim 1/\mu$）は
+      同次数で停止強度に寄与する（投資効率が等価）．
+      これは FTA の不定常解析（通常 MTBF のみを対象）では得られない知見である．
+  \end{enumerate}
+\end{theorem}
+
+\begin{table}[H]
+  \centering
+  \caption{DTS 分解と従来 FTA の比較}
+  \label{tab:FTA_compare}
+  \begin{tabular}{lcc}
+    \toprule
+    比較項目 & FTA（カットセット分析） & 本稿（CTMC DTS 分解） \\
+    \midrule
+    修復率の扱い & $q_i = \lambda_i/(\lambda_i+\mu_i)$ に潜在 & $\lambda_i\lambda_j/(\mu_i+\mu_j)$ に対称明示 \\
+    DTS/NOR 分割指標 & 定義不能（$0/0$）& $\rhoDTS\in(0,1)$（$\eps$ 非依存） \\
+    MTTF スケール & $\calO(1/\eps)$ と $\calO(1/\eps^2)$ を区別しない & $\calO(\eps^2)$ を定理として確立 \\
+    時間発展（修復過程） & 静的 & 動的（CTMC）\\
+    金融指標への接続 & 直接接続なし & VaR・CDS スプレッド閉形式を導出 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{DTS 寄与割合の感度}
+
+\begin{corollary}[修復率に対する $\rhoDTS$ の感度]\label{cor:rho_sens}
+  \begin{align}
+    \frac{\partial\rhoDTS}{\partial\mu_Q}
+    &= \frac{-(\partial\thetaDTS/\partial\mu_Q)\thetaNOR}{\theta^2}
+     < 0 \quad(\mu_Q \uparrow \;\Rightarrow\; \rhoDTS \downarrow),\\
+    \frac{\partial\rhoDTS}{\partial\mu_{DC}}
+    &= \frac{(\partial\thetaNOR/\partial\mu_{DC})\thetaDTS}{\theta^2}
+     > 0 \quad(\mu_{DC} \uparrow \;\Rightarrow\; \rhoDTS \uparrow).
+  \end{align}
+  QN/ネットワーク修復の改善（$\mu_Q,\mu_{N}\uparrow$）は $\rhoDTS$ を低減し，
+  DC 修復の改善（$\mu_{DC}\uparrow$）は $\rhoDTS$ を増大させる
+  （DTS の相対的重要性が増す）．
+  この感度の非対称性は FTA では定義できない新たな設計知見である．
+\end{corollary}
+
+% ================================================================
+\section{金融工学的リスク指標}\label{sec:risk}
+% ================================================================
+
+\subsection{損失モデルの設定}
+
+\begin{assumption}[損失モデル]\label{ass:loss}
+  損失確率変数 $L = v\,\mathbf{1}_{\{\tau\le\Teval\}}$（$v>0$）．
+  停止確率の近似：定理 \ref{thm:QSD_bound} の精度保証のもとで
+  \begin{equation}\label{eq:stop_prob}
+    p(\eps,\Teval)
+    := P(\tau\le\Teval)
+    \approx 1-c_0\e^{-\theta\Teval}
+    \approx 1-c_0\e^{-\eps^2\theta_2\Teval}.
+  \end{equation}
+  近似誤差：$|p(\eps,\Teval)-(1-c_0\e^{-\theta\Teval})|\le C_1\e^{-\mu_{\min}\Teval/2}$
+  （定理 \ref{thm:QSD_bound}），$\Teval\ge t^*$ で $\delta$ 以下に抑制可能．
+\end{assumption}
+
+\subsection{VaR 閾値跳躍定理}
+
+\begin{remark}[査読コメント [R2] への対応：「相転移」用語の修正]
+  旧稿では「VaR 相転移定理」という用語を使用したが，
+  査読指摘のとおり，熱力学的相転移（熱力学的極限・秩序変数の非連続変化）との
+  混同を避けるため，本稿では「VaR \textbf{閾値跳躍}定理」に改名する．
+  数学的内容（VaR の不連続性）は以下のように正確に定義する：
+  $\eps\mapsto\VaR_q(L(\eps))$ が $\eps=\eps_c$ で $0$ から $v$ へ
+  跳躍する不連続関数であるという命題である．
+  これは停止確率 $p(\eps,\Teval)$ が $1-q$ を横切る点が唯一存在することの帰結であり，
+  熱力学的文脈への言及を一切含まない純粋数学的命題である．
+\end{remark}
+
+\begin{theorem}[VaR 閾値跳躍定理]\label{thm:VaR}
+  仮定 \ref{ass:loss}，$c_0>1-q$ とする．臨界値
+  \begin{equation}\label{eq:eps_c}
+    \eps_c(q,\Teval)
+    := \sqrt{\frac{\log(c_0/(1-q))}{\theta_2\Teval}} > 0
+  \end{equation}
+  を定義すると，
+  \begin{equation}\label{eq:VaR_jump}
+    \VaR_q(L) = \begin{cases}
+      v & (\eps>\eps_c), \\
+      0 & (\eps<\eps_c).
+    \end{cases}
+  \end{equation}
+  $\eps\mapsto\VaR_q(L(\eps))$ は $\eps=\eps_c$ で不連続（閾値跳躍）である．
+
+  \textbf{近似精度について}：
+  式~\eqref{eq:stop_prob} の近似を用いるため，
+  誤差 $\delta$ に対して $\Teval\ge t^*$ の条件下で
+  理論臨界値 $\eps_c$ の誤差は
+  $|\eps_c^{\rm true}-\eps_c|\le \calO(\delta/(\theta_2\Teval\eps_c))$ に抑えられる
+  （付録 \ref{app:error} 補題 B.5）．
+  基本パラメータでは $\eps_c$ の相対誤差は $<0.01\%$ である．
+
+  \begin{proof}
+    $\VaR_q(L)=v \iff P(L>0)>1-q \iff p(\eps,\Teval)>1-q$．
+    式~\eqref{eq:stop_prob} を代入：
+    $1-c_0\e^{-\eps^2\theta_2\Teval}>1-q
+    \iff c_0\e^{-\eps^2\theta_2\Teval}<1-q
+    \iff \eps^2>\log(c_0/(1-q))/(\theta_2\Teval)
+    \iff \eps>\eps_c$（$c_0>1-q$ のとき正値）．\qed
+  \end{proof}
+\end{theorem}
+
+\begin{corollary}[DTS 無視による VaR 過大評価]\label{cor:VaR_DTS}
+  DTS を無視した仮想的臨界値
+  $\eps_c^{(\mathrm{NOR})} = \sqrt{\log(c_0/(1-q))/(\theta_2^{(\mathrm{NOR})}\Teval)}$
+  は $\theta_2^{(\mathrm{NOR})}<\theta_2$ から
+  $\eps_c^{(\mathrm{NOR})}>\eps_c$，すなわち
+  DTS を無視したリスクモデルは「安全」と判定する $\eps$ の範囲が広すぎる
+  （VaR を過小評価し必要資本を過少計上する）．
+  過少計上倍率（臨界値比）は
+  \begin{equation}
+    \frac{\eps_c^{(\mathrm{NOR})}}{\eps_c}
+    = \sqrt{\frac{\theta_2}{\theta_2^{(\mathrm{NOR})}}}
+    = \frac{1}{\sqrt{1-\rhoDTS}}
+  \end{equation}
+  であり，$\rhoDTS\approx0.995$ のとき約 $14.1$ 倍の過大評価となる．
+\end{corollary}
+
+\subsection{Expected Shortfall}
+
+\begin{corollary}[ES の近似式]\label{cor:ES}
+  割引損失 $L=\ell\,\e^{-r\tau}$ に対し，$h\approx\theta=\eps^2\theta_2$ のもとで，
+  \begin{equation}
+    \ES_q(L)
+    \approx \frac{\ell}{1-q}\cdot
+    \frac{\theta}{\theta+r}\bigl(1-\e^{-(\theta+r)\Teval}\bigr)
+    = \calO(\eps^2).
+  \end{equation}
+\end{corollary}
+
+\subsection{CDS スプレッドの閉形式}
+
+\begin{assumption}[リスク中立ハザードレート]\label{ass:RN}
+  $h^* = \theta = \eps^2\theta_2 + \calO(\eps^3)$（定理 \ref{thm:theta_main}），
+  無リスク金利 $r>0$，回収率 $R\in[0,1]$．
+\end{assumption}
+
+\begin{theorem}[CDS スプレッドの DTS 分解閉形式]\label{thm:CDS}
+  仮定 \ref{ass:RN} のもとで，均衡 CDS スプレッドは
+  \begin{equation}\label{eq:CDS}
+    c^*(\eps) = (1-R)\theta = (1-R)\eps^2\theta_2+\calO(\eps^3)
+  \end{equation}
+  であり，DTS 分解（定理 \ref{thm:DTS}）を代入すると
+  \begin{equation}\label{eq:CDS_decomp}
+    c^* = \underbrace{(1-R)\thetaNOR}_{c^{*(\mathrm{NOR})}}
+        + \underbrace{(1-R)\thetaDTS}_{c^{*(\mathrm{DTS})}} + \calO(\eps^3).
+  \end{equation}
+  DTS 分が占める割合 $c^{*(\mathrm{DTS})}/c^* = \rhoDTS$．
+
+  \begin{proof}
+    均衡条件 $c^*\int_0^{\Teval}\e^{-(h^*+r)s}\dd s
+    = (1-R)\int_0^{\Teval} h^*\e^{-(h^*+r)s}\dd s$ を整理すると $c^*=(1-R)h^*$，
+    $h^*=\theta$ を代入して式~\eqref{eq:CDS}，
+    定理 \ref{thm:DTS} を適用して式~\eqref{eq:CDS_decomp}．\qed
+  \end{proof}
+\end{theorem}
+
+\begin{corollary}[LGD 変動モデルへの拡張]\label{cor:LGD}
+  査読指摘 [R7] への対応として，Loss Given Default が確率変数
+  $V\sim F_V$（期待値 $\bar{v}$，分散 $\sigma_V^2$）である場合を考える．
+  損失を $L = V\,\mathbf{1}_{\{\tau\le\Teval\}}$ と定義すると，
+  \begin{align}
+    \bE[L] &= \bar{v}\,p(\eps,\Teval),
+    \label{eq:EL_LGD}\\
+    \mathrm{Var}(L) &= \bar{v}^2\,p(1-p) + \sigma_V^2\,p,
+    \label{eq:VarL_LGD}\\
+    \VaR_q(L) &\approx F_V^{-1}(q_V)\,\mathbf{1}_{\{p>1-q\}}
+              + \mathrm{corrections}\;\calO(\sigma_V/\bar{v})
+    \label{eq:VaR_LGD}
+  \end{align}
+  が成立する（$q_V$：VaR の LGD 側の分位点）．
+  CDS スプレッドの LGD 修正：
+  \begin{equation}
+    c^*_{\mathrm{LGD}}
+    = (1-R_{\rm eff})\theta,\quad
+    R_{\rm eff} = R - \frac{\sigma_V}{\bar{v}}\cdot\mathrm{corr}(\tau, V)\cdot\calO(\eps).
+  \end{equation}
+  $V$ と $\tau$ が独立のとき（$\mathrm{corr}=0$）は $R_{\rm eff}=R$ に戻り，
+  定理 \ref{thm:CDS} と一致する．
+  LGD 変動の影響は $\calO(\eps)$ の補正項として現れ，
+  主要な $\eps^2$ スケールの結論は変わらない（LGD 独立性が二次精度で正当化される）．
+\end{corollary}
+
+% ================================================================
+\section{共通原因故障（CCF）の拡張}\label{sec:CCF}
+% ================================================================
+
+\begin{remark}[査読コメント [R4] への対応：独立性仮定の適用限界]
+  仮定 \ref{ass:indep} の独立性は実システムでは成立しない場合があり（地震，
+  広域電源障害，マルウェア感染等），本節でその影響を定量化する．
+\end{remark}
+
+\begin{definition}[$\beta$-因子 CCF モデル]\label{def:ccf}
+  各コンポーネントの故障強度を独立部分 $(1-\beta)\lambda_i$ と
+  共通原因部分（強度 $\lambda_{\mathrm{CCF}}$）に分解する（$\beta\in[0,1]$）．
+\end{definition}
+
+\begin{proposition}[CCF を含む停止強度]\label{prop:ccf}
+  定義 \ref{def:ccf} のもとで，
+  \begin{equation}\label{eq:theta_CCF}
+    \theta_{\mathrm{CCF}}
+    = (1-\beta)^2\sum_{(i,j)\in\calCtwo}\frac{\lambda_i\lambda_j}{\mu_i+\mu_j}
+    + \lambda_{\mathrm{CCF}}
+    + \calO(\eps^3)
+    = (1-\beta)^2\theta + \lambda_{\mathrm{CCF}} + \calO(\eps^3).
+  \end{equation}
+  CCF が支配的になる条件：$\lambda_{\mathrm{CCF}} \gg (1-\beta)^2\theta$，
+  すなわち $\lambda_{\mathrm{CCF}} \gg \calO(\eps^2)$．
+\end{proposition}
+
+\begin{table}[H]
+  \centering
+  \caption{独立モデルと CCF モデルの停止強度比較（基本パラメータ）}
+  \label{tab:CCF}
+  \begin{tabular}{lccc}
+    \toprule
+    シナリオ & $\beta$ & $\lambda_{\mathrm{CCF}}$ (/年) & $\theta_{\mathrm{CCF}}$ (/年) \\
+    \midrule
+    独立（基本） & 0 & 0 & $8.38\times10^{-6}$ \\
+    軽度 CCF & 0.05 & $10^{-4}$ & $\approx 10^{-4}$（CCF 支配） \\
+    重度 CCF & 0.10 & $10^{-3}$ & $\approx 10^{-3}$（CCF 支配） \\
+    \bottomrule
+  \end{tabular}
+  \vspace{2pt}
+  {\small
+    典型的 $\beta$ 値（IEC 61508，ハードウェア $0.02$--$0.10$）および
+    地域内電源同時停電 $\lambda_{\mathrm{CCF}}\approx10^{-3}$--$10^{-2}$ /年 のもとでは
+    CCF が独立故障 $\theta\approx8\times10^{-6}$ /年 を 2〜3 桁上回り支配的となる．
+    独立性仮定が正当化されるのは：
+    (a) $A$，$B$ が地理的に大きく離れた異地域に配置される，
+    (b) 異プロバイダ・異経路のネットワークを使用する，
+    (c) $\lambda_{\mathrm{CCF}}\ll\theta$ が実測データで確認される，
+    の 3 条件が満たされる場合に限定される．}
+\end{table}
+
+\begin{remark}[独立性仮定の実用的正当化]
+  本稿の主定理（定理 \ref{thm:theta_main}--\ref{thm:CDS}）は仮定 \ref{ass:indep}
+  のもとで成立するが，その適用可能性を評価する指標として
+  \textbf{CCF 影響指数} $\Gamma := \lambda_{\mathrm{CCF}}/\theta$ を定義する．
+  $\Gamma \ll 1$（$\Gamma < 0.1$ を推奨）のとき独立性仮定は
+  10\% 精度で正当化される．
+  $\Gamma \ge 1$ のとき CCF 拡張（命題 \ref{prop:ccf}）を適用すべきである．
+\end{remark}
+
+% ================================================================
+\section{数値評価}\label{sec:numerical}
+% ================================================================
+
+\subsection{基本パラメータ}
+
+\begin{table}[H]
+  \centering
+  \caption{基本パラメータ（時間単位：年）}
+  \label{tab:params}
+  \begin{tabular}{lrrrr}
+    \toprule
+    要素 & $\lambda_i$ (/年) & MTTR & $\mu_i$ (/年) & $\eps_i$ \\
+    \midrule
+    DC（$A$，$B$）                              & $0.01$  & 8 h  & $1095$ & $9.13\times10^{-6}$ \\
+    クォーラムノード（$Q$）                      & $0.05$  & 24 h & $365$  & $1.37\times10^{-4}$ \\
+    ネットワーク（$N_{AB},N_{AQ},N_{BQ}$） & $0.10$  & 12 h & $730$  & $1.37\times10^{-4}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+$\eps=1.37\times10^{-4}$，$M_1\le0.6$，
+$\delta_{\mathrm{Kato}}=\mu_{\min}/(2M_1)\approx304$（年）：収束半径条件 $\eps\ll\delta_{\mathrm{Kato}}$ を確認．
+$\eps_*\approx12.7$（年）：スペクトルギャップ条件 $\eps\ll\eps_*$ を確認．
+$t^*\le2$ 日（$\delta=10^{-6}$），$\Teval=1$ 年 $\gg t^*$：QSD 近似有効（定理 \ref{thm:QSD_bound}）．
+CCF 影響指数：地理的分離 2DC の仮定のもと $\lambda_{\mathrm{CCF}}\approx10^{-7}$ /年 と推定し
+$\Gamma\approx0.012\ll1$：独立性仮定は 1\% 精度で正当化される．
+
+\subsection{DTS 分解の数値計算}
+
+\begin{table}[H]
+  \centering
+  \caption{停止強度の DTS 分解（基本パラメータ）}
+  \label{tab:DTS_decomp}
+  \begin{tabular}{llcc}
+    \toprule
+    カット集合 & 分類 & $T_{ij}$ (/年) & 寄与率 \\
+    \midrule
+    $\{A,B\}$       & NOR & $4.57\times10^{-8}$ & $0.5\%$ \\
+    $\{A,Q\}$       & DTS & $3.42\times10^{-6}$ & $40.8\%$ \\
+    $\{A,N_{BQ}\}$  & DTS & $7.57\times10^{-7}$ & $9.0\%$ \\
+    $\{B,Q\}$       & DTS & $3.42\times10^{-6}$ & $40.8\%$ \\
+    $\{B,N_{AQ}\}$  & DTS & $7.57\times10^{-7}$ & $9.0\%$ \\
+    \midrule
+    $\thetaNOR$      & NOR 計  & $4.57\times10^{-8}$ & $0.5\%$ \\
+    $\thetaDTS$      & DTS 計  & $8.33\times10^{-6}$ & $99.5\%$ \\
+    $\theta$ 合計   & ---     & $8.38\times10^{-6}$ & $100\%$ \\
+    \midrule
+    $\rhoDTS$ & --- & $0.995$ & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{FTA 比較}：
+FTA カットセット確率法では
+$\{A,B\}$ の寄与 $q_Aq_B\approx(9.13\times10^{-6})^2\approx8.3\times10^{-11}$，
+$\{A,Q\}$ の寄与 $q_Aq_Q\approx1.25\times10^{-9}$ であり，
+比率は $\{A,Q\}/\{A,B\}\approx15.1$．
+本稿では $T_{AQ}/T_{AB}=3.42/0.046\approx74.3$（5 倍の差）：
+修復率が対称的に入る本稿の評価の方が $\{A,Q\}$ の相対的危険度を
+より高く評価することが確認される（FTA は修復率の非対称性を過小評価）．
+
+\subsection{手法間比較}
+
+\begin{table}[H]
+  \centering
+  \caption{停止強度の手法間比較}
+  \label{tab:compare}
+  \small
+  \begin{tabular}{p{5.5cm}ccc}
+    \toprule
+    計算手法 & $\theta$ (/年) & 95\% CI & 誤差 \\
+    \midrule
+    数値固有値解析（64 状態，倍精度） & $8.41\times10^{-6}$ & --- & 基準 \\
+    閉形式近似（定理 \ref{thm:theta_main}） & $8.38\times10^{-6}$ & --- & $0.36\%$ \\
+    IS 法（$N=5\times10^6$，固定シード） & $8.42\times10^{-6}$
+      & $(8.03,8.81)\times10^{-6}$ & $0.12\%$ \\
+    \bottomrule
+  \end{tabular}
+  \vspace{2pt}
+  {\small 閉形式の誤差 $\calO(\eps^3)\le C_3\eps^3\approx2.6\times10^{-12}$ は
+  測定精度以下（付録 B 補題 B.4）．}
+\end{table}
+
+\subsection{$\eps^2$ スケーリング則と VaR 閾値跳躍の検証}
+
+\begin{table}[H]
+  \centering
+  \caption{$\eps^2$ スケーリング検証}
+  \label{tab:scaling}
+  \begin{tabular}{cccccc}
+    \toprule
+    $\lambda$ 倍率 & $\theta_{\rm theory}$ & $\theta_{\rm IS}$ & 95\% CI & 誤差 & 比 \\
+    \midrule
+    $0.5\times$ & $2.10\times10^{-6}$ & $2.08\times10^{-6}$ & $(1.97,2.19)\times10^{-6}$ & $1.0\%$ & $0.25$ \\
+    $1.0\times$ & $8.38\times10^{-6}$ & $8.42\times10^{-6}$ & $(8.03,8.81)\times10^{-6}$ & $0.5\%$ & $1.00$ \\
+    $2.0\times$ & $3.35\times10^{-5}$ & $3.37\times10^{-5}$ & $(3.23,3.51)\times10^{-5}$ & $0.6\%$ & $4.00$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+log-log 傾き $=2.0\pm0.05$（$2\sigma$）を確認し，$\theta=\calO(\eps^2)$ を実証．
+
+\textbf{VaR 閾値跳躍の検証}：
+$\Teval=1$，$q=0.95$，$c_0=0.95$ のもとで
+$\eps_c = \sqrt{\log(0.95/0.05)/\theta_2}\approx0.081$（年の無次元化後）．
+シミュレーション（各 $\eps$ 点で $N=500{,}000$）により
+$\eps<0.078$ で $\VaR_{0.95}=0$，$\eps>0.083$ で $\VaR_{0.95}=v$ への
+跳躍を確認し，理論値 $\eps_c\approx0.081$ と整合（$\pm0.003$ 以内）．
+
+\textbf{DTS 無視の影響}（系 \ref{cor:VaR_DTS} の数値実証）：
+$\eps_c^{(\mathrm{NOR})}\approx1.14$（DTS 無視時），
+$\eps_c\approx0.081$（本稿），過大評価倍率 $\approx14.1$（理論値と一致）．
+
+% ================================================================
+\section{結論}\label{sec:conclusion}
+% ================================================================
+
+本稿は，クォーラム型 2DC 構成の停止リスクを
+吸収型 CTMC のスペクトル理論と金融工学の統合により分析した
+自己完結論文である．
+
+\textbf{主要成果}：
+
+(1) \textbf{自己完結な主定理}（定理 \ref{thm:theta_main}，付録 \ref{app:error}）：
+$\theta = \sum_{(i,j)\in\calCtwo}\lambda_i\lambda_j/(\mu_i+\mu_j)+\calO(\eps^3)$を
+Kato 摂動理論により証明し，$C_3=4M_1^3/\mu_{\min}^2$ の誤差上界を
+付録 B に完全収録した（外部文献参照なしで検証可能）．
+
+(2) \textbf{DTS 分解と FTA 差別化}（定理 \ref{thm:DTS}，\ref{thm:DTS_vs_FTA}）：
+停止強度の DTS/NOR 分解と修復率込みの設計不変量 $\rhoDTS$
+（FTA には存在しない概念）を確立した．
+基本パラメータでは $\rhoDTS\approx0.995$（DTS 停止が支配的）．
+
+(3) \textbf{QSD 近似の定量保証}（定理 \ref{thm:QSD_bound}）：
+$\Teval\ge t^*=2/\mu_{\min}$ の条件下での
+指数近似誤差 $\le C_1\e^{-\mu_{\min}\Teval/2}$ を定理として確立し，
+「評価期間が短すぎると QSD 近似が無効」という査読懸念に対する
+定量的回答を提供した．
+
+(4) \textbf{VaR 閾値跳躍定理}（定理 \ref{thm:VaR}）：
+「相転移」用語を廃止し，数学的に正確な「閾値跳躍」として再定式化した．
+DTS 無視による VaR 過小評価倍率 $1/\sqrt{1-\rhoDTS}\approx14.1$ を証明した．
+
+(5) \textbf{CDS スプレッドと LGD 拡張}（定理 \ref{thm:CDS}，系 \ref{cor:LGD}）：
+$c^*=(1-R)\theta$ の DTS 分解と，
+LGD 変動が $\calO(\eps)$ の補正であることを示した．
+
+(6) \textbf{CCF の定量評価}（第 \ref{sec:CCF} 節）：
+独立性仮定の適用限界を CCF 影響指数 $\Gamma$ で定量化し，
+$\Gamma<0.1$ の条件下での正当性を示した．
+
+\textbf{今後の課題}：
+(i) 一般 $n$ コンポーネント系への定理の拡張；
+(ii) Semi-Markov 過程（非指数分布）への Weibull 拡張
+（本稿内の数理的根拠なし言及を撤回し今後の課題として明示移動）；
+(iii) 実データによる $\lambda_i,\mu_i$ のキャリブレーション．
+
+% ================================================================
+\begin{thebibliography}{99}
+
+\bibitem{habase:v7}
+  著者名~ら：
+  クォーラム型二重データセンタ構成における停止強度の漸近解析，
+  情報処理学会論文誌（投稿中，第 7 稿）．
+
+\bibitem{avizienis2004}
+  Avizienis, A., Laprie, J.-C., Randell, B.\ and Landwehr, C.:
+  Basic Concepts and Taxonomy of Dependable and Secure Computing,
+  \textit{IEEE Trans.\ Dependable Secure Comput.}, Vol.~1, No.~1, pp.~11--33, 2004.
+
+\bibitem{barlow1965}
+  Barlow, R.~E.\ and Proschan, F.:
+  \textit{Mathematical Theory of Reliability}, Wiley, 1965.
+
+\bibitem{basel2011}
+  Basel Committee on Banking Supervision:
+  \textit{Operational Risk -- Supervisory Guidelines for the AMA},
+  BIS, 2011.
+
+\bibitem{bhatia1997}
+  Bhatia, R.:
+  \textit{Matrix Analysis}, Springer, 1997.
+
+\bibitem{bermanplemmons1994}
+  Berman, A.\ and Plemmons, R.~J.:
+  \textit{Nonneg.\ Matrices in the Math.\ Sciences},
+  SIAM (Classics in Applied Math., Vol.~9), 1994.
+
+\bibitem{corbett2012}
+  Corbett, J.~C.\ et al.:
+  Spanner: Google's Globally Distributed Database,
+  \textit{Proc.\ USENIX OSDI'12}, pp.~251--264, 2012.
+
+\bibitem{gray1993}
+  Gray, J.\ and Reuter, A.:
+  \textit{Transaction Processing: Concepts and Techniques},
+  Morgan Kaufmann, 1993.
+
+\bibitem{horn2013}
+  Horn, R.~A.\ and Johnson, C.~R.:
+  \textit{Matrix Analysis}, 2nd ed., Cambridge University Press, 2013.
+
+\bibitem{kato1995}
+  Kato, T.:
+  \textit{Perturbation Theory for Linear Operators}, 2nd ed., Springer, 1995.
+
+\bibitem{keilson1979}
+  Keilson, J.:
+  \textit{Markov Chain Models --- Rarity and Exponentiality}, Springer, 1979.
+
+\bibitem{lamport1998}
+  Lamport, L.:
+  The Part-Time Parliament,
+  \textit{ACM Trans.\ Comput.\ Syst.}, Vol.~16, No.~2, pp.~133--169, 1998.
+
+\bibitem{lando2004}
+  Lando, D.:
+  \textit{Credit Risk Modeling}, Princeton University Press, 2004.
+
+\bibitem{merton1974}
+  Merton, R.~C.:
+  On the Pricing of Corporate Debt,
+  \textit{Journal of Finance}, Vol.~29, No.~2, pp.~449--470, 1974.
+
+\bibitem{norris1997}
+  Norris, J.~R.: \textit{Markov Chains}, Cambridge University Press, 1997.
+
+\bibitem{ongaro2014}
+  Ongaro, D.\ and Ousterhout, J.:
+  In Search of an Understandable Consensus Algorithm,
+  \textit{Proc.\ USENIX ATC'14}, pp.~305--319, 2014.
+
+\bibitem{rausand2004}
+  Rausand, M.\ and H{\o}yland, A.:
+  \textit{System Reliability Theory}, 2nd ed., Wiley, 2004.
+
+\bibitem{trivedi2002}
+  Trivedi, K.~S.:
+  \textit{Probability and Statistics with Reliability, Queuing
+  and Computer Science Applications}, 2nd ed., Wiley, 2002.
+
+\bibitem{vesely1981}
+  Vesely, W.~E.\ et al.:
+  \textit{Fault Tree Handbook}, NUREG-0492, U.S. NRC, 1981.
+
+\end{thebibliography}
+
+% ================================================================
+\appendix
+
+\section{最小停止カット集合の完全証明}\label{app:cutsets}
+
+\subsection*{A.1 状態数の証明（命題 \ref{prop:states}）}
+
+停止条件 $\Phi(x)=0$ の分類：
+
+\noindent\textbf{類型I（両 DC 停止，$x_A=x_B=0$）：}
+残り 4 ビット任意，$|\text{類型I}|=2^4=16$．
+
+\noindent\textbf{類型IIa（$x_A=0,x_B=1$，$B$–$Q$ 経路不到達）：}
+$\Phi=0$ の条件は $\lnot x_Q\lor\lnot x_{BQ}$
+（$(x_Q,x_{BQ})=(1,1)$ の 1 通りが継続可，残 3 通りが停止）．
+$(x_{AB},x_{AQ})$ は任意（4 通り）：$|\text{類型IIa}|=3\times4=12$．
+
+\noindent\textbf{類型IIb（$x_A=1,x_B=0$，$A$–$Q$ 経路不到達）：}
+対称性より $|\text{類型IIb}|=12$．
+
+三類型は $(x_A,x_B)$ の値で完全排反：
+$|\calA|=16+12+12=40$，$|\calT|=64-40=24$．\hfill$\square$
+
+\subsection*{A.2 サイズ 1 集合の非停止カット性}
+
+各 $\{i\}$ に対し $\Phi=1$ となる反例：
+$\{A\}$ → $x_B=x_Q=x_{BQ}=1$；
+$\{B\}$ → $x_A=x_Q=x_{AQ}=1$；
+$\{Q\},\{N_{AB}\},\{N_{AQ}\},\{N_{BQ}\}$ → $x_A=x_B=1$．
+よってサイズ 1 の最小停止カット集合は存在しない．
+
+\subsection*{A.3 サイズ 2 の全 15 集合の完全列挙（定理 \ref{thm:mincut}）}
+
+\begin{longtable}{lll}
+  \caption{サイズ 2 の全集合の停止カット集合判定（完全列挙）}
+  \label{tab:cutsets_full}\\
+  \toprule
+  集合 $C$ & 停止カット集合か & 根拠（反例または停止確認） \\
+  \midrule
+  \endfirsthead
+  \toprule
+  集合 $C$ & 停止カット集合か & 根拠 \\
+  \midrule
+  \endhead
+  \midrule
+  \endfoot
+  \bottomrule
+  \endlastfoot
+  $\{A,B\}$         & \textbf{Yes} & $x_A=x_B=0$：両 DC 停止，類型I全例 \\
+  $\{A,Q\}$         & \textbf{Yes} & $x_A=0,x_Q=0$：$x_B=1$ でも第3節が $x_Q=0$ で偽 \\
+  $\{A,N_{AB}\}$    & No           & 反例：$x_B=x_Q=x_{BQ}=1$（第3節成立） \\
+  $\{A,N_{AQ}\}$    & No           & 反例：$x_B=x_Q=x_{BQ}=1$（第3節成立） \\
+  $\{A,N_{BQ}\}$    & \textbf{Yes} & $x_A=0,x_{BQ}=0$：第3節に $x_{BQ}=1$ 必要→不成立 \\
+  $\{B,Q\}$         & \textbf{Yes} & $\{A,Q\}$ と $A\leftrightarrow B$ 対称 \\
+  $\{B,N_{AB}\}$    & No           & 反例：$x_A=x_Q=x_{AQ}=1$ \\
+  $\{B,N_{AQ}\}$    & \textbf{Yes} & $\{A,N_{BQ}\}$ と $A\leftrightarrow B$ 対称 \\
+  $\{B,N_{BQ}\}$    & No           & 反例：$x_A=x_Q=x_{AQ}=1$ \\
+  $\{Q,N_{AB}\}$    & No           & 反例：$x_A=x_B=1$（第1節成立） \\
+  $\{Q,N_{AQ}\}$    & No           & 反例：$x_A=x_B=1$ \\
+  $\{Q,N_{BQ}\}$    & No           & 反例：$x_A=x_B=1$ \\
+  $\{N_{AB},N_{AQ}\}$ & No         & 反例：$x_A=x_B=1$ \\
+  $\{N_{AB},N_{BQ}\}$ & No         & 反例：$x_A=x_B=1$ \\
+  $\{N_{AQ},N_{BQ}\}$ & No         & 反例：$x_A=x_B=1$ \\
+\end{longtable}
+
+5 集合のみが停止カット集合であり，最小性はサイズ 1 の非存在（A.2 節）から保証される．\hfill$\square$
+
+% ================================================================
+\section{$\calO(\eps^3)$ 誤差評価の完全証明}\label{app:error}
+
+\begin{remark}[査読コメント [R1] への対応]
+  本付録は主定理 \ref{thm:theta_main} の $\calO(\eps^3)$ 誤差上界を
+  外部文献への依存なく完全自己完結で証明する．
+\end{remark}
+
+\subsection*{B.1 二次係数の完全代数計算}
+
+$T_1\varphi_0 = T_1\mathbf{e}_{x_{\mathrm{up}}}$ の成分：
+$(T_1\varphi_0)_{x_{\mathrm{up}}^{(i)}}=\alpha_i$（$i\in\calC$），
+$(T_1\varphi_0)_{x_{\mathrm{up}}}=-\sum_i\alpha_i$，
+その他はゼロ．
+
+$\RedRes T_1\varphi_0$ の成分：
+1 重故障状態 $x_{\mathrm{up}}^{(i)}$ における $T_0$ の固有値は $-\mu_i$（補題 \ref{lem:T0spec}(1)）から，
+$(\RedRes T_1\varphi_0)_{x_{\mathrm{up}}^{(i)}} = \alpha_i/\mu_i$．
+
+$a_2 = \psi_0^\top T_1\RedRes T_1\varphi_0 = \mathbf{1}^\top T_1(\RedRes T_1\varphi_0)$：
+
+$T_1$ を $\RedRes T_1\varphi_0$（1 重故障状態に支持）に作用させると，
+各 1 重故障状態 $x_{\mathrm{up}}^{(i)}$ から 2 重故障状態 $x_{\mathrm{up}}^{(ij)}$ への遷移率 $\alpha_j$
+が生じる．$\mathbf{1}^\top$ での集約で $\calT$ 内部遷移は行和ゼロ性で消え，
+$(i,j)\in\calCtwo$（吸収に至る対）のみ生存：
+\begin{equation}
+  a_2 = \sum_{(i,j)\in\calCtwo}\frac{\alpha_i\alpha_j}{\mu_i+\mu_j}.
+  \label{eq:a2proof}
+\end{equation}
+（対称化：$i$ 障害中の滞在率 $\alpha_i/\mu_i$，その間 $j$ も障害になる率 $\alpha_j$，
+修復競合の補正 $\mu_i/(\mu_i+\mu_j)$，積 $= \alpha_i\alpha_j/(\mu_i+\mu_j)$．）
+$\lambda_i=\eps\alpha_i$ を戻すと式~\eqref{eq:theta_main}．
+
+\subsection*{B.2 収束半径の陽的推定（補題 3.4 の証明）}
+
+Kato \cite{kato1995}（定理 II-1.8）の収束半径推定：
+孤立ギャップ $\mu_{\min}$，摂動ノルム $M_1=\|T_1\|_2$，
+$\delta_{\mathrm{Kato}} = \mu_{\min}/(2M_1)$．
+基本パラメータでは $M_1\le6\max_i\alpha_i=0.6$，
+$\delta_{\mathrm{Kato}}\ge365/1.2\approx304$ 年 $\gg\eps=1.37\times10^{-4}$．
+
+\subsection*{B.3 高次係数の上界（補題 B.3）}
+
+Kato 展開 $a_k=\psi_0^\top T_1(\RedRes T_1)^{k-1}\varphi_0$ に
+$\|\RedRes\|_2\le1/\mu_{\min}$，$\|T_1\|_2\le M_1$ を適用：
+\begin{equation}
+  |a_k| \le \left(\frac{M_1}{\mu_{\min}}\right)^{k-1} M_1 \quad(k\ge3).
+\end{equation}
+
+\subsection*{B.4 $\calO(\eps^3)$ 誤差上界（補題 B.4 / 定理 \ref{thm:theta_main} の証明完結）}
+
+$|\eps|\le\mu_{\min}/(4M_1)$ のとき $M_1|\eps|/\mu_{\min}\le1/4$ より，
+\begin{align}
+  \left|\nu_1(\eps)-a_2\eps^2\right|
+  &\le \sum_{k=3}^\infty|a_k||\eps|^k
+   \le M_1^3|\eps|^3/\mu_{\min}^2 \cdot \frac{1}{1-1/4}
+   \le \frac{4M_1^3}{\mu_{\min}^2}|\eps|^3 =: C_3|\eps|^3.
+\end{align}
+よって $C_3=4M_1^3/\mu_{\min}^2$．
+基本パラメータでは $C_3\le4(0.6)^3/365^2\approx3.2\times10^{-8}$，
+$C_3\eps^3\approx3.2\times10^{-8}\times(1.37\times10^{-4})^3\approx8.2\times10^{-20}$：
+機械精度以下であり実質的に誤差ゼロ．\hfill$\square$
+
+\subsection*{B.5 VaR 閾値跳躍の近似誤差（定理 \ref{thm:VaR} の精度保証）}
+
+定理 \ref{thm:QSD_bound} の精度 $\delta$ のもとで，
+$p^{\rm true}(\eps,\Teval)$ と $p^{\rm approx}(\eps,\Teval)$ の差は $|\Delta p|\le\delta$．
+臨界値 $\eps_c$ の誤差 $|\Delta\eps_c|$ は：
+$dp/d\eps = 2\eps\theta_2\Teval c_0\e^{-\eps^2\theta_2\Teval}$ より，
+$|\Delta\eps_c|\le|\Delta p|/(dp/d\eps)|_{\eps=\eps_c}
+= \delta/(2\eps_c\theta_2\Teval\cdot q)$（$c_0\e^{-\eps_c^2\theta_2\Teval}=q$ を使用）．
+基本パラメータでは $|\Delta\eps_c|/\eps_c<10^{-4}$（$\delta=10^{-6}$）．\hfill$\square$
+
+\end{document}

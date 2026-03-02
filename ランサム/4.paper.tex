@@ -1,0 +1,140 @@
+# -*- coding: utf-8 -*-
+
+tex_content = r"""
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{hyperref}
+\geometry{margin=25mm}
+\setstretch{1.2}
+
+\title{ランサムウェア潜伏リスク下における検知投資とバックアップ設計の最適化\\
+— 潜伏分布の尾指数による均衡分岐と企業継続性への含意 —}
+\author{}
+\date{}
+
+\newtheorem{theorem}{定理}
+\newtheorem{proposition}{命題}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+本研究は、ランサムウェア攻撃の「潜伏・破壊」構造を明示的に組み込んだ数理モデルを構築し、
+検知投資およびバックアップ設計（バックアップ間隔・リテンション設計）の同時最適化問題を定式化する。
+潜伏時間分布をWeibull分布で表現し、その尾指数が企業の最適防御戦略および均衡構造に与える影響を理論的に解析する。
+その結果、尾指数が1を境に均衡の性質が相転移的に変化し、重尾環境下では多重均衡や防御水準の二極化が生じ得ることを示す。
+さらに、構造推定可能な実証フレームワークを提示し、理論の検証可能性を明確化する。
+本研究はITシステムのロバスト性と企業継続性を統合的に分析する理論基盤を提供する。
+\end{abstract}
+
+\section{序論}
+
+近年、ランサムウェア攻撃は企業継続性を脅かす重大リスクとなっている。
+特に近年の攻撃は単純暗号化型ではなく、長期潜伏後に破壊・情報窃取を行う高度化型が主流である。
+この構造は「侵入 → 潜伏 → 横展開 → 破壊」という時間的プロセスを持つ。
+
+本研究の目的は以下の3点である。
+
+(1) 潜伏リスクを明示化した企業防御最適化モデルの構築  
+(2) 尾指数に基づく均衡構造の分岐分析  
+(3) 実証可能な識別戦略の提示  
+
+\section{モデル}
+
+企業はバックアップ間隔 $R>0$ と検知投資 $I>0$ を選択する。
+期待費用は以下で与えられる：
+
+\begin{equation}
+C(R,I)
+=
+\frac{a}{R}
++ bR
++ c_I I
++ c_f \kappa(I)\exp(-\beta(I)R^k)
+\end{equation}
+
+ここで、
+
+\begin{itemize}
+\item $a/R$ : 復旧損失
+\item $bR$ : バックアップ運用費
+\item $c_I I$ : 検知投資費
+\item $c_f$ : 破壊時損失
+\item $k$ : 潜伏時間分布の尾指数
+\end{itemize}
+
+$\kappa'(I)<0, \beta'(I)>0$ を仮定する。
+
+\section{最適化と均衡}
+
+一階条件：
+
+\begin{align}
+-\frac{a}{R^2}
++ b
+- c_f \kappa(I)\beta(I)kR^{k-1}e^{-\beta(I)R^k}
+&=0 \\
+c_I
++ c_f e^{-\beta(I)R^k}
+(\kappa'(I)-\kappa(I)\beta'(I)R^k)
+&=0
+\end{align}
+
+\begin{theorem}
+$k>1$ のとき費用関数は大域的に凸であり、均衡は一意である。
+$k<1$ のとき非凸領域が出現し、多重均衡が生じ得る。
+\end{theorem}
+
+\section{相図解析}
+
+パラメータ空間 $(k, c_f)$ 上で相図を構築する。
+
+\begin{itemize}
+\item Region I ($k>1$)：単一均衡
+\item Region II ($k\approx1$)：臨界領域
+\item Region III ($k<1$)：多重均衡
+\end{itemize}
+
+重尾環境では均衡ジャンプが発生し、
+防御水準の二極化が理論的に導かれる。
+
+\section{Stackelberg拡張}
+
+攻撃者が尾指数または潜伏強度を選択する場合、
+防御者反応関数は非連続となり得る。
+重尾領域ではゲーム均衡も多重化する。
+
+\section{実証識別戦略}
+
+潜伏時間データからWeibull推定により $k$ を識別する。
+
+\begin{equation}
+h(t)=k\lambda t^{k-1}
+\end{equation}
+
+構造方程式をGMM推定可能である。
+また、混合分布推定により多重均衡の存在を検証できる。
+
+\section{企業継続性への含意}
+
+重尾リスク下では、
+バックアップ頻度を上げるだけでは不十分であり、
+長期リテンションと検知投資の同時最適化が不可欠である。
+
+\section{結論}
+
+本研究はランサムウェア潜伏構造を明示化した最適防御理論を提示し、
+尾指数に基づく均衡分岐と企業継続性への含意を示した。
+理論・実証両面から発展可能な研究基盤を提供する。
+
+\end{document}
+"""
+
+file_path = "/mnt/data/ransomware_backup_fullpaper_v2.tex"
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(tex_content)
+
+file_path

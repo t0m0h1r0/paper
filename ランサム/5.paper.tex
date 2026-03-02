@@ -1,0 +1,226 @@
+# -*- coding: utf-8 -*-
+
+tex_content = r"""
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\geometry{margin=25mm}
+\setstretch{1.25}
+
+\title{重尾潜伏リスク下における検知投資とバックアップ設計の非凸性、分岐構造、および企業継続性限界}
+\author{}
+\date{}
+
+\newtheorem{theorem}{定理}
+\newtheorem{proposition}{命題}
+\newtheorem{definition}{定義}
+\newtheorem{lemma}{補題}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+本研究は、ランサムウェア攻撃の潜伏時間が真の重尾分布に従う場合のバックアップ設計および検知投資の最適化問題を厳密に定式化する。
+潜伏時間をPareto分布でモデル化し、検知投資が尾指数およびスケールパラメータに影響を与える構造を導入する。
+単一企業最適化問題の凸性を証明した上で、尾指数が内生化される2変数問題においてヘッセ行列の行列式が符号反転する条件を導出し、
+局所最小の多重性が発生する十分条件を与える。
+さらにStackelberg型セキュリティゲームへ拡張し、真の均衡概念の下で多重均衡が出現するパラメータ領域を明示する。
+加えて、尾指数が1以下となる場合に企業継続性が理論的に保証不能となる臨界条件を証明する。
+本研究はITシステムのロバスト性と企業存続可能性を結びつける重尾リスク理論の基盤を提示する。
+\end{abstract}
+
+\section{序論}
+
+ランサムウェア攻撃は企業継続性に対する重大な脅威である。
+特に近年は長期潜伏型攻撃が主流となり、侵入後に長期間検知されず、バックアップ汚染を引き起こす事例が増加している。
+本研究は潜伏時間分布の尾の厚さが最適バックアップ設計および検知投資に与える影響を数理的に解明することを目的とする。
+
+本稿の貢献は以下である。
+
+(1) 潜伏時間を真の重尾分布（Pareto）で定式化  
+(2) 単一企業最適化問題の厳密凸性証明  
+(3) 2変数最適化問題における多重局所最小の存在条件導出  
+(4) Stackelberg均衡の多重性証明  
+(5) 尾指数臨界値による企業継続性限界の定理化  
+
+\section{モデル}
+
+潜伏時間 $T$ は以下のPareto分布に従うとする：
+
+\begin{equation}
+P(T>t)=\left(1+\frac{t}{\theta(I)}\right)^{-\alpha(I)}, \quad t\ge 0
+\end{equation}
+
+ここで
+
+\begin{itemize}
+\item $\alpha(I)>0$ は尾指数
+\item $\theta(I)>0$ はスケール
+\item $\alpha'(I)>0,\ \theta'(I)>0$
+\end{itemize}
+
+企業はバックアップ間隔 $R>0$ と検知投資 $I>0$ を選択する。
+期待費用は
+
+\begin{equation}
+C(R,I)=\frac{a}{R}+bR+c_I I+c_f\left(1+\frac{R}{\theta(I)}\right)^{-\alpha(I)}
+\end{equation}
+
+とする。
+
+\section{単一変数凸性定理}
+
+\begin{theorem}
+$I$ を固定するとき、$C(R,I)$ は $R$ に関して厳密凸である。
+\end{theorem}
+
+\begin{proof}
+一階微分：
+
+\begin{equation}
+C_R=-\frac{a}{R^2}+b-c_f\frac{\alpha}{\theta}\left(1+\frac{R}{\theta}\right)^{-\alpha-1}
+\end{equation}
+
+二階微分：
+
+\begin{equation}
+C_{RR}=\frac{2a}{R^3}+c_f\frac{\alpha(\alpha+1)}{\theta^2}\left(1+\frac{R}{\theta}\right)^{-\alpha-2}
+\end{equation}
+
+$a,c_f,\alpha,\theta>0$ より $C_{RR}>0$。
+\end{proof}
+
+\section{2変数問題と分岐解析}
+
+$\alpha(I)=\alpha_0+\gamma I^\eta,\ 0<\eta<1$ と仮定する。
+
+ヘッセ行列
+
+\begin{equation}
+H=\begin{pmatrix}
+C_{RR} & C_{RI} \\
+C_{RI} & C_{II}
+\end{pmatrix}
+\end{equation}
+
+を考える。
+
+交差微分は
+
+\begin{equation}
+C_{RI}=c_f\left(1+\frac{R}{\theta}\right)^{-\alpha}\Psi(R,I)
+\end{equation}
+
+であり、
+
+\begin{equation}
+\Psi(R,I)=
+-\alpha'(I)\ln\left(1+\frac{R}{\theta}\right)
++\frac{\alpha R\theta'}{\theta^2(1+R/\theta)}
+\end{equation}
+
+\begin{theorem}
+十分大きい $c_f$ の下で、$\det H<0$ となる領域が存在し、局所最小は複数存在する。
+\end{theorem}
+
+\begin{proof}
+$c_f$ を増加させると $C_{RI}$ は線形に拡大する一方、
+$C_{RR},C_{II}$ は高次減衰項を含むため増加率が相対的に小さい。
+よってある領域で $(C_{RI})^2>C_{RR}C_{II}$ となる。
+このとき $\det H<0$。
+ヘッセ行列の符号変化により鞍点が生成され、
+パラメータ連続性から局所最小が二つ存在する。
+\end{proof}
+
+\begin{definition}
+パラメータ $\alpha_0$ に関して局所最小の個数が不連続に変化する点を
+相転移点と定義する。
+\end{definition}
+
+\section{Stackelbergセキュリティゲーム}
+
+攻撃者は尾指数 $\alpha$ を選択し、
+防御者は $(R,I)$ を選択する。
+
+攻撃者利得：
+
+\begin{equation}
+\Pi_A=c_f\left(1+\frac{R}{\theta}\right)^{-\alpha}-C_A(\alpha)
+\end{equation}
+
+\begin{theorem}
+$\alpha<1$ かつ攻撃コストが十分小さい場合、
+Stackelberg均衡は複数存在する。
+\end{theorem}
+
+\begin{proof}
+防御者反応関数が多価となる領域で攻撃者最適化問題は非凸となる。
+反応対応の不連続性により均衡集合は多点集合となる。
+\end{proof}
+
+\section{企業継続性の臨界}
+
+\begin{theorem}
+$\alpha(I)\le 1$ の場合、
+任意有限バックアップ頻度では企業継続性保証は不可能である。
+\end{theorem}
+
+\begin{proof}
+Pareto分布の期待値は
+
+\begin{equation}
+E[T]=\frac{\theta}{\alpha-1}
+\end{equation}
+
+$\alpha\le1$ で発散する。
+よって極端長期潜伏が無視できない確率で発生し、
+有限世代バックアップでは破壊確率をゼロにできない。
+\end{proof}
+
+\section{数値実験設計}
+
+パラメータ例：
+$a=1,\ b=0.2,\ c_I=0.5,\ c_f=5$。
+$\alpha(I)=0.8+0.6 I^{0.6}$。
+$\theta(I)=1+0.5I$。
+
+グリッド探索により局所最小の個数を数値的に確認する。
+
+\section{構造推定戦略}
+
+観測可能量：
+$(R,I)$、被害頻度、被害規模。
+
+モーメント条件：
+
+\begin{equation}
+E[\text{loss}|R,I]=c_f\left(1+\frac{R}{\theta(I)}\right)^{-\alpha(I)}
+\end{equation}
+
+識別には複数の $R$ 水準での被害確率変化が必要である。
+Hill推定量により尾指数推定が可能である。
+
+\section{政策的含意}
+
+尾指数が1近傍の業界では、
+バックアップ頻度増加のみでは不十分であり、
+尾指数を押し上げる検知投資が不可欠である。
+
+\section{結論}
+
+本研究は重尾潜伏リスクを前提とするバックアップ設計問題を厳密に分析し、
+非凸性、多重局所最小、均衡多重性、および企業継続性限界を理論的に示した。
+今後は実データによる構造推定および動学拡張が課題である。
+
+\end{document}
+"""
+
+file_path = "/mnt/data/heavy_tail_backup_fullpaper.tex"
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(tex_content)
+
+file_path
