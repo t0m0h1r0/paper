@@ -1,11 +1,11 @@
 """
-コロケート格子（2D/3D統一）
+コロケート格子（2D/3D統一）+ 界面適合非一様格子
 
-各軸の座標・メトリクス係数を独立に管理。
-初期状態は等間隔格子。界面適合格子への更新は後のフェーズで実装。
+論文 §4: ω(φ) = 1 + (α-1)δ*(φ) で界面近傍を自動高解像度化
 """
 
 from __future__ import annotations
+import math
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,65 +14,100 @@ if TYPE_CHECKING:
 
 
 class Grid:
-    """
-    2D/3D コロケート格子
-
-    Attributes:
-        ndim: 空間次元数 (2 or 3)
-        N: 各軸のセル数タプル (Nx, Ny) or (Nx, Ny, Nz)
-        L: 各軸の領域長タプル
-        coords[ax]: 軸 ax の物理座標 (1D配列, 長さ N[ax]+1)
-        h[ax]: 軸 ax の格子間隔 (等間隔時はスカラー)
-        J[ax]: メトリクス dξ/dx (1D配列)
-        dJ_dxi[ax]: ∂J/∂ξ (1D配列)
-    """
-
     def __init__(self, config: SimulationConfig, backend: Backend):
         xp = backend.xp
         self.ndim = config.ndim
         self.N = tuple(config.N)
         self.L = tuple(config.L)
         self.backend = backend
-
+        self.config = config
         self.axis_names = ('x', 'y', 'z')[:self.ndim]
-
-        # 各軸の座標とメトリクス
-        self.coords = {}
-        self.h = {}
-        self.J = {}
-        self.dJ_dxi = {}
+        self.adaptive = False
+        self.coords, self.h, self.J, self.dJ_dxi = {}, {}, {}, {}
 
         for ax in range(self.ndim):
-            n = self.N[ax]
-            length = self.L[ax]
+            n, length = self.N[ax], self.L[ax]
             self.coords[ax] = xp.linspace(0.0, length, n + 1)
             self.h[ax] = length / n
-            self.J[ax] = xp.ones(n + 1)            # 等間隔ではJ=N/L
-            self.dJ_dxi[ax] = xp.zeros(n + 1)       # 等間隔では0
+            self.J[ax] = xp.ones(n + 1)
+            self.dJ_dxi[ax] = xp.zeros(n + 1)
 
     @property
     def shape(self):
-        """場の配列形状: (Nx+1, Ny+1) or (Nx+1, Ny+1, Nz+1)"""
         return tuple(n + 1 for n in self.N)
 
     @property
     def dx_min(self) -> float:
-        """全軸の最小格子幅"""
         xp = self.backend.xp
-        vals = []
-        for ax in range(self.ndim):
-            dx = self.coords[ax][1:] - self.coords[ax][:-1]
-            vals.append(float(xp.min(dx)))
-        return min(vals)
+        return min(float(xp.min(self.coords[ax][1:] - self.coords[ax][:-1]))
+                   for ax in range(self.ndim))
 
     def meshgrid(self):
-        """
-        格子点座標のメッシュグリッドを返す。
-
-        Returns:
-            2D: (X, Y) 各 shape (Nx+1, Ny+1)
-            3D: (X, Y, Z) 各 shape (Nx+1, Ny+1, Nz+1)
-        """
         xp = self.backend.xp
-        coord_arrays = [self.coords[ax] for ax in range(self.ndim)]
-        return xp.meshgrid(*coord_arrays, indexing='ij')
+        return xp.meshgrid(*[self.coords[ax] for ax in range(self.ndim)],
+                           indexing='ij')
+
+    def update_from_levelset(self, phi, ccd, alpha=None, max_iter=10, tol=1e-6):
+        """③ 界面適合格子の再生成（論文 §4.5）"""
+        import numpy as np
+        from scipy.interpolate import CubicSpline
+        xp = self.backend.xp
+        if alpha is None:
+            alpha = self.config.alpha_grid
+        if alpha <= 1.0:
+            return
+        self.adaptive = True
+        epsilon = self.config.epsilon_factor * self.dx_min
+
+        for ax in range(self.ndim):
+            n, length = self.N[ax], self.L[ax]
+            phi_1d_np = np.asarray(self.backend.to_host(
+                self._extract_axis_profile(phi.data, ax)))
+            x_old = np.linspace(0.0, length, n + 1)
+
+            for _ in range(max_iter):
+                omega = self._density_func(phi_1d_np, epsilon, alpha)
+                dx0 = length / n
+                s = np.zeros(n + 1)
+                for i in range(1, n + 1):
+                    s[i] = s[i-1] + omega[i-1] * dx0
+                s_equal = np.linspace(0, s[-1], n + 1)
+                cs = CubicSpline(s, x_old)
+                x_new = cs(s_equal)
+                x_new[0], x_new[-1] = 0.0, length
+                # 単調性を保証
+                x_new = np.sort(x_new)
+                x_new[0], x_new[-1] = 0.0, length
+                if np.max(np.abs(x_new - x_old)) < tol:
+                    break
+                x_old = x_new.copy()
+
+            self.coords[ax] = xp.asarray(x_new)
+            dx_arr = x_new[1:] - x_new[:-1]
+            self.h[ax] = float(np.min(dx_arr))
+            J_np = 1.0 / np.maximum(dx_arr, 1e-14)
+            J_full = np.zeros(n + 1)
+            J_full[0], J_full[-1] = J_np[0], J_np[-1]
+            J_full[1:-1] = 0.5 * (J_np[:-1] + J_np[1:])
+            self.J[ax] = xp.asarray(J_full)
+            dJ = np.zeros(n + 1)
+            dJ[1:-1] = (J_full[2:] - J_full[:-2]) / 2.0
+            dJ[0], dJ[-1] = J_full[1]-J_full[0], J_full[-1]-J_full[-2]
+            self.dJ_dxi[ax] = xp.asarray(dJ)
+
+    def _extract_axis_profile(self, data, axis):
+        xp = self.backend.xp
+        slices = []
+        for ax in range(self.ndim):
+            slices.append(slice(None) if ax == axis else data.shape[ax]//2)
+        return data[tuple(slices)]
+
+    @staticmethod
+    def _density_func(phi_1d, epsilon, alpha):
+        import numpy as np
+        delta = np.zeros_like(phi_1d)
+        mask = np.abs(phi_1d) <= epsilon
+        delta[mask] = (0.5/epsilon)*(1.0+np.cos(math.pi*phi_1d[mask]/epsilon))
+        d_max = np.max(delta)
+        delta_star = delta / d_max if d_max > 1e-14 else np.zeros_like(delta)
+        return 1.0 + (alpha - 1.0) * delta_star

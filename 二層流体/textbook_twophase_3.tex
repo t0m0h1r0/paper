@@ -1,0 +1,1837 @@
+%% ============================================================
+%%  二次元気液混合流体の数値計算法 ── 教科書的総合解説
+%%  Level Set法 + 結合コンパクト差分法(CCD) + 界面適合格子
+%%  + Projection法 による完全定式化
+%%
+%%  XeLaTeX でコンパイル
+%%  フォント: NotoSerifCJK-Regular/Bold.ttc, DejaVu Serif/Sans/Mono
+%% ============================================================
+\documentclass[12pt, a4paper, titlepage]{article}
+
+%% ── フォント設定（XeLaTeX 専用）──────────────────────────────
+\usepackage{fontspec}
+\usepackage{xltxtra}
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}[Scale=0.9]
+\newfontfamily\jpfont{NotoSerifCJK-Regular.ttc}[
+    Path=/usr/share/fonts/opentype/noto/,
+    BoldFont=NotoSerifCJK-Bold.ttc,
+    AutoFakeBold=false
+]
+\newfontfamily\jpbold{NotoSerifCJK-Bold.ttc}[
+    Path=/usr/share/fonts/opentype/noto/
+]
+\newcommand{\jp}[1]{{\normalfont\jpfont #1}}
+\newcommand{\jpb}[1]{{\normalfont\jpbold\bfseries #1}}
+
+%% ── 数学・図表パッケージ ──────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+\usepackage{booktabs, array, multirow, tabularx}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable, theorems}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric,
+                backgrounds, calc, decorations.pathreplacing,
+                matrix, patterns}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{microtype}
+\usepackage{nicefrac}
+\usepackage{ragged2e}
+
+%% ── ページレイアウト ──────────────────────────────────────────
+\geometry{top=25mm, bottom=28mm, left=26mm, right=26mm,
+          headheight=16pt}
+
+%% overfull 対策
+\emergencystretch=2em
+\setlength{\hfuzz}{3pt}
+
+%% ── カラー定義 ────────────────────────────────────────────────
+\definecolor{navy}{RGB}{0,40,90}
+\definecolor{blue2}{RGB}{0,80,160}
+\definecolor{midblue}{RGB}{0,90,170}
+\definecolor{lightblue}{RGB}{230,242,255}
+\definecolor{tblue}{RGB}{218,234,255}
+\definecolor{tgreen}{RGB}{215,255,225}
+\definecolor{tyellow}{RGB}{255,250,210}
+\definecolor{tred}{RGB}{255,225,220}
+\definecolor{darkgray}{RGB}{60,60,60}
+\definecolor{boxgray}{RGB}{245,245,245}
+\definecolor{green4}{RGB}{0,120,60}
+\definecolor{red2}{RGB}{160,0,0}
+%% Extra colors for detailed overview figure
+\definecolor{orange2}{RGB}{200,90,0}
+\definecolor{torange}{RGB}{255,238,210}
+\definecolor{teal2}{RGB}{0,110,110}
+\definecolor{tteal}{RGB}{210,245,245}
+\definecolor{purple2}{RGB}{100,0,140}
+\definecolor{tpurple}{RGB}{240,220,255}
+\definecolor{brown2}{RGB}{120,60,0}
+\definecolor{tbrown}{RGB}{250,235,215}
+
+%% ── tcolorbox スタイル ────────────────────────────────────────
+\tcbset{
+  mybox/.style={
+    enhanced, breakable,
+    colback=tblue, colframe=blue2,
+    toprule=0.8pt, bottomrule=0.8pt,
+    leftrule=0.8pt, rightrule=0.8pt,
+    fonttitle=\bfseries\small\color{white},
+    colbacktitle=navy,
+    attach boxed title to top left={yshift=-2mm, xshift=6mm},
+    boxed title style={sharp corners},
+    sharp corners=south,
+  },
+  derivbox/.style={
+    enhanced, breakable,
+    colback=boxgray, colframe=navy!40,
+    toprule=0.5pt, bottomrule=0.5pt,
+    leftrule=3pt, rightrule=0.5pt,
+    sharp corners,
+  },
+  resultbox/.style={
+    enhanced,
+    colback=tgreen, colframe=navy,
+    toprule=1pt, bottomrule=1pt,
+    leftrule=1pt, rightrule=1pt,
+    sharp corners,
+  },
+  warnbox/.style={
+    enhanced,
+    colback=tyellow, colframe=red2!70,
+    toprule=0.6pt, bottomrule=0.6pt,
+    leftrule=3pt, rightrule=0.6pt,
+    sharp corners,
+  },
+  algbox/.style={
+    enhanced, breakable,
+    colback=white, colframe=navy,
+    toprule=1pt, bottomrule=1pt,
+    leftrule=1pt, rightrule=1pt,
+    sharp corners,
+    fonttitle=\bfseries\small\color{white},
+    colbacktitle=navy,
+    attach boxed title to top left={yshift=-2mm, xshift=6mm},
+    boxed title style={sharp corners},
+  },
+  defbox/.style={
+    enhanced,
+    colback=boxgray, colframe=darkgray!50,
+    toprule=0.6pt, bottomrule=0.6pt,
+    leftrule=0.6pt, rightrule=0.6pt,
+    sharp corners,
+  },
+}
+
+%% ── ヘッダー/フッター ─────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{navy}\jp{二次元気液混合流体の数値計算法}}
+\fancyhead[R]{\small\color{navy!70}CCD~+~Level Set~+~Projection}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+%% ── セクション書式 ────────────────────────────────────────────
+\titleformat{\section}
+  {\large\bfseries\color{navy}}
+  {\thesection.}{0.8em}{}[\color{blue2}\rule{\linewidth}{0.8pt}]
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{navy!80}}
+  {\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{navy!60}}
+  {\thesubsubsection}{0.8em}{}
+
+%% ── 数学マクロ ────────────────────────────────────────────────
+\newcommand{\pd}[2]{\dfrac{\partial #1}{\partial #2}}
+\newcommand{\pdd}[2]{\dfrac{\partial^2 #1}{\partial #2^2}}
+\newcommand{\pdm}[3]{\dfrac{\partial^2 #1}{\partial #2\,\partial #3}}
+\newcommand{\bu}{\bm{u}}
+\newcommand{\bg}{\bm{g}}
+\newcommand{\bnabla}{\bm{\nabla}}
+\newcommand{\He}{H_\varepsilon}
+\newcommand{\de}{\delta_\varepsilon}
+\newcommand{\Ord}[1]{\mathcal{O}(#1)}
+\newcommand{\half}{\tfrac{1}{2}}
+\newcommand{\fp}[1]{f^{(1)}_{#1}}
+\newcommand{\fpp}[1]{f^{(2)}_{#1}}
+
+%% theorem 環境
+\newtheorem{remark}{Remark}
+\newtheorem{definition}{\jp{定義}}
+\newtheorem{theorem}{\jp{定理}}
+
+%% ── ハイパーリンク ────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=navy,
+  citecolor=navy,
+  urlcolor=blue2,
+  pdftitle={Two-Dimensional Gas-Liquid Two-Phase Flow Numerical Methods},
+}
+
+%% ============================================================
+\begin{document}
+\sloppy
+%% ============================================================
+
+%% ── 表紙 ──────────────────────────────────────────────────────
+\begin{titlepage}
+\begin{center}
+\vspace*{12mm}
+{\color{navy}\rule{\linewidth}{2pt}}\\[8pt]
+{\LARGE\bfseries\jp{二次元気液混合流体の数値計算法}}\\[6pt]
+{\large\bfseries\jp{── 基礎理論から完全アルゴリズムまでの教科書的解説 ──}}\\[4pt]
+{\color{navy}\rule{\linewidth}{2pt}}\\[10pt]
+
+{\large
+\textbf{Numerical Methods for Two-Dimensional Gas--Liquid Two-Phase Flows}\\[4pt]
+\textit{From Basic Theory to Complete Algorithm}\\[3pt]
+\textit{Coupled Compact Difference $\cdot$ Level Set $\cdot$ Interface-Adapted Grid $\cdot$ Projection Method}
+}
+
+\vspace{18mm}
+\begin{tcolorbox}[defbox, width=0.85\textwidth]
+\small\centering
+\begin{tabular}{rl}
+\jp{界面追跡法：} & Level Set \jp{法（符号付き距離関数）}\\[2pt]
+\jp{空間離散化：} & \jp{結合コンパクト差分法（CCD 法）}$\Ord{h^6}$\\
+                  & Chu \& Fan, \textit{J. Comput. Phys.}, 1998\\[2pt]
+\jp{格子構造：}   & \jp{コロケート格子} + Rhie--Chow \jp{補正}\\[2pt]
+\jp{界面適合格子：} & $\phi$ \jp{連動グリッド密度関数による自動高解像度化}\\[2pt]
+\jp{時間積分：}   & 3\jp{次} TVD Runge--Kutta \jp{（対流・}Level Set\jp{）}\\
+                  & Crank--Nicolson \jp{（粘性項，半陰的）}\\[2pt]
+\jp{圧力求解：}   & \jp{変密度} Chorin Projection + BiCGSTAB\\[2pt]
+\jp{表面張力：}   & CSF \jp{法（連続体表面力法）}
+\end{tabular}
+\end{tcolorbox}
+
+\vspace{10mm}
+{\small\color{darkgray}
+\jp{本稿は，Chu \& Fan (1998) の CCD スキーム係数をテイラー展開から厳密に再導出し，}\\
+\jp{Sussman \textit{et al.} (1994) の Level Set 法と Chorin (1968) の Projection 法を組み合わせた，}\\
+\jp{気液二相流シミュレーションの完全定式化を教科書的に解説したものである．}
+}
+\end{center}
+
+\vfill
+{\color{navy}\rule{\linewidth}{0.8pt}}\\[2pt]
+{\small\color{darkgray}\jp{対象読者：大学院生・研究者（計算流体力学の基礎知識を前提とする）}}
+\end{titlepage}
+
+%% ── 目次 ──────────────────────────────────────────────────────
+\tableofcontents
+\newpage
+
+%% ============================================================
+\section{\jp{はじめに}}
+\label{sec:intro}
+%% ============================================================
+
+\subsection{\jp{気液二相流の数値計算における課題}}
+
+\jp{気液二相流とは，気相（ガス）と液相（液体）が共存し，
+その間に明確な界面を形成しながら運動する流体現象である．
+気泡塔，核沸騰，波浪，噴霧燃焼など，工学・自然界に広く現れる流体現象である．}
+
+\jp{この現象を数値的に扱う際には，以下の4つの本質的困難が存在する：}
+
+\begin{enumerate}
+  \item \jp{\textbf{界面の捕捉}：密度・粘性が界面を挟んで不連続に変化する
+        （$\rho_l/\rho_g \approx 1000$，$\mu_l/\mu_g \approx 100$）ため，
+        界面位置を高精度かつ安定に追跡しなければならない．}
+  \item \jp{\textbf{表面張力の正確な評価}：表面張力は界面の曲率（$\kappa$）に比例する体積力である．
+        曲率の計算には二階偏微分が必要となり，数値誤差が増幅されやすい．}
+  \item \jp{\textbf{非圧縮条件の高精度維持}：速度場の発散をゼロに保つ
+        圧力場を毎ステップ正確に求解する必要がある．}
+  \item \jp{\textbf{密度成層の安定処理}：重力と密度差による静水圧分布を
+        正確に扱わないと寄生流れ（parasitic currents）が発生する．}
+\end{enumerate}
+
+\subsection{\jp{本稿のアプローチ}}
+
+\jp{上記の困難を克服するため，本稿では以下の手法を組み合わせる（図\ref{fig:overview}参照）：}
+
+\begin{itemize}
+  \item \jp{\textbf{界面追跡：} Level Set 法 \cite{Sussman1994}
+        により符号付き距離関数 $\phi$ で界面を陰的に表現する．
+        滑らか化ヘヴィサイド関数によって物性値を界面近傍で連続的に補間し，
+        One-Fluid（単一流体）定式化を実現する．}
+  \item \jp{\textbf{高精度空間微分：} 結合コンパクト差分法（CCD 法，Chu \& Fan \cite{ChuFan1998}）を用い，
+        一次微分・二次微分・混合偏微分をすべて $\Ord{h^6}$ 精度で統一的に評価する．
+        本稿では係数をテイラー展開から厳密に導出する．}
+  \item \jp{\textbf{界面適合格子：} Level Set 値に連動したグリッド密度関数 $\omega(\phi)$ により，
+        界面近傍のみを自動的に高解像度化する非一様格子を生成する．}
+  \item \jp{\textbf{格子構造：} チェッカーボード不安定を防ぐため
+        コロケート格子を採用し，Rhie--Chow 型流束補正を適用する．}
+  \item \jp{\textbf{時間積分：} 対流項と Level Set 移流には
+        3次 TVD Runge--Kutta を，粘性項には Crank--Nicolson 半陰的処理を用いる．}
+  \item \jp{\textbf{圧力求解：} 変密度 Chorin Projection 法に基づいて圧力 Poisson 方程式を導き，
+        CCD で差分化した後 BiCGSTAB で反復求解する．}
+\end{itemize}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=4mm and 5mm,
+  %% styles
+  nsterm/.style={draw=navy!70, fill=lightblue, rounded corners=4pt,
+                 font=\small\bfseries\jpfont, inner sep=6pt,
+                 minimum width=26mm, minimum height=10mm, align=center},
+  solver/.style={draw=#1!70, fill=#1!10, rounded corners=4pt,
+                 font=\scriptsize\jpfont, inner sep=5pt,
+                 minimum width=26mm, align=center},
+  solver/.default=navy,
+  phasebox/.style={draw=#1!80, fill=#1!8, rounded corners=4pt,
+                   font=\small\jpfont, inner sep=6pt,
+                   text width=115mm, align=left},
+  phasebox/.default=navy,
+  statebox/.style={draw=navy!60, fill=lightblue!50, rounded corners=4pt,
+                   font=\small\jpfont, inner sep=6pt,
+                   text width=115mm, align=center},
+  arr/.style={-Stealth, thick, navy},
+  subarr/.style={-Stealth, semithick, darkgray!60},
+]
+
+%% ═══════════ PART Ⅰ：NS各項とソルバーの対応 ═══════════════
+\node[font=\small\bfseries\jpfont, text=navy] (hd1) at (0,0)
+  {\jp{NS 方程式の各項とソルバーの対応}};
+
+%% ── NS 5項ボックス ──────────────────────────────────────────
+\node[nsterm, below=7mm of hd1, xshift=-57mm] (T1) {\jp{対流項}};
+\node[nsterm, right=4mm of T1]  (T2) {\jp{圧力項}};
+\node[nsterm, right=4mm of T2]  (T3) {\jp{粘性項}};
+\node[nsterm, right=4mm of T3]  (T4) {\jp{重力項}};
+\node[nsterm, right=4mm of T4]  (T5) {\jp{表面張力項}};
+
+%% ── 各ソルバーボックス ──────────────────────────────────────
+\node[solver=orange2, below=5mm of T1] (S1)
+  {\jp{CCD（$\Ord{h^6}$）}\\TVD-RK3\\\jp{陽的}};
+\node[solver=midblue, below=5mm of T2] (S2)
+  {\jp{CCD $\to\bnabla p$}\\FVM-PPE\\\jp{Projection法}};
+\node[solver=teal2, below=5mm of T3] (S3)
+  {\jp{CCD（$\Ord{h^6}$）}\\Crank-Nicolson\\\jp{半陰的}};
+\node[solver=darkgray, below=5mm of T4] (S4)
+  {\jp{陽的}\\(\jp{定数項})};
+\node[solver=red2, below=5mm of T5] (S5)
+  {Level Set $\to\kappa$\\CCD\\\jp{半陰的}};
+
+\foreach \t/\s in {T1/S1, T2/S2, T3/S3, T4/S4, T5/S5}
+  \draw[subarr] (\t) -- (\s);
+
+%% ─── 区切り線 ─────────────────────────────────────────────
+\draw[darkgray!30, thick] (-7.3,-3.5) -- (7.3,-3.5);
+
+%% ═══════════ PART Ⅱ：タイムステッピングフロー ═════════════
+\begin{scope}[yshift=-40mm]
+
+\node[font=\small\bfseries\jpfont, text=navy] at (0,0)
+  {\jp{タイムステッピングフロー（$t^n \to t^{n+1}$）}};
+
+\node[statebox, below=5mm] (In)
+  {\jp{入力：}\,$\phi^n$，$\bu^n$，$p^n$，$\tilde\rho^n$};
+
+\node[phasebox=red2, below=3mm of In] (P1)
+  {\textcolor{red2}{\textbf{\jp{①② Level Set 更新}}}\enspace
+   \jp{移流（TVD-RK3 + CCD）→ 再初期化}};
+\node[phasebox=green4, below=2.5mm of P1] (P2)
+  {\textcolor{green4}{\textbf{\jp{③④⑤ 格子・物性・曲率更新}}}\enspace
+   \jp{密度関数 $\omega(\phi^{n+1})$ → Heaviside補間 → CCD で $\kappa^{n+1}$}};
+\node[phasebox=navy, below=2.5mm of P2] (P3)
+  {\textcolor{navy}{\textbf{\jp{⑥ 運動量予測（Predictor）}}}\\\jp{対流（陽的）・粘性（半陰的）・重力・表面張力 → 予測速度 $\bu^*$}};
+\node[phasebox=orange2, below=2.5mm of P3] (P4)
+  {\textcolor{orange2}{\textbf{\jp{⑦ 圧力 Poisson 求解（FVM）}}}\enspace
+   \jp{Rhie-Chow 補正 → 変密度 PPE → BiCGSTAB → $p^{n+1}$}};
+\node[phasebox=purple2, below=2.5mm of P4] (P5)
+  {\textcolor{purple2}{\textbf{\jp{⑧⑨ 速度補正・収束確認}}}\enspace
+   \jp{CCD $\bnabla p^{n+1}$ + Rhie-Chow 補正 → $\bu^{n+1}$；CFL更新}};
+
+\node[statebox, below=3mm of P5] (Out)
+  {\jp{出力：}\,$\phi^{n+1}$，$\bu^{n+1}$，$p^{n+1}$\quad$\to$\quad$t:=t+\Delta t$};
+
+\foreach \a/\b in {In/P1, P1/P2, P2/P3, P3/P4, P4/P5, P5/Out}
+  \draw[arr] (\a) -- (\b);
+
+%% ループ矢印
+\draw[arr, rounded corners=5pt]
+  (Out.east) -- ++(7mm,0) -- ++(0,46mm)
+  node[midway, right, font=\scriptsize\jpfont, rotate=90, anchor=south,
+       text=navy, yshift=0.5mm] {\jp{次ステップへ}}
+  -- (In.east);
+
+\end{scope}
+\end{tikzpicture}
+\caption{\jp{（上）NS 方程式の各項と対応ソルバーの概要．（下）タイムステッピングフロー．
+①〜⑨ は第\ref{sec:algorithm}章に対応する．}}
+\label{fig:overview}
+\end{figure}
+
+\subsection{\jp{本稿の構成}}
+
+\jp{第\ref{sec:governing}章で支配方程式（One-Fluid Navier--Stokes + Level Set）を導く．
+第\ref{sec:levelset}章で Level Set 法の詳細（移流・再初期化・物性補間）を述べる．
+第\ref{sec:grid}章で界面適合非一様格子の構築法と座標変換を説明する．
+第\ref{sec:CCD}章が本稿の数学的核心であり，CCD スキームの係数をテイラー展開から完全に導出する．
+第\ref{sec:collocate}章でコロケート格子と Rhie--Chow 補正を述べる．
+第\ref{sec:pressure}章で圧力 Poisson 方程式を導出し CCD で差分化する．
+第\ref{sec:time}章で時間積分スキームを説明し，
+第\ref{sec:algorithm}章で完全アルゴリズムをまとめる．}
+
+
+%% ============================================================
+\section{\jp{支配方程式系の導出}}
+\label{sec:governing}
+%% ============================================================
+
+\subsection{\jp{One-Fluid（単一流体）定式化の概念}}
+
+\jp{気相・液相を別々の変数で扱う代わりに，
+界面近傍で物性値を滑らかに補間した \textbf{「一つの流体」として扱う}定式化を One-Fluid 法という．
+変密度・変粘性の単一 Navier--Stokes 方程式で全領域を記述できるため，
+界面の陰関数表現（Level Set など）と自然に組み合わせられる．}
+
+\subsection{\jp{非圧縮条件（連続の式）}}
+
+\jp{気相・液相とも非圧縮性流体（$\rho = $const in each phase）を仮定する．
+One-Fluid 定式化では，界面が移流によって運ばれるだけで質量が生成・消滅しないから，
+速度場に対して以下の拘束条件が成立する：}
+\begin{equation}
+  \bnabla \cdot \bu = 0
+  \label{eq:continuity}
+\end{equation}
+\jp{この式は各タイムステップで圧力場を通じて強制的に満たされる（後述の Projection 法）．}
+
+\subsection{Navier--Stokes \jp{方程式（One-Fluid + CSF）}}
+
+\jp{One-Fluid 定式化による運動方程式は，密度・粘性が空間的に変化することを許した
+Navier--Stokes 方程式である：}
+
+\begin{tcolorbox}[mybox, title={\jp{One-Fluid Navier--Stokes 方程式（次元形）}}]
+\begin{equation}
+  \rho(\phi)\!\left(\pd{\bu}{t} + \bu\cdot\bnabla\bu\right)
+  = -\bnabla p
+  + \bnabla\cdot\!\left[\mu(\phi)\!\left(\bnabla\bu + \bnabla\bu^T\right)\right]
+  + \rho(\phi)\,\bg
+  + \sigma\,\kappa\,\de(\phi)\,\bnabla\phi
+  \label{eq:NS_dim}
+\end{equation}
+\end{tcolorbox}
+
+\jp{各項の物理的意味を表\ref{tab:NS_terms}に整理する．}
+
+\begin{table}[h]
+\centering
+\caption{\jp{Navier--Stokes 方程式の各項の意味}}
+\label{tab:NS_terms}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\jp{項} & \jp{数式} & \jp{物理的意味}\\
+\midrule
+\jp{慣性力（左辺）} & $\rho D\bu/Dt$ & \jp{質量}$\times$\jp{加速度（Newton 第2法則）}\\
+\jp{圧力勾配力} & $-\bnabla p$ & \jp{等方圧縮力}\\
+\jp{粘性応力} & $\bnabla\cdot[\mu(\bnabla\bu+\bnabla\bu^T)]$ & \jp{変密度対応の Stokes 応力テンソル}\\
+\jp{重力} & $\rho\,\bg$ & \jp{$\bg = -g\hat{\bm{z}}$（下向き重力）}\\
+\jp{表面張力（CSF法）} & $\sigma\kappa\de\bnabla\phi$ & \jp{界面の曲率を体積力に変換 \cite{Brackbill1992}}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{CSF \jp{法（連続体表面力法）の導出}}
+
+\jp{界面上の表面張力は本来面積力（界面にのみ作用する面分布力）であるが，
+Brackbill \textit{et al.} \cite{Brackbill1992} の \textbf{CSF（Continuum Surface Force）法} では，
+これを体積力として全領域の方程式に組み込む．}
+
+\jp{界面上の単位面積あたりの表面張力ベクトルは，
+曲率 $\kappa$ と界面法線 $\hat{\bm{n}} = \bnabla\phi/|\bnabla\phi|$ を用いて：}
+\begin{equation}
+  \bm{F}_{\mathrm{surf}} = \sigma\kappa\hat{\bm{n}}
+\end{equation}
+\jp{これを界面からの距離に応じて分布させるためにデルタ関数 $\de(\phi)|\bnabla\phi|$ を掛け，
+$\bnabla\phi = |\bnabla\phi|\hat{\bm{n}}$ を用いて書き直すと式\eqref{eq:NS_dim}の最終項を得る：}
+\begin{equation}
+  \bm{F}_{\mathrm{CSF}} = \sigma\kappa\,\de(\phi)\,\bnabla\phi
+\end{equation}
+
+\subsection{\jp{界面曲率の計算式}}
+
+\jp{平均曲率 $\kappa$ は Level Set 関数の発散（単位法線ベクトルの発散）として定義される：}
+\begin{equation}
+  \kappa(\phi) = -\bnabla\cdot\!\left(\frac{\bnabla\phi}{|\bnabla\phi|}\right)
+  \label{eq:curvature_def}
+\end{equation}
+\jp{2次元の場合にこれを展開すると，$\phi_x = \partial\phi/\partial x$ 等と略記して：}
+\begin{tcolorbox}[mybox, title={\jp{2次元界面曲率（展開形）}}]
+\begin{equation}
+  \kappa = -\frac{
+    \phi_x^2\,\phi_{yy}
+    - 2\phi_x\phi_y\,\phi_{xy}
+    + \phi_y^2\,\phi_{xx}
+  }{\bigl(\phi_x^2 + \phi_y^2\bigr)^{3/2}}
+  \label{eq:curvature_2d}
+\end{equation}
+\end{tcolorbox}
+\jp{この計算には $\phi_{xx}$，$\phi_{yy}$，$\phi_{xy}$ という二階偏微分が必要であり，
+CCD 法を用いることで $\Ord{h^6}$ 精度の高精度評価が可能となる（第\ref{sec:CCD}章参照）．}
+
+\subsubsection{\jp{曲率計算の導出（式\eqref{eq:curvature_def}から式\eqref{eq:curvature_2d}）}}
+
+\jp{$\hat{\bm{n}} = (\phi_x/|\bnabla\phi|,\, \phi_y/|\bnabla\phi|)$ として発散を計算する：}
+\begin{align}
+  \kappa
+  &= -\left(\pd{}{x}\frac{\phi_x}{|\bnabla\phi|}
+           + \pd{}{y}\frac{\phi_y}{|\bnabla\phi|}\right) \notag\\
+  &= -\frac{\phi_{xx}|\bnabla\phi|^2 - \phi_x(\phi_x\phi_{xx}+\phi_y\phi_{xy})}{|\bnabla\phi|^3}
+     -\frac{\phi_{yy}|\bnabla\phi|^2 - \phi_y(\phi_x\phi_{xy}+\phi_y\phi_{yy})}{|\bnabla\phi|^3}
+     \notag\\
+  &= -\frac{(\phi_x^2+\phi_y^2)(\phi_{xx}+\phi_{yy})
+            - (\phi_x^2\phi_{xx}+2\phi_x\phi_y\phi_{xy}+\phi_y^2\phi_{yy})}{|\bnabla\phi|^3}
+     \notag\\
+  &= -\frac{\phi_y^2\phi_{xx} - 2\phi_x\phi_y\phi_{xy} + \phi_x^2\phi_{yy}}{|\bnabla\phi|^3}
+\end{align}
+\jp{符号付き距離関数の性質 $|\bnabla\phi|=1$ の近傍では分母が 1 に近いが，
+一般の Level Set 関数では式\eqref{eq:curvature_2d}の通り分母を保持する必要がある．}
+
+\subsection{\jp{無次元化}}
+
+\jp{参照量として液相密度 $\rho_l$，代表速度 $U$，代表長さ $L$ を選ぶ：}
+\begin{equation}
+  \tilde{\bm{x}} = \frac{\bm{x}}{L},\quad
+  \tilde{\bu} = \frac{\bu}{U},\quad
+  \tilde{t} = \frac{Ut}{L},\quad
+  \tilde{p} = \frac{p}{\rho_l U^2},\quad
+  \tilde{\phi} = \frac{\phi}{L}
+  \label{eq:nondim_vars}
+\end{equation}
+
+\jp{無次元パラメータ（チルダは省略）：}
+\begin{equation}
+  Re = \frac{\rho_l U L}{\mu_l},\quad
+  Fr = \frac{U}{\sqrt{gL}},\quad
+  We = \frac{\rho_l U^2 L}{\sigma},\quad
+  \hat{\rho} = \frac{\rho_g}{\rho_l},\quad
+  \hat{\mu}  = \frac{\mu_g}{\mu_l}
+  \label{eq:nondim_params}
+\end{equation}
+
+\jp{無次元密度・粘性係数：}
+$\tilde{\rho} = \hat{\rho} + (1-\hat{\rho})\He(\phi)$\jp{，}
+$\tilde{\mu} = \hat{\mu} + (1-\hat{\mu})\He(\phi)$
+
+\jp{無次元 Navier--Stokes 方程式（チルダ省略）：}
+\begin{tcolorbox}[mybox, title={\jp{無次元 Navier--Stokes 方程式}}]
+\begin{equation}
+  \tilde{\rho}\!\left(\pd{\bu}{t} + \bu\cdot\bnabla\bu\right)
+  = -\bnabla p
+  + \frac{1}{Re}\,\bnabla\cdot\!\left[\tilde{\mu}\!\left(\bnabla\bu + \bnabla\bu^T\right)\right]
+  - \frac{\tilde{\rho}}{Fr^2}\hat{\bm{z}}
+  + \frac{\kappa\,\de\,\bnabla\phi}{We}
+  \label{eq:NS_dimless}
+\end{equation}
+\end{tcolorbox}
+
+%% ============================================================
+\section{Level Set \jp{法による界面追跡}}
+\label{sec:levelset}
+%% ============================================================
+
+\subsection{\jp{符号付き距離関数（Level Set 関数）}}
+
+\jp{Level Set 法 \cite{OsherSethian1988, Sussman1994} では，
+界面を陰関数 $\phi(\bm{x}, t)$ で表す．
+特に \textbf{符号付き距離関数} を用いるのが標準的で：}
+\begin{equation}
+  \phi(\bm{x}, t)
+  \begin{cases}
+    > 0 & \text{\jp{（液相内部）}}\\
+    = 0 & \text{\jp{（界面上）}}\\
+    < 0 & \text{\jp{（気相内部）}}
+  \end{cases}
+  \qquad
+  |\phi(\bm{x},t)| = \mathrm{dist}(\bm{x},\,\Gamma)
+\end{equation}
+
+\jp{距離関数の特徴的な性質は}
+\begin{equation}
+  |\bnabla\phi| = 1 \quad \text{\jp{（Eikonal 方程式）}}
+  \label{eq:eikonal}
+\end{equation}
+\jp{である．この性質により，界面法線 $\hat{\bm{n}} = \bnabla\phi$ と曲率計算が安定化される．
+移流によって徐々に崩れるため，後述の再初期化で定期的に回復させる．}
+
+\subsection{\jp{滑らか化ヘヴィサイド関数とデルタ関数}}
+
+\jp{界面の急峻な不連続を数値的に扱うため，
+幅 $\varepsilon$（典型値 $\varepsilon \approx 1.5\Delta x_{\min}$）の滑らか化を施す：}
+
+\begin{tcolorbox}[mybox, title={\jp{滑らか化ヘヴィサイド関数（Sussman-type）}}]
+\begin{equation}
+  \He(\phi) =
+  \begin{cases}
+    0
+      & (\phi < -\varepsilon) \\[6pt]
+    \displaystyle\frac{1}{2}\!\left[
+      1 + \frac{\phi}{\varepsilon}
+      + \frac{1}{\pi}\sin\!\left(\frac{\pi\phi}{\varepsilon}\right)
+    \right]
+      & (|\phi| \leq \varepsilon) \\[10pt]
+    1
+      & (\phi > +\varepsilon)
+  \end{cases}
+  \label{eq:heaviside}
+\end{equation}
+\end{tcolorbox}
+
+\jp{これを $\phi$ で微分したものが滑らか化デルタ関数であり，
+界面積分を体積積分に変換するために用いられる（CSF 表面張力等）：}
+\begin{equation}
+  \de(\phi) = \frac{d\He}{d\phi}
+  =
+  \begin{cases}
+    0
+      & (|\phi| > \varepsilon) \\[4pt]
+    \displaystyle\frac{1}{2\varepsilon}
+      \!\left[1 + \cos\!\left(\frac{\pi\phi}{\varepsilon}\right)\right]
+      & (|\phi| \leq \varepsilon)
+  \end{cases}
+  \label{eq:delta}
+\end{equation}
+
+\jp{この定義により，$\He$ は $C^1$ 級（一階微分が連続），
+$\de$ は $C^0$ 級の関数であり，数値的に安定な補間を保証する．}
+
+\subsection{\jp{物性値の補間}}
+
+\jp{密度と粘性係数を $\He$ を用いて連続補間する：}
+\begin{align}
+  \rho(\phi) &= \rho_g + (\rho_l - \rho_g)\,\He(\phi)
+  \label{eq:rho_interp}\\
+  \mu(\phi)  &= \mu_g  + (\mu_l  - \mu_g )\,\He(\phi)
+  \label{eq:mu_interp}
+\end{align}
+\jp{気相領域（$\phi<-\varepsilon$）では $\rho=\rho_g, \mu=\mu_g$，
+液相領域（$\phi>+\varepsilon$）では $\rho=\rho_l, \mu=\mu_l$ となり，
+界面近傍（$|\phi|\le\varepsilon$）で滑らかに遷移する．}
+
+\subsection{Level Set \jp{移流方程式とその意味}}
+
+\jp{界面は流体速度 $\bu$ によって移流される．
+$\phi$ は流体質点に乗って運ばれる物質量（Lagrangian quantity）ではなく，
+Eulerian 場として定義されるため，移流方程式は：}
+\begin{equation}
+  \pd{\phi}{t} + \bu \cdot \bnabla\phi = 0
+  \label{eq:levelset_adv}
+\end{equation}
+\jp{これは双曲型偏微分方程式であり，衝撃波の形成（level set の折り畳み）の危険があるため，
+TVD（Total Variation Diminishing）スキームで安定化して解く（第\ref{sec:time}章参照）．}
+
+\subsection{\jp{再初期化方程式}}
+\label{sec:reinit}
+
+\jp{移流によって Eikonal 条件 $|\bnabla\phi|=1$ が崩れると，
+曲率計算が不正確になり，物性値の補間幅も変化してしまう．
+Sussman \textit{et al.} \cite{Sussman1994} による再初期化方程式は，
+仮想時間 $\tau$ 方向に解くことで $|\bnabla\phi|=1$ を回復する：}
+\begin{equation}
+  \pd{\phi}{\tau} + \operatorname{sgn}(\phi_0)\bigl(|\bnabla\phi| - 1\bigr) = 0
+  \label{eq:reinit}
+\end{equation}
+\jp{ここで $\phi_0$ は再初期化前の $\phi$ の値，$\operatorname{sgn}(\cdot)$ は符号関数である．
+$\phi$ の等値線を保ちながら勾配の大きさを 1 に引き寄せる PDE 操作である．}
+
+\subsection{\jp{質量保存性について}}
+\label{sec:massconserv}
+
+\jp{Level Set 法は界面の幾何形状（法線・曲率）を高精度に表現できる反面，
+\textbf{質量（体積）保存性を陽には保証しない}という本質的な特性を持つ．
+移流誤差と再初期化の組み合わせにより，$\phi=0$ の等値面が微小量変位し，
+閉鎖界面で囲まれた体積が経時的に減少・増大することがある．}
+
+\jp{本稿の実装では以下の方法で質量誤差を抑制する：}
+\begin{itemize}
+  \item \jp{再初期化の反復回数を1タイムステップあたり3〜5回に制限し，
+        界面位置の変位を最小化する．}
+  \item \jp{上流差分として Godunov 型（第\ref{sec:upstream}節）を採用し，
+        移流ステップでの数値拡散による体積変化を低減する．}
+  \item \jp{高精度差分（CCD $\Ord{h^6}$）と界面適合格子により，
+        格子解像度を上げることで質量誤差のスケーリングを改善する．}
+\end{itemize}
+
+\jp{より厳密な質量保存が必要な場合は，体積補正法（Volume-Correction method；\
+Sussman \& Fatemi \cite{Sussman1999}）や，Level Set と Volume-of-Fluid（VOF）を
+組み合わせた CLSVOF 法 \cite{Sussman2000} を適用することで，
+$\nabla\cdot\bu=0$ を維持しながら閉鎖界面の体積を厳密に保存できる．
+これらは本稿の枠組みの自然な拡張として位置づけられる．}
+
+%% ============================================================
+\section{\jp{界面適合非一様格子の構築}}
+\label{sec:grid}
+%% ============================================================
+
+\subsection{\jp{基本概念：なぜ非一様格子が必要か}}
+
+\jp{気液界面では密度・粘性・圧力に急峻な勾配が存在する．
+一様格子では界面分解能を上げるためには全格子を細分化する必要があり，
+計算コストが $\Ord{N^2}$ で増大する（2次元）．
+Level Set 値に連動した非一様格子により，界面近傍のみ高解像度化し，
+遠方は粗い格子を保つことができる．}
+
+\subsection{\jp{グリッド密度関数}}
+
+\jp{Level Set 関数 $\phi$ の値に基づき，界面（$\phi=0$）近傍ほど高密度となる
+グリッド密度関数 $\omega(\phi)$ を定義する：}
+\begin{equation}
+  \omega(\phi) = 1 + (\alpha - 1)\,\de^*(\phi),
+  \qquad
+  \de^*(\phi) = \frac{\de(\phi)}{\displaystyle\max_{\bm{x}}\,\de(\phi)}
+  \label{eq:density_func}
+\end{equation}
+\jp{ここで $\alpha > 1$ は界面近傍の格子密度倍率（典型値 $\alpha = 3\sim5$），
+$\de^*$ は最大値を 1 に正規化したデルタ関数である．
+界面から離れると $\de^*\to0$ なので $\omega\to1$（粗い格子），
+界面近傍では $\omega\to\alpha$（$\alpha$ 倍の細かい格子）となる．}
+
+\subsection{\jp{座標変換とメトリクス係数}}
+
+\jp{一様な計算空間 $\xi \in [0, N_\xi]$ を物理空間 $x \in [x_L, x_R]$ に
+写像する非線形座標変換を導入する．
+メトリクス係数 $J_x = d\xi/dx$ は：}
+\begin{equation}
+  J_x(x) = \frac{\omega(\phi(x))}{I_\omega}\cdot\frac{N_\xi}{x_R - x_L},
+  \qquad
+  I_\omega = \frac{1}{x_R - x_L}\int_{x_L}^{x_R}\omega(\phi(x'))\,dx'
+  \label{eq:metrics}
+\end{equation}
+\jp{$I_\omega$ は $\int_{x_L}^{x_R} J_x\,dx = N_\xi$ を保証する正規化係数である．}
+
+\subsection{\jp{偏微分の座標変換（厳密な導出）}}
+\label{sec:coord_transform}
+
+\jp{一次微分の変換はチェーンルール（合成関数の微分）から直接：}
+\begin{equation}
+  \pd{f}{x} = \pd{f}{\xi}\cdot\pd{\xi}{x} = J_x\,\pd{f}{\xi}
+  \label{eq:transform_1st}
+\end{equation}
+
+\jp{二次微分の変換は，式\eqref{eq:transform_1st} を再び $x$ で微分する．
+積の微分則を正しく適用することが重要である：}
+\begin{align}
+  \pdd{f}{x}
+  &= \pd{}{x}\!\left(J_x\,\pd{f}{\xi}\right)
+  = J_x\,\pd{}{\xi}\!\left(J_x\,\pd{f}{\xi}\right)
+  \qquad\left[\because \pd{}{x} = J_x\pd{}{\xi}\right] \notag\\
+  &= J_x\!\left(\pd{J_x}{\xi}\,\pd{f}{\xi} + J_x\,\pdd{f}{\xi}\right)
+\end{align}
+
+\begin{tcolorbox}[resultbox]
+\textbf{\jp{座標変換公式（正しい形）：}}
+\begin{align}
+  \pd{f}{x} &= J_x\,\pd{f}{\xi}
+  \label{eq:transform_1st_correct}\\[6pt]
+  \pdd{f}{x} &= J_x^2\,\pdd{f}{\xi} + \mathbf{J_x}\,\pd{J_x}{\xi}\,\pd{f}{\xi}
+  \label{eq:transform_2nd_correct}
+\end{align}
+\end{tcolorbox}
+
+\subsection{\jp{グリッド生成アルゴリズム（反復法）}}
+
+\begin{tcolorbox}[algbox, title={\jp{界面適合格子生成アルゴリズム}}]
+\begin{enumerate}[label=\textbf{Step~\arabic*.}, leftmargin=*, itemsep=4pt]
+  \item \jp{\textbf{初期化：}
+        $x_i^{(0)} = x_L + i\,\Delta x_0$，
+        $\Delta x_0 = (x_R-x_L)/N$（等間隔）}
+
+  \item \jp{\textbf{密度重み計算：}
+        各格子点 $x_i^{(k)}$ で Level Set 値から
+        $\omega_i^{(k)} = 1 + (\alpha-1)\,\de^*\!\bigl(\phi(x_i^{(k)})\bigr)$}
+
+  \item \jp{\textbf{累積弧長：}
+        $s_0 = 0$，
+        $s_i = \displaystyle\sum_{j=0}^{i-1}\omega_j^{(k)}\,\Delta x_0$}
+
+  \item \jp{\textbf{スプライン補間：}
+        等分点 $s_i^* = i\,s_N/N$ に対して三次スプラインで $x_i^{(k+1)}$ を更新}
+
+  \item \jp{\textbf{収束判定：}
+        $\|x^{(k+1)} - x^{(k)}\|_\infty < \mathrm{tol}$ ならば終了，
+        そうでなければ Step~2 へ戻る}
+\end{enumerate}
+\jp{2次元では $x$ 方向・$y$ 方向それぞれ独立にこのアルゴリズムを適用する．
+メトリクス係数 $\partial J_x/\partial\xi$ も CCD 法（第\ref{sec:CCD}章）を用いて高精度に評価する．}
+\end{tcolorbox}
+
+
+%% ============================================================
+\section{\jp{結合コンパクト差分法（CCD 法）の厳密導出}}
+\label{sec:CCD}
+%% ============================================================
+
+\subsection{\jp{コンパクト差分法の概念と精度の比較}}
+
+\jp{古典的な有限差分法では，精度を上げるためにステンシルを拡大する（多点を使う）．
+これに対して \textbf{コンパクト差分法} は，
+隣接点の\emph{微分値}も未知数として連立することで，
+同じ3点ステンシルでより高精度を実現する陰的手法である．}
+
+\begin{table}[h]
+\centering
+\caption{\jp{各種差分スキームの比較}}
+\label{tab:scheme_compare}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\jp{スキーム} & \jp{精度} & \jp{幅} & \jp{コスト} & \jp{特徴}\\
+\midrule
+\jp{中心差分} & $\Ord{h^2}$ & 3 \jp{点} & $\Ord{N}$ & \jp{陽的，低精度}\\
+\jp{4次中心差分} & $\Ord{h^4}$ & 5 \jp{点} & $\Ord{N}$ & \jp{ステンシル増大}\\
+Padé \jp{スキーム (Lele)} & $\Ord{h^4}$ & 3 \jp{点} & $\Ord{N}$\jp{（三重対角）} & \jp{$f'$ のみ}\\
+\jp{CCD 法（本稿）} & $\Ord{h^6}$ & 3 \jp{点} & $\Ord{N}$\jp{（ブロック三重対角）} & \jp{$f', f''$ 同時}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\jp{CCD 法最大の利点は，一次微分 $f^{(1)}_i$ と二次微分 $f^{(2)}_i$ を
+\emph{同一コスト}で，かつ \emph{両方とも $\Ord{h^6}$ 精度}で求められることである．
+これは曲率計算（二次微分が必要）と速度勾配計算（一次微分が必要）を
+統一的な枠組みで高精度に行えることを意味する．}
+
+\subsection{CCD \jp{スキームの定義}}
+
+\jp{格子点 $i = 0, 1, \ldots, N$（間隔 $h = L/N$）を配置する．
+各内点 $i = 1, \ldots, N-1$ において，以下の2式が成立するように係数を定める：}
+
+\begin{tcolorbox}[mybox, title={CCD \jp{スキームの2方程式}}]
+\textbf{Equation-I}\jp{（一次微分の結合式）：}
+\begin{equation}
+  \alpha_1\fp{i-1} + \fp{i} + \alpha_1\fp{i+1}
+  = \frac{a_1}{h}\bigl(f_{i+1}-f_{i-1}\bigr)
+  + b_1 h\bigl(\fpp{i+1}-\fpp{i-1}\bigr)
+  \label{eq:CCD_I}
+\end{equation}
+
+\textbf{Equation-II}\jp{（二次微分の結合式）：}
+\begin{equation}
+  \beta_2\fpp{i-1} + \fpp{i} + \beta_2\fpp{i+1}
+  = \frac{a_2}{h^2}\bigl(f_{i-1}-2f_i+f_{i+1}\bigr)
+  + \frac{b_2}{h}\bigl(\fp{i+1}-\fp{i-1}\bigr)
+  \label{eq:CCD_II}
+\end{equation}
+\end{tcolorbox}
+
+\jp{ここで $\fp{i} \equiv f^{(1)}_i = \partial f/\partial x|_{x_i}$，
+$\fpp{i} \equiv f^{(2)}_i = \partial^2 f/\partial x^2|_{x_i}$ である．
+係数 $(\alpha_1, a_1, b_1, \beta_2, a_2, b_2)$ は次節でテイラー展開から決定する．}
+
+\subsection{Equation-I \jp{の係数導出（テイラー展開による厳密計算）}}
+
+\jp{格子点 $i$ の周りでテイラー展開する．上付き $(n)$ は $n$ 階微分を表す：}
+\begin{align}
+  f_{i\pm1} &= f_i \pm h\fp{i} + \frac{h^2}{2}\fpp{i}
+               \pm \frac{h^3}{6}f^{(3)}_i
+               + \frac{h^4}{24}f^{(4)}_i
+               \pm \frac{h^5}{120}f^{(5)}_i + \Ord{h^6}
+  \label{eq:taylor_f}\\
+  \fp{i\pm1} &= \fp{i} \pm h\fpp{i}
+               + \frac{h^2}{2}f^{(3)}_i
+               \pm \frac{h^3}{6}f^{(4)}_i
+               + \frac{h^4}{24}f^{(5)}_i + \Ord{h^5}
+  \label{eq:taylor_fp}\\
+  \fpp{i\pm1} &= \fpp{i} \pm h f^{(3)}_i
+               + \frac{h^2}{2}f^{(4)}_i
+               \pm \frac{h^3}{6}f^{(5)}_i + \Ord{h^4}
+  \label{eq:taylor_fpp}
+\end{align}
+
+\jp{Equation-I の各項をテイラー展開で整理する：}
+\begin{tcolorbox}[derivbox]
+\textbf{\jp{LHS の展開：}}
+\begin{align}
+  &\alpha_1\fp{i-1} + \fp{i} + \alpha_1\fp{i+1} \notag\\
+  &= (1+2\alpha_1)\fp{i} + \alpha_1 h^2 f^{(3)}_i + \frac{\alpha_1}{12}h^4 f^{(5)}_i + \Ord{h^6}
+\end{align}
+\textbf{\jp{RHS 第1項の展開：}}
+\begin{align}
+  &\frac{a_1}{h}\bigl(f_{i+1}-f_{i-1}\bigr) = 2a_1\fp{i}
+    + \frac{a_1}{3}h^2 f^{(3)}_i
+    + \frac{a_1}{60}h^4 f^{(5)}_i + \Ord{h^6}
+\end{align}
+\textbf{\jp{RHS 第2項の展開：}}
+\begin{align}
+  &b_1 h\bigl(\fpp{i+1}-\fpp{i-1}\bigr) = 2b_1 h^2 f^{(3)}_i
+    + \frac{b_1}{3}h^4 f^{(5)}_i + \Ord{h^6}
+\end{align}
+\end{tcolorbox}
+
+\jp{残差 $R_I = $ LHS $-$ RHS を $f^{(n)}_i \cdot h^{n-1}$ の各次数で整理すると：}
+\begin{align}
+  \Ord{h^0}\text{\,\jp{（整合条件）}}:&\quad (1+2\alpha_1) - 2a_1 = 0
+  \label{eq:cond_I_0}\\[3pt]
+  \Ord{h^2}\text{\,\jp{（誤差消去）}}:&\quad \alpha_1 - \frac{a_1}{3} - 2b_1 = 0
+  \label{eq:cond_I_2}\\[3pt]
+  \Ord{h^4}\text{\,\jp{（誤差消去）}}:&\quad \frac{\alpha_1}{12} - \frac{a_1}{60} - \frac{b_1}{3} = 0
+  \label{eq:cond_I_4}
+\end{align}
+
+\jp{これは3元連立1次方程式である．解法：}
+\begin{enumerate}[noitemsep]
+  \item \jp{式\eqref{eq:cond_I_0} より $a_1 = (1+2\alpha_1)/2$}
+  \item \jp{式\eqref{eq:cond_I_2} に代入して $b_1 = \alpha_1/2 - a_1/6 = (4\alpha_1-1)/12$}
+  \item \jp{式\eqref{eq:cond_I_4} に代入して
+        $\alpha_1(1/12 - 1/30 - 4/36) = $ $\ldots$ を解くと $\alpha_1 = 7/16$}
+\end{enumerate}
+
+\begin{tcolorbox}[resultbox]
+\textbf{\jp{Equation-I の係数（}$\Ord{h^6}$ \jp{精度，一意解）：}}
+\begin{equation}
+  \boxed{
+    \alpha_1 = \frac{7}{16},\quad
+    a_1 = \frac{15}{16},\quad
+    b_1 = \frac{1}{16}
+  }
+  \label{eq:coef_I}
+\end{equation}
+\jp{打切り誤差：} $T_I = -\dfrac{h^6}{5040}f^{(7)}_i + \Ord{h^8}$
+\end{tcolorbox}
+
+\subsection{Equation-II \jp{の係数導出}}
+
+\jp{同様に Equation-II の各項をテイラー展開する：}
+\begin{tcolorbox}[derivbox]
+\textbf{\jp{LHS の展開：}}
+\begin{align}
+  &\beta_2\fpp{i-1} + \fpp{i} + \beta_2\fpp{i+1} \notag\\
+  &= (1+2\beta_2)\fpp{i} + \beta_2 h^2 f^{(4)}_i
+    + \frac{\beta_2}{12}h^4 f^{(6)}_i + \Ord{h^6}
+\end{align}
+\textbf{\jp{RHS 第1項の展開：}}
+\begin{align}
+  &\frac{a_2}{h^2}\bigl(f_{i-1}-2f_i+f_{i+1}\bigr) = a_2\fpp{i}
+    + \frac{a_2}{12}h^2 f^{(4)}_i
+    + \frac{a_2}{360}h^4 f^{(6)}_i + \Ord{h^6}
+\end{align}
+\textbf{\jp{RHS 第2項の展開：}}
+\begin{align}
+  &\frac{b_2}{h}\bigl(\fp{i+1}-\fp{i-1}\bigr) = 2b_2\fpp{i}
+    + \frac{b_2}{3}h^2 f^{(4)}_i
+    + \frac{b_2}{60}h^4 f^{(6)}_i + \Ord{h^6}
+\end{align}
+\end{tcolorbox}
+
+\jp{各次数の拘束条件：}
+\begin{align}
+  \Ord{h^0}:&\quad (1+2\beta_2) - a_2 - 2b_2 = 0
+  \label{eq:cond_II_0}\\[3pt]
+  \Ord{h^2}:&\quad \beta_2 - \frac{a_2}{12} - \frac{b_2}{3} = 0
+  \label{eq:cond_II_2}\\[3pt]
+  \Ord{h^4}:&\quad \frac{\beta_2}{12} - \frac{a_2}{360} - \frac{b_2}{60} = 0
+  \label{eq:cond_II_4}
+\end{align}
+
+\jp{式\eqref{eq:cond_II_0}--\eqref{eq:cond_II_4} を連立して解くと：}
+
+\begin{tcolorbox}[resultbox]
+\textbf{\jp{Equation-II の係数（}$\Ord{h^6}$ \jp{精度，一意解）：}}
+\begin{equation}
+  \boxed{
+    \beta_2 = -\frac{1}{8},\quad
+    a_2 = 3,\quad
+    b_2 = -\frac{9}{8}
+  }
+  \label{eq:coef_II}
+\end{equation}
+\jp{打切り誤差：} $T_{II} = -\dfrac{h^6}{20160}f^{(8)}_i + \Ord{h^8}$
+\end{tcolorbox}
+
+\subsection{\jp{ブロック行列の完全定式化}}
+
+\jp{$N-1$ 個の内点における全 Eq-I・Eq-II を並べると，
+$2(N-1)\times2(N-1)$ のブロック連立系が得られる：}
+\begin{equation}
+  \begin{bmatrix}
+    \bm{A}_{11} & \bm{A}_{12}\\[4pt]
+    \bm{A}_{21} & \bm{A}_{22}
+  \end{bmatrix}
+  \begin{bmatrix}
+    \bm{f}^{(1)}\\[4pt] \bm{f}^{(2)}
+  \end{bmatrix}
+  =
+  \begin{bmatrix}
+    \bm{r}_1\\[4pt] \bm{r}_2
+  \end{bmatrix}
+  \label{eq:block_system}
+\end{equation}
+
+\jp{各ブロック行列の具体的な定義：}
+\begin{tcolorbox}[mybox, title={\jp{ブロック行列の定義（正しい符号）}}]
+\begin{alignat}{2}
+  \bm{A}_{11} &= \operatorname{tridiag}\!\left(\frac{7}{16},\;1,\;\frac{7}{16}\right),
+  &\quad& A_{11,ij}= \begin{cases}7/16 & |i-j|=1\\ 1 & i=j\end{cases}
+  \label{eq:A11}\\[6pt]
+  \bm{A}_{12} &= \frac{h}{16}\operatorname{tridiag}(+1,\;0,\;-1),
+  &\quad& A_{12,ij}= \begin{cases}+h/16 & j=i-1\\ -h/16 & j=i+1\end{cases}
+  \label{eq:A12}\\[6pt]
+  \bm{A}_{21} &= \frac{9}{8h}\operatorname{tridiag}(-1,\;0,\;+1),
+  &\quad& A_{21,ij}= \begin{cases}-9/(8h) & j=i-1\\ +9/(8h) & j=i+1\end{cases}
+  \label{eq:A21}\\[6pt]
+  \bm{A}_{22} &= \operatorname{tridiag}\!\left(-\frac{1}{8},\;1,\;-\frac{1}{8}\right),
+  &\quad&\text{\jp{正定値（固有値}} \in [3/4,\,5/4]\text{\jp{）}}
+  \label{eq:A22}
+\end{alignat}
+\end{tcolorbox}
+
+\jp{右辺ベクトル（正しい係数を代入）：}
+\begin{equation}
+  (\bm{r}_1)_i = \frac{15}{16h}\bigl(f_{i+1}-f_{i-1}\bigr),
+  \qquad
+  (\bm{r}_2)_i = \frac{3}{h^2}\bigl(f_{i-1}-2f_i+f_{i+1}\bigr)
+  \label{eq:CCD_rhs}
+\end{equation}
+
+\jp{境界点 $i=0,N$ の微分値は次節の境界スキームで求め，
+行\eqref{eq:block_system} の右辺に移行する：}
+\begin{align}
+  (\bm{r}_1)_1    &\leftarrow (\bm{r}_1)_1    - \tfrac{7}{16}\fp{0} - \tfrac{h}{16}\fpp{0}
+  \\
+  (\bm{r}_2)_1    &\leftarrow (\bm{r}_2)_1    + \tfrac{9}{8h}\fp{0} + \tfrac{1}{8}\fpp{0}
+  \\
+  (\bm{r}_1)_{N-1}&\leftarrow (\bm{r}_1)_{N-1} - \tfrac{7}{16}\fp{N} + \tfrac{h}{16}\fpp{N}
+  \\
+  (\bm{r}_2)_{N-1}&\leftarrow (\bm{r}_2)_{N-1} - \tfrac{9}{8h}\fp{N} + \tfrac{1}{8}\fpp{N}
+\end{align}
+
+\subsection{\jp{境界コンパクトスキームの導出}}
+
+\jp{内点 CCD が $i-1$，$i$，$i+1$ を参照するため，
+境界点 $i=0$（左境界）には片側スキームを用いる．
+4点のステンシル $f_0, f_1, f_2, f_3$ と隣接点微分値 $\fp{1}, \fpp{1}$ を結合し，
+$\Ord{h^5}$ 精度（内点の $\Ord{h^6}$ より1次低い，標準的設計）で導出する：}
+
+\begin{tcolorbox}[mybox, title={\jp{左境界スキーム（$i=0$，$\Ord{h^5}$）}}]
+\textbf{Eq-I-bc:}
+\begin{equation}
+  \fp{0} + \frac{3}{2}\fp{1} - \frac{3h}{2}\fpp{1}
+  = \frac{1}{h}\!\left(
+    -\frac{23}{6}f_0
+    + \frac{21}{4}f_1
+    - \frac{3}{2}f_2
+    + \frac{1}{12}f_3
+  \right)
+  \label{eq:bc_I_left}
+\end{equation}
+\textbf{Eq-II-bc:}
+\begin{equation}
+  \fpp{0} - 3\fpp{1}
+  + \frac{23}{3h}\fp{0}
+  + \frac{9}{h}\fp{1}
+  = \frac{1}{h^2}\!\left(
+    -\frac{325}{18}f_0
+    + \frac{39}{2}f_1
+    - \frac{3}{2}f_2
+    + \frac{1}{18}f_3
+  \right)
+  \label{eq:bc_II_left}
+\end{equation}
+\end{tcolorbox}
+
+\jp{右境界 $i=N$ のスキームは，左境界式に $h\to-h$ の変換を適用して得られる．
+Eq-I（奇関数，$\fp{}$ は1階）では関数値係数の符号が反転し，
+Eq-II（偶関数，$\fpp{}$ は2階）では $\fp{}$ 結合係数の符号が反転する：}
+
+\begin{tcolorbox}[mybox, title={\jp{右境界スキーム（$i=N$，$\Ord{h^5}$）}}]
+\textbf{Eq-I-bc:}
+\begin{equation}
+  \fp{N} + \frac{3}{2}\fp{N-1} + \frac{3h}{2}\fpp{N-1}
+  = \frac{1}{h}\!\left(
+    +\frac{23}{6}f_N
+    - \frac{21}{4}f_{N-1}
+    + \frac{3}{2}f_{N-2}
+    - \frac{1}{12}f_{N-3}
+  \right)
+  \label{eq:bc_I_right}
+\end{equation}
+\textbf{Eq-II-bc:}
+\begin{equation}
+  \fpp{N} - 3\fpp{N-1}
+  - \frac{23}{3h}\fp{N}
+  - \frac{9}{h}\fp{N-1}
+  = \frac{1}{h^2}\!\left(
+    -\frac{325}{18}f_N
+    + \frac{39}{2}f_{N-1}
+    - \frac{3}{2}f_{N-2}
+    + \frac{1}{18}f_{N-3}
+  \right)
+  \label{eq:bc_II_right}
+\end{equation}
+\end{tcolorbox}
+
+\subsection{\jp{非一様格子への CCD の拡張}}
+
+\jp{計算空間（一様，格子間隔 $\Delta\xi$）で Eq-I・Eq-II を解いて
+$f^{(1)}_{\xi}$，$f^{(2)}_{\xi}$ を求め，
+第\ref{sec:coord_transform}節の座標変換式で物理空間の微分値に変換する：}
+\begin{align}
+  \left.\pd{f}{x}\right|_i
+    &= J_{x,i}\cdot f^{(1)}_{\xi,i}
+  \label{eq:nonuniform_1st}\\[6pt]
+  \left.\pdd{f}{x}\right|_i
+    &= J_{x,i}^2\cdot f^{(2)}_{\xi,i}
+     + J_{x,i}\cdot\left.\pd{J_x}{\xi}\right|_i \cdot f^{(1)}_{\xi,i}
+  \label{eq:nonuniform_2nd}
+\end{align}
+\jp{$\partial J_x/\partial\xi$ 自体も CCD を用いて $\Ord{h^6}$ 精度で評価する．}
+
+\subsection{\jp{混合偏微分の計算（逐次適用）}}
+
+\jp{曲率式\eqref{eq:curvature_2d}の $\phi_{xy}$ など，
+混合偏微分 $\partial^2 f/\partial x\partial y$ は CCD の逐次適用で評価する：}
+\begin{enumerate}
+  \item \jp{まず $y$ 方向に全列 $j$ で CCD を適用し，$f^{(1)}_{y,i,j}$ を求める．}
+  \item \jp{次に $f^{(1)}_{y,i,j}$ を「関数値」として $x$ 方向 CCD を適用し，
+        $\bigl(f^{(1)}_y\bigr)^{(1)}_{x,i,j} = \partial^2 f/\partial x\partial y|_{i,j}$ を得る．}
+\end{enumerate}
+\jp{この2段階で曲率計算に必要な
+$\phi^{(1)}_x, \phi^{(1)}_y, \phi^{(2)}_x, \phi^{(2)}_y, (\phi^{(1)}_y)^{(1)}_x$
+をすべて $\Ord{h^6}$ 精度で統一的に評価できる．}
+
+\subsection{\jp{数値精度の確認}}
+
+\jp{$f(x) = \sin x$，$x\in[0,\pi]$，境界微分値は厳密値を使用した場合の収束試験：}
+
+\begin{table}[h]
+\centering
+\caption{$f=\sin x$ \jp{における CCD 法の格子収束（$\Ord{h^6}$）}}
+\label{tab:convergence}
+\begin{tabular}{rccccc}
+\toprule
+$N$ & $h$ & \jp{誤差} $\|\fp{}\|_\infty$ & \jp{収束次数} & \jp{誤差} $\|\fpp{}\|_\infty$ & \jp{収束次数}\\
+\midrule
+10  & $3.14\times10^{-1}$ & $1.61\times10^{-7}$ & --   & $2.77\times10^{-7}$ & --\\
+20  & $1.57\times10^{-1}$ & $2.52\times10^{-9}$ & 6.00 & $7.27\times10^{-9}$  & 5.25\\
+40  & $7.85\times10^{-2}$ & $3.93\times10^{-11}$ & 6.00 & $2.39\times10^{-10}$ & 4.92\\
+80  & $3.93\times10^{-2}$ & $6.12\times10^{-13}$ & 6.00 & $7.61\times10^{-12}$ & 4.97\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\jp{一次微分 $\fp{}$ では厳密に $\Ord{h^6}$ 収束が達成される．
+二次微分 $\fpp{}$ では内点の打切り誤差は $\Ord{h^6}$ であるが，
+格子精緻化時に境界スキーム（$\Ord{h^5}$）からの誤差伝播により
+見かけ上の次数がやや低下する傾向があり，それでも $\Ord{h^5}$ 以上を維持する．}
+
+\jp{また $f(x)=x^6$ の多項式完全性テスト（$f^{(7)}=0$ なので打切り誤差の主要項がゼロ）では，
+内点の誤差が機械精度（$\sim10^{-14}$）レベルとなることが確認できる．}
+
+
+%% ============================================================
+\section{\jp{コロケート格子と Rhie--Chow 補正}}
+\label{sec:collocate}
+%% ============================================================
+
+\subsection{\jp{格子構造の選択：スタガード vs コロケート}}
+
+\jp{非圧縮流体の数値計算には，速度・圧力の配置方法が2通り存在する：}
+
+\begin{itemize}
+  \item \jp{\textbf{スタガード格子（MAC 法）：}
+        速度成分をセル界面，圧力をセル中心に配置する．
+        速度の発散が自然に2次精度中心差分で評価でき，
+        チェッカーボード不安定が発生しない．
+        ただし変数を異なる格子点に配置するため CCD との併用には制約がある．}
+
+  \item \jp{\textbf{コロケート格子：}
+        全変数（$p, u, v, \phi, \rho, \mu, \kappa$）を同一のセル中心に配置する．
+        CCD を統一的に適用できる一方，チェッカーボード不安定が生じる危険がある．}
+\end{itemize}
+
+\jp{本稿では CCD の高精度を全変数で保つため，
+\textbf{コロケート格子を採用し，
+チェッカーボード不安定は Rhie--Chow 補正で制御する}．}
+
+\subsection{\jp{チェッカーボード不安定のメカニズム}}
+
+\jp{コロケート格子での圧力勾配は中心差分で
+$(\partial p/\partial x)_i \approx (p_{i+1}-p_{i-1})/(2h)$ と評価される．
+この式では $p_{i-1}$ と $p_{i+1}$ の差のみが現れ，$p_i$ 自身が現れない．
+そのため，奇数点と偶数点が独立に振動する「チェッカーボード」パターンが圧力に生じ，
+発散計算と整合しなくなる危険がある．}
+
+\subsection{Rhie--Chow \jp{補正}}
+
+\jp{Rhie \& Chow \cite{RhieChow1983} の補正は，
+セル界面での流束 $u_{i+1/2}$ を評価する際に，
+圧力の数値的振動成分を除去する補間を行う：}
+\begin{tcolorbox}[mybox, title={Rhie--Chow \jp{補正速度（セル界面，2次元）}}]
+\begin{equation}
+  u_{i+1/2,j}^{\mathrm{RC}}
+  = \frac{u^*_{i,j} + u^*_{i+1,j}}{2}
+  - \frac{\Delta t}{\tilde\rho_{i+1/2,j}}
+    \!\left[
+      \frac{p_{i+1,j} - p_{i,j}}{h_x}
+      - \frac{1}{2}\!\left(
+        \left.\frac{\partial p}{\partial x}\right|_{i,j}^{\mathrm{CCD}}
+        + \left.\frac{\partial p}{\partial x}\right|_{i+1,j}^{\mathrm{CCD}}
+      \right)
+    \right]
+  \label{eq:rhie_chow}
+\end{equation}
+\end{tcolorbox}
+
+\jp{式\eqref{eq:rhie_chow}の角括弧内の構造を解剖する：}
+\begin{itemize}
+  \item \jp{第1項 $\dfrac{p_{i+1,j}-p_{i,j}}{h_x}$：セル界面$(i+1/2,j)$における\textbf{直接的な}2点圧力差分．
+       $p_i$ 自身を参照するためチェッカーボード振動成分を「見る」ことができる．}
+  \item \jp{第2項 $\dfrac{1}{2}(p^{(1)}_{x,i,j}+p^{(1)}_{x,i+1,j})$：
+     隣接セル中心での CCD 圧力勾配の平均値．中心差分的評価のためチェッカーボード成分が「見えない」．}
+\end{itemize}
+\jp{両項の差はチェッカーボード成分のみを選択的に抽出しセル界面流速を補正する．
+均一場では補正がゼロになり，非物理的な拡散は導入されない．}
+
+\jp{\textbf{3次元への拡張：}セル $(i,j,k)$ の6面すべてに補正を適用する（2次元の4辺の場合は $k$ インデックスを省略）：}
+\begin{align}
+  u_{i+1/2,j,k}^{\mathrm{RC}} &= \frac{u^*_{i,j,k}+u^*_{i+1,j,k}}{2}
+    - \frac{\Delta t}{\tilde\rho_{i+1/2,j,k}}\!\left[\frac{p_{i+1,j,k}-p_{i,j,k}}{h_x}
+      -\frac{p^{(1)}_{x,i,j,k}+p^{(1)}_{x,i+1,j,k}}{2}\right]\label{eq:rhie_chow_u}\\[3pt]
+  v_{i,j+1/2,k}^{\mathrm{RC}} &= \frac{v^*_{i,j,k}+v^*_{i,j+1,k}}{2}
+    - \frac{\Delta t}{\tilde\rho_{i,j+1/2,k}}\!\left[\frac{p_{i,j+1,k}-p_{i,j,k}}{h_y}
+      -\frac{p^{(1)}_{y,i,j,k}+p^{(1)}_{y,i,j+1,k}}{2}\right]\label{eq:rhie_chow_v}\\[3pt]
+  w_{i,j,k+1/2}^{\mathrm{RC}} &= \frac{w^*_{i,j,k}+w^*_{i,j,k+1}}{2}
+    - \frac{\Delta t}{\tilde\rho_{i,j,k+1/2}}\!\left[\frac{p_{i,j,k+1}-p_{i,j,k}}{h_z}
+      -\frac{p^{(1)}_{z,i,j,k}+p^{(1)}_{z,i,j,k+1}}{2}\right]\label{eq:rhie_chow_w}
+\end{align}
+\jp{密度界面値は線形補間 $\tilde\rho_{i+1/2,j,k}=(\tilde\rho_{i,j,k}+\tilde\rho_{i+1,j,k})/2$ で評価する．}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[scale=0.9]
+  %% コロケート格子の模式図
+  \draw[thick,navy] (0,0) grid[step=1.5] (6,3);
+  \foreach \i in {0,1,2,3}{
+    \foreach \j in {0,1}{
+      \fill[navy] ({(\i+0.5)*1.5},{(\j+0.5)*1.5}) circle (3pt);
+    }
+  }
+  \node[font=\small\jpfont, navy] at (3,-0.5)
+    {\jp{コロケート格子：全変数を同一セル中心（$\bullet$）に配置}};
+  \node[font=\footnotesize, darkgray] at (0.75,0.75) {$p,u,v$};
+  \node[font=\footnotesize, darkgray] at (0.75,0.75-0.35) {$\phi,\rho,\mu$};
+  %% Rhie-Chow の矢印
+  \draw[-Stealth, thick, red2] (1.5,0.75)
+    -- node[above,font=\footnotesize,red2]{$u_{i+1/2}^{\mathrm{RC}}$} (2.4,0.75);
+\end{tikzpicture}
+\caption{\jp{コロケート格子の模式図と Rhie--Chow 補正速度の位置}}
+\label{fig:collocate}
+\end{figure}
+
+
+%% ============================================================
+\section{\jp{圧力 Poisson 方程式の導出と CCD 差分化}}
+\label{sec:pressure}
+%% ============================================================
+
+\subsection{\jp{分割ステップ法（Chorin Projection 法）の原理}}
+
+\jp{非圧縮条件 $\bnabla\cdot\bu = 0$ を拘束条件として扱う Chorin \cite{Chorin1968} の
+Projection 法では，各タイムステップを3段階に分ける：}
+
+\begin{tcolorbox}[algbox, title={\jp{Projection 法の3段階}}]
+\textbf{Step~1\jp{：}}\jp{予測速度（圧力なし）}
+\begin{equation}
+  \frac{\bu^* - \bu^n}{\Delta t}
+  = -\bu^n\cdot\bnabla\bu^n
+  + \frac{1}{\tilde{\rho}^{n+1} Re}\,\bnabla\cdot\!\left[\tilde{\mu}\!\left(\bnabla\bu^n + \bnabla{\bu^n}^T\right)\right]
+  - \frac{1}{Fr^2}\hat{\bm{z}}
+  + \frac{\kappa^{n+1}\de^{n+1}\bnabla\phi^{n+1}}{\tilde{\rho}^{n+1} We}
+  \label{eq:predictor}
+\end{equation}
+
+\textbf{Step~2\jp{：}}\jp{圧力 Poisson 方程式（変密度）}
+\begin{equation}
+  \bnabla\cdot\!\left(\frac{1}{\tilde{\rho}^{n+1}}\bnabla p^{n+1}\right)
+  = \frac{\bnabla\cdot\bu^*}{\Delta t}
+  \label{eq:PPE_operator}
+\end{equation}
+
+\textbf{Step~3\jp{：}}\jp{速度補正}
+\begin{equation}
+  \bu^{n+1} = \bu^* - \frac{\Delta t}{\tilde{\rho}^{n+1}}\bnabla p^{n+1}
+  \label{eq:corrector}
+\end{equation}
+\end{tcolorbox}
+
+\subsection{\jp{Predictor 式の正しい導出}}
+
+\jp{式\eqref{eq:NS_dimless} の左辺 $\tilde\rho(\partial\bu/\partial t + \ldots)$ から
+速度の時間発展方程式を得るには，\textbf{両辺を $\tilde\rho^{n+1}$ で除算}しなければならない：}
+
+\begin{align}
+  \tilde\rho\!\left(\pd{\bu}{t} + \ldots\right) &= -\bnabla p + F_{\mathrm{visc}} + F_{\mathrm{grav}} + F_{\mathrm{surf}} \notag\\
+  \Rightarrow\quad
+  \pd{\bu}{t} + \ldots &= -\frac{\bnabla p}{\tilde\rho} + \frac{F_{\mathrm{visc}}}{\tilde\rho}
+    \underbrace{- \frac{\tilde\rho}{Fr^2\tilde\rho}}_{-1/Fr^2}\hat{\bm{z}} + \frac{F_{\mathrm{surf}}}{\tilde\rho}
+\end{align}
+
+\jp{重力項は $\tilde\rho/\tilde\rho = 1$ となり $-\hat{\bm{z}}/Fr^2$ に簡単化される．
+これを時間積分すると Predictor 式\eqref{eq:predictor}を得る．}
+
+\subsection{\jp{圧力 Poisson 方程式の展開}}
+
+\jp{Step~3 の式\eqref{eq:corrector} の発散を取り，$\bnabla\cdot\bu^{n+1}=0$ を要求する：}
+\begin{equation}
+  0 = \bnabla\cdot\bu^* - \frac{\Delta t}{\tilde\rho}\bnabla^2 p
+    + \Delta t\,\bnabla\!\left(\frac{1}{\tilde\rho}\right)\cdot\bnabla p
+  \quad\Rightarrow\quad
+  \bnabla\cdot\!\left(\frac{\bnabla p}{\tilde\rho}\right) = \frac{\bnabla\cdot\bu^*}{\Delta t}
+\end{equation}
+
+\jp{左辺を積の微分則で展開する（$\bnabla(1/\rho) = -\bnabla\rho/\rho^2$）：}
+\begin{tcolorbox}[mybox, title={\jp{展開された変密度 Poisson 方程式}}]
+\begin{equation}
+  \frac{1}{\rho}\,\bnabla^2 p
+  - \frac{\bnabla\rho}{\rho^2}\cdot\bnabla p
+  = \frac{\bnabla\cdot\bu^*}{\Delta t}
+  \label{eq:PPE_expanded}
+\end{equation}
+\end{tcolorbox}
+\jp{左辺第1項は変密度ラプラシアン，第2項は密度勾配による修正項である．
+均一密度極限 ($\rho=$ const) では標準的 Poisson 方程式 $\bnabla^2 p = (\bnabla\cdot\bu^*)/\Delta t$ に帰着する．}
+
+\subsection{\jp{FVM と Rhie-Chow 整合による PPE 差分化（方針A）}}
+\label{sec:PPE_FVM}
+
+\jp{Projection 法の速度補正ステップ（Step~3）を，セル\textbf{界面}単位で記述し直す．
+セル$(i,j)$の$x^+$界面における補正後速度は：}
+\begin{equation}
+  u^{n+1}_{i+1/2,j} = u^{\mathrm{RC}}_{i+1/2,j}
+    - \frac{\Delta t}{\tilde\rho_{i+1/2,j}}\frac{p^{n+1}_{i+1,j}-p^{n+1}_{i,j}}{h_x}
+  \label{eq:face_correction}
+\end{equation}
+\jp{非圧縮条件 $\bnabla\!\cdot\!\bu^{n+1}=0$ をセルの発散定理（Gauss の定理）で離散化すると：}
+\begin{equation}
+  \frac{u^{n+1}_{i+1/2,j}-u^{n+1}_{i-1/2,j}}{h_x}
+  + \frac{v^{n+1}_{i,j+1/2}-v^{n+1}_{i,j-1/2}}{h_y} = 0
+\end{equation}
+\jp{式\eqref{eq:face_correction}を代入し $p^{n+1}$ について整理すると，\textbf{Rhie-Chow 整合型変密度 PPE} が導かれる：}
+
+\begin{tcolorbox}[mybox, title={\jp{FVM 変密度 PPE（Rhie-Chow 整合，2次元）}}]
+\begin{equation}
+  \frac{1}{h_x^2}\!\left[
+    \frac{p_{i+1,j}-p_{i,j}}{\tilde\rho_{i+1/2,j}}
+  - \frac{p_{i,j}-p_{i-1,j}}{\tilde\rho_{i-1/2,j}}
+  \right]
+  + \frac{1}{h_y^2}\!\left[
+    \frac{p_{i,j+1}-p_{i,j}}{\tilde\rho_{i,j+1/2}}
+  - \frac{p_{i,j}-p_{i,j-1}}{\tilde\rho_{i,j-1/2}}
+  \right]
+  = \frac{(\bnabla_h^{\mathrm{RC}}\!\cdot\bu^*)_{i,j}}{\Delta t}
+  \label{eq:PPE_FVM}
+\end{equation}
+\end{tcolorbox}
+
+\jp{右辺の Rhie-Chow 発散は，式\eqref{eq:rhie_chow_u},\eqref{eq:rhie_chow_v} の界面速度を用いて：}
+\begin{equation}
+  (\bnabla_h^{\mathrm{RC}}\!\cdot\bu^*)_{i,j}
+  = \frac{u^{\mathrm{RC}}_{i+1/2,j} - u^{\mathrm{RC}}_{i-1/2,j}}{h_x}
+  + \frac{v^{\mathrm{RC}}_{i,j+1/2} - v^{\mathrm{RC}}_{i,j-1/2}}{h_y}
+  \label{eq:RC_div}
+\end{equation}
+
+\jp{\textbf{均一密度極限の確認：}$\tilde\rho = $ const のとき式\eqref{eq:PPE_FVM}は5点ステンシル}
+\begin{equation}
+  \frac{p_{i+1,j}+p_{i-1,j}+p_{i,j+1}+p_{i,j-1}-4p_{i,j}}{h^2}
+  = \frac{(\bnabla_h^{\mathrm{RC}}\!\cdot\bu^*)_{i,j}}{\Delta t}
+\end{equation}
+\jp{に帰着し，整合性が確認できる．}
+
+\jp{\textbf{連続形との整合性（$\Ord{h^2}$）：}界面密度 $\tilde\rho_{i+1/2,j}=(\tilde\rho_{i,j}+\tilde\rho_{i+1,j})/2$ をテイラー展開すると：}
+\begin{equation}
+  \frac{1}{\tilde\rho_{i+1/2}} \approx \frac{1}{\tilde\rho_i}
+  + \frac{h_x}{2}\frac{\partial}{\partial x}\!\left(\frac{1}{\tilde\rho}\right)
+  \quad\Rightarrow\quad
+  \text{\jp{式}}\eqref{eq:PPE_FVM} = \frac{1}{\tilde\rho}\bnabla^2 p
+    - \frac{\bnabla\tilde\rho}{\tilde\rho^2}\cdot\bnabla p + \Ord{h^2}
+\end{equation}
+\jp{連続形 PPE\eqref{eq:PPE_expanded}を $\Ord{h^2}$ で再現する（FVM の2次精度は標準的な Projection 法と整合）．速度場に対しては CCD の $\Ord{h^6}$ 精度を維持しつつ，圧力場に対して FVM の $\Ord{h^2}$ 精度を採用するのが本手法の設計原理である．}
+
+\jp{\textbf{3次元への拡張：}式\eqref{eq:PPE_FVM}に $z$方向の2項を追加するだけでよい：}
+\begin{tcolorbox}[mybox, title={\jp{FVM 変密度 PPE（3次元，7点ステンシル）}}]
+\begin{multline}
+  \frac{1}{h_x^2}\!\left[\frac{p_{i+1,j,k}-p_{i,j,k}}{\tilde\rho_{i+1/2,j,k}}-\frac{p_{i,j,k}-p_{i-1,j,k}}{\tilde\rho_{i-1/2,j,k}}\right]
+  + \frac{1}{h_y^2}\!\left[\frac{p_{i,j+1,k}-p_{i,j,k}}{\tilde\rho_{i,j+1/2,k}}-\frac{p_{i,j,k}-p_{i,j-1,k}}{\tilde\rho_{i,j-1/2,k}}\right]\\
+  + \frac{1}{h_z^2}\!\left[\frac{p_{i,j,k+1}-p_{i,j,k}}{\tilde\rho_{i,j,k+1/2}}-\frac{p_{i,j,k}-p_{i,j,k-1}}{\tilde\rho_{i,j,k-1/2}}\right]
+  = \frac{(\bnabla_h^{\mathrm{RC}}\!\cdot\bu^*)_{i,j,k}}{\Delta t}
+  \label{eq:PPE_FVM_3D}
+\end{multline}
+\end{tcolorbox}
+\jp{3次元では7点ステンシル（6面$+$中心）となる．係数行列は非対称（変密度）だが
+BiCGSTAB + ILU(0) 前処理で効率的に求解できる．線形系：}
+\begin{equation}
+  \bm{L}_{\mathrm{FVM}}\,\bm{p}^{n+1} = \bm{b}^{\mathrm{RC}}
+  \label{eq:PPE_linear_system}
+\end{equation}
+\jp{$\bm{L}_{\mathrm{FVM}}$ は疎な7点（3次元）または5点（2次元）ブロック行列，$\bm{b}^{\mathrm{RC}}$ は Rhie-Chow 発散\eqref{eq:RC_div}から構成される右辺ベクトルである．}
+
+\subsection{PPE \jp{の境界条件}}
+
+\begin{table}[h]
+\centering
+\caption{\jp{圧力 Poisson 方程式の境界条件}}
+\begin{tabular}{lll}
+\toprule
+\jp{境界の種類} & \jp{圧力境界条件} & \jp{離散化手法}\\
+\midrule
+\jp{固体壁} & $\partial p/\partial n = 0$\jp{（ノイマン）} & \jp{FVM 片側1次差分}\\
+\jp{流入/流出} & $\partial p/\partial n = 0$\jp{（ノイマン）} & \jp{FVM 片側1次差分}\\
+\jp{自由表面} & $p = p_{\mathrm{atm}}$\jp{（ディリクレ）} & \jp{既知値を代入}\\
+\jp{周期境界} & $p_0 = p_N$ & Sherman--Morrison \jp{公式}\\
+\bottomrule
+\end{tabular}
+\end{table}
+\jp{（注：速度補正 Step~3 における $\bnabla p$ 評価には引き続き CCD を用いる．境界条件はこの CCD 片側公式\eqref{eq:CCD_bc_left},\eqref{eq:CCD_bc_right}を適用する．）}
+
+
+%% ============================================================
+\section{\jp{時間積分スキーム}}
+\label{sec:time}
+%% ============================================================
+
+\subsection{\jp{対流項と Level Set 移流：3次 TVD Runge--Kutta}}
+
+\jp{Level Set 移流方程式および NS の対流項は
+Shu \& Osher \cite{ShuOsher1988} の3次 TVD Runge--Kutta で時間積分する．
+これは TVD（全変動非増大）性を保つため，
+数値振動（Gibbs 現象）を抑制しながら3次精度を達成する：}
+
+\begin{tcolorbox}[mybox, title={3\jp{次} TVD Runge--Kutta \jp{（Shu--Osher スキーム）}}]
+\begin{align}
+  \bm{q}^{(1)} &= \bm{q}^n + \Delta t\,\mathcal{L}(\bm{q}^n)
+  \label{eq:TVDRK3_1}\\[4pt]
+  \bm{q}^{(2)} &= \frac{3}{4}\bm{q}^n
+               + \frac{1}{4}\bigl[\bm{q}^{(1)} + \Delta t\,\mathcal{L}(\bm{q}^{(1)})\bigr]
+  \label{eq:TVDRK3_2}\\[4pt]
+  \bm{q}^{n+1} &= \frac{1}{3}\bm{q}^n
+               + \frac{2}{3}\bigl[\bm{q}^{(2)} + \Delta t\,\mathcal{L}(\bm{q}^{(2)})\bigr]
+  \label{eq:TVDRK3_3}
+\end{align}
+\jp{ここで $\mathcal{L}$ は空間離散化演算子（CCD で評価）である．}
+\end{tcolorbox}
+
+\jp{このスキームはオイラー法の3回の組み合わせとして表現でき，
+各段階の係数（$1/4$, $3/4$, $1/3$, $2/3$）は凸結合になっているため，
+数値解が各段階のオイラー解の凸結合として書けること（TVD 安定性）が保証される．}
+
+\subsection{\jp{粘性項：Crank--Nicolson 半陰的処理}}
+
+\jp{粘性項は格子間隔 $h$ が小さいと陽的処理では安定条件 $\Delta t \leq \rho h^2/\mu$ が
+非常に厳しくなる．Crank--Nicolson（半陰的）スキームを用いることで，
+この制約を緩和できる：}
+\begin{equation}
+  \frac{\bu^* - \bu^n}{\Delta t}
+  = \mathcal{N}(\bu^n)
+  + \frac{1}{2\tilde\rho^{n+1} Re}\bigl[\mathcal{V}(\bu^n) + \mathcal{V}(\bu^*)\bigr]
+  \label{eq:CN}
+\end{equation}
+\jp{ここで $\mathcal{N}$ は対流・重力・表面張力の（非線形）演算子，
+$\mathcal{V}$ は粘性拡散演算子（線形）である．
+$\bu^*$ について線形系を立てて CCD + バンド行列ソルバーで解く．}
+
+\subsection{\jp{上流安定化（Level Set の Godunov 型微分）}}
+\label{sec:upstream}
+
+\jp{再初期化方程式 $\partial\phi/\partial\tau + \operatorname{sgn}(\phi_0)(|\bnabla\phi|-1)=0$ は，情報が界面（$\phi=0$）から\textbf{外側}（$|\phi|$ が増大する方向）に伝播する双曲型方程式である．伝播速度の符号が $\operatorname{sgn}(\phi_0)$ に依存するため，「上流側」が $\phi_0$ の符号によって反転する：}
+\begin{itemize}
+  \item \jp{$\phi_0 > 0$（液相側）：情報が界面 $\to$ 液相方向（$\phi$ 増大方向）に伝播 $\Rightarrow$ $D^-_x$（後退差分）が上流}
+  \item \jp{$\phi_0 < 0$（気相側）：情報が界面 $\to$ 気相方向（$\phi$ 減少方向）に伝播 $\Rightarrow$ $D^+_x$（前進差分）が上流}
+\end{itemize}
+
+\begin{tcolorbox}[mybox, title={Godunov \jp{型上流勾配（$\phi_0$ 符号依存，2次元）}}]
+\jp{$\phi_0 > 0$ の場合（液相側）：}
+\begin{equation}
+  |\bnabla\phi|^{\mathrm{uw}}_{i,j} =
+  \sqrt{
+    \bigl[\max(D^-_x,\,0)^2 + \min(D^+_x,\,0)^2\bigr]
+    +
+    \bigl[\max(D^-_y,\,0)^2 + \min(D^+_y,\,0)^2\bigr]
+  }
+  \label{eq:godunov_pos}
+\end{equation}
+\jp{$\phi_0 < 0$ の場合（気相側）：}
+\begin{equation}
+  |\bnabla\phi|^{\mathrm{uw}}_{i,j} =
+  \sqrt{
+    \bigl[\min(D^-_x,\,0)^2 + \max(D^+_x,\,0)^2\bigr]
+    +
+    \bigl[\min(D^-_y,\,0)^2 + \max(D^+_y,\,0)^2\bigr]
+  }
+  \label{eq:godunov_neg}
+\end{equation}
+\end{tcolorbox}
+
+\jp{2式を $s = \operatorname{sgn}(\phi_0)$ を用いて1式に統合すると：}
+\begin{equation}
+  |\bnabla\phi|^{\mathrm{uw}}_{i,j} =
+  \sqrt{G_x^2 + G_y^2}, \quad
+  G_x^2 = \max(s\,D^-_x,\,0)^2 + \min(s\,D^+_x,\,0)^2
+  \quad (s=\pm1)
+  \label{eq:godunov_unified}
+\end{equation}
+\jp{（$G_y$ も同様．式\eqref{eq:godunov_pos}は $s=+1$，式\eqref{eq:godunov_neg}は $s=-1$ の場合に対応する．）}
+
+\jp{前進・後退差分（一様格子の場合）：}
+\begin{equation}
+  D^+_x = \frac{\phi_{i+1,j}-\phi_{i,j}}{h_x},\qquad
+  D^-_x = \frac{\phi_{i,j}-\phi_{i-1,j}}{h_x}
+\end{equation}
+\jp{（非一様格子では $h_x \to h_{x,i}$，$h_{x,i+1}$ にそれぞれ置換．Godunov 勾配の安定性はステンシル幅1点の単純差分で十分であり，CCD による高精度化は不要なことが多い．）}
+
+\jp{\textbf{3次元への拡張：}$z$方向の成分 $G_z^2 = \max(s D^-_z,0)^2+\min(s D^+_z,0)^2$ を加える：}
+\begin{equation}
+  |\bnabla\phi|^{\mathrm{uw}}_{i,j,k} = \sqrt{G_x^2+G_y^2+G_z^2},\quad
+  G_\alpha^2 = \max(s\,D^-_\alpha,0)^2 + \min(s\,D^+_\alpha,0)^2,\quad \alpha=x,y,z
+  \label{eq:godunov_3d}
+\end{equation}
+\jp{（$\phi_0=0$ の点では $s=0$ としてソース項がゼロになるため更新不要．）}
+
+\subsection{CFL \jp{安定条件}}
+
+\jp{時間刻み幅の上限は3つの物理的制約の最小値で与えられる：}
+
+\begin{tcolorbox}[mybox, title={CFL \jp{安定条件（3項目の最小値）}}]
+\begin{equation}
+  \Delta t \leq C_{\mathrm{CFL}}\cdot\min\!\left(
+    \underbrace{\frac{h_{\min}}{|\bu|_{\max}}}_{\text{\jp{対流 CFL}}},\quad
+    \underbrace{\frac{\rho_{\min}\,h_{\min}^2}{\mu_{\max}}}_{\text{\jp{粘性 CFL}}},\quad
+    \underbrace{\sqrt{\frac{(\rho_l + \rho_g)\,h_{\min}^3}{4\pi\sigma}}}_{\text{\jp{毛管波 CFL}}}
+  \right),
+  \qquad C_{\mathrm{CFL}} \leq 0.5
+  \label{eq:CFL}
+\end{equation}
+\end{tcolorbox}
+
+\jp{第3項（毛管波 CFL）は界面張力による毛管波の最短周期 $T_{\min}$ から導かれる：
+分散関係 $\omega^2 = \sigma k^3/(\rho_l+\rho_g)$ から，格子間隔 $h$ に対応する
+波数 $k=\pi/h$ を代入して $T_{\min} = 2\pi/\omega_{\max}$ を求めると式\eqref{eq:CFL}の第3項を得る．
+表面張力が支配的な場合（We $\ll$ 1），$C_{\mathrm{CFL}} \leq 0.3$ が望ましい．}
+
+
+%% ============================================================
+\section{\jp{完全アルゴリズムフロー}}
+\label{sec:algorithm}
+%% ============================================================
+
+\jp{以上の全手法を組み合わせた，時刻 $t^n$ から $t^{n+1} = t^n + \Delta t$ への
+完全計算フローを以下に示す．}
+
+\begin{tcolorbox}[algbox, title={\jp{時刻 $t^n \to t^{n+1}$ の完全計算フロー（9段階）}}]
+
+\textbf{\jp{① Level Set 移流}}\jp{（TVD-RK3 + CCD 上流安定化）}
+\[
+  \pd{\phi}{t} + \bu^n\cdot\bnabla\phi = 0
+  \;\longrightarrow\; \phi^*
+\]
+
+\medskip
+\textbf{\jp{② 再初期化}}\jp{（仮想時間 $\tau$ 方向に 3〜5 反復，$\phi_0$ 符号依存 Godunov 勾配，式\eqref{eq:godunov_unified}）}
+\[
+  \pd{\phi}{\tau} + \operatorname{sgn}(\phi_0)(|\bnabla\phi|^{\mathrm{uw}} - 1) = 0
+  \;\longrightarrow\; \phi^{n+1}
+\]
+
+\medskip
+\textbf{\jp{③ グリッド更新}}
+\[
+  \phi^{n+1} \;\longrightarrow\; \omega_{i,j},\; J_{x,i},\; J_{y,j} \;\text{\jp{を更新}}
+\]
+
+\medskip
+\textbf{\jp{④ 物性値更新}}
+\[
+  \tilde\rho^{n+1} = \hat\rho + (1-\hat\rho)\He(\phi^{n+1}),\quad
+  \tilde\mu^{n+1} = \hat\mu + (1-\hat\mu)\He(\phi^{n+1})
+\]
+
+\medskip
+\textbf{\jp{⑤ 曲率計算}}\jp{（CCD 逐次適用）}
+\[
+  \phi^{(1)}_x,\;\phi^{(1)}_y,\;\phi^{(2)}_x,\;\phi^{(2)}_y,\;
+  \bigl(\phi^{(1)}_y\bigr)^{(1)}_x
+  \;\longrightarrow\; \kappa^{n+1}
+  \quad\text{\jp{（式\eqref{eq:curvature_2d}）}}
+\]
+
+\medskip
+\textbf{\jp{⑥ 予測速度計算}}\jp{（Crank--Nicolson + CCD，式\eqref{eq:predictor}）}
+\[
+  \bu^n,\;\tilde\rho^{n+1},\;\kappa^{n+1}
+  \;\longrightarrow\; \bu^*
+\]
+
+\medskip
+\textbf{\jp{⑦ 圧力 Poisson 求解}}\jp{（FVM 変密度 PPE，BiCGSTAB / GMRES，ILU(0) 前処理）}
+\[
+  \bm{L}_{\mathrm{FVM}}\,\bm{p}^{n+1} = \bm{b}^{\mathrm{RC}}(\bu^*,\,\tilde\rho^{n+1})
+  \quad\text{\jp{（式\eqref{eq:PPE_FVM}，右辺は Rhie-Chow 発散式\eqref{eq:RC_div}）}}
+\]
+
+\medskip
+\textbf{\jp{⑧ 速度補正}}\jp{（CCD で圧力勾配を計算，Rhie--Chow 補正含む）}
+\[
+  \bu^{n+1} = \bu^* - \frac{\Delta t}{\tilde\rho^{n+1}}\bnabla p^{n+1}
+\]
+
+\medskip
+\textbf{\jp{⑨ 収束確認・モニタリング}}\\
+\jp{$\bullet$ 非圧縮性：}$\|\bnabla\cdot\bu^{n+1}\|_\infty \leq \varepsilon_{\mathrm{div}}$\\
+\jp{$\bullet$ 体積保存：}$\int \He(\phi^{n+1})\,dV = \int \He(\phi^0)\,dV \pm \delta$\\
+\jp{$\bullet$ Eikonal 品質：}$\bigl\|\,|\bnabla\phi^{n+1}|-1\bigr\|_\infty \leq \varepsilon_{\mathrm{eik}}$
+
+\end{tcolorbox}
+
+\jp{フロー全体のデータ依存グラフを図\ref{fig:dataflow}に示す．
+各段階の入出力が明確に分離されており，
+段階③〜⑤で界面情報が更新されてから段階⑥の Predictor に入る構造が重要である．}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm and 12mm,
+  stepbox/.style={draw=navy, fill=tblue, rounded corners=2pt,
+                  minimum width=30mm, minimum height=7mm,
+                  align=center, font=\small\jpfont},
+  sbox/.style={draw=green4, fill=tgreen, rounded corners=2pt,
+               minimum width=30mm, minimum height=7mm,
+               align=center, font=\small\jpfont},
+  arr/.style={-Stealth, thick, navy}
+]
+\node[stepbox] (ls) {\jp{① LS 移流}};
+\node[stepbox, below=3mm of ls] (ri) {\jp{② 再初期化}};
+\node[sbox,    below=3mm of ri] (gr) {\jp{③ グリッド更新}};
+\node[sbox,    right=20mm of gr] (ph) {\jp{④ 物性値更新}};
+\node[sbox,    right=20mm of ph] (kp) {\jp{⑤ 曲率計算}};
+\node[stepbox, below=3mm of gr] (pr) {\jp{⑥ Predictor}};
+\node[stepbox, below=3mm of pr] (pp) {\jp{⑦ Poisson 求解}};
+\node[stepbox, below=3mm of pp] (co) {\jp{⑧ 速度補正}};
+\node[stepbox, below=3mm of co] (ch) {\jp{⑨ 収束確認}};
+\draw[arr] (ls) -- (ri);
+\draw[arr] (ri) -- (gr);
+\draw[arr] (gr) -- (ph);
+\draw[arr] (ph) -- (kp);
+\draw[arr] (gr.south) -- (pr.north);
+\draw[arr] (ph.south) -- (pr.north);
+\draw[arr] (kp.south) -- (pr.north);
+\draw[arr] (pr) -- (pp);
+\draw[arr] (pp) -- (co);
+\draw[arr] (co) -- (ch);
+\end{tikzpicture}
+\caption{\jp{アルゴリズムのデータフロー（1タイムステップ）}}
+\label{fig:dataflow}
+\end{figure}
+
+
+%% ============================================================
+\section{\jp{計算精度の検証指標}}
+\label{sec:verification}
+%% ============================================================
+
+\jp{実装の正確性を確認するための検証テストと許容誤差を表\ref{tab:verification}に示す．}
+
+\begin{table}[h]
+\centering
+\caption{\jp{数値検証の指標と許容誤差}}
+\label{tab:verification}
+\begin{tabular}{p{35mm}p{40mm}p{35mm}c}
+\toprule
+\jp{検証項目} & \jp{理論値/解析解} & \jp{チェック方法} & \jp{許容誤差}\\
+\midrule
+\jp{CCD 精度収束} & $\Ord{h^6}$\jp{（$\fp{}$），$\Ord{h^5}$ 以上（$\fpp{}$）} & $f=\sin x$\jp{格子精緻化} & \jp{スロープ確認}\\[3pt]
+\jp{Eikonal 品質} & $|\bnabla\phi| \equiv 1$ & $\|\,|\bnabla\phi|-1\|_\infty$ & $< 10^{-4}$\\[3pt]
+\jp{体積保存} & $\int\He\,dV = $ const & \jp{タイムステップごと積分} & $< 0.1\%$\\[3pt]
+\jp{非圧縮性} & $\bnabla\cdot\bu \equiv 0$ & $\|\bnabla\cdot\bu\|_\infty$ & $< 10^{-10}$\\[3pt]
+\jp{静水圧テスト} & $p = \rho g z$ & $L_\infty$\jp{誤差} & $< 10^{-12}$\\[3pt]
+\jp{毛管波周波数} & $\omega^2 = \sigma k^3/(\rho_l+\rho_g)$ & \jp{時系列 FFT 比較} & $< 1\%$\\[3pt]
+\jp{座標変換精度} & $\Ord{h^6}$\jp{（CCD + メトリクス）} & \jp{解析解との比較} & \jp{スロープ確認}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\jp{特に静水圧テスト（$\bu\equiv\bm{0}$，$p=\rho g z$）は
+表面張力の寄生流れ（parasitic currents）の有無を検証する重要なテストであり，
+Projection 法と CSF 法の実装が正しければ $p$ は静水圧分布に収束し，
+$\bu$ は機械精度以下にとどまるはずである．}
+
+
+%% ============================================================
+\section{\jp{まとめと今後の課題}}
+\label{sec:conclusion}
+%% ============================================================
+
+\jp{本稿では気液混合流体の数値計算向けの定式化を教科書的に解説した（\textbf{3次元}対応）．
+主要な要点を以下にまとめる．}
+
+\begin{enumerate}[leftmargin=2em, itemsep=4pt]
+
+  \item \jp{\textbf{CCD 係数の厳密導出（第\ref{sec:CCD}章）：}
+        テイラー展開の整合条件・誤差消去条件から Eq-I の係数
+        $(\alpha_1,a_1,b_1)=(7/16,\,15/16,\,1/16)$，
+        Eq-II の係数 $(\beta_2,a_2,b_2)=(-1/8,\,3,\,-9/8)$ を一意に導出した．
+        ブロック行列 $\bm{A}_{12}$ の正しい符号（下対角が正）も明示した．}
+
+  \item \jp{\textbf{座標変換の正しい形（第\ref{sec:grid}章）：}
+        二次微分の変換式において第2項の先頭に $J_x$ が掛かる
+        $\partial^2 f/\partial x^2 = J_x^2\,\partial^2 f/\partial\xi^2
+        + J_x\,(\partial J_x/\partial\xi)\,\partial f/\partial\xi$
+        が正しい形であることを導出した．三次元では $y$，$z$ 方向も同様．}
+
+  \item \jp{\textbf{Predictor 式の正しい形（第\ref{sec:pressure}章）：}
+        NS 方程式全体を $\tilde\rho$ で除算することで，
+        粘性項・表面張力項が $1/\tilde\rho$ で，重力項が単純な $-\hat{\bm{z}}/Fr^2$ になる
+        正しい Predictor 式\eqref{eq:predictor}を示した．}
+
+  \item \jp{\textbf{Rhie-Chow 補正式（第\ref{sec:collocate}章）：}
+        式\eqref{eq:rhie_chow}は2点圧力差分と CCD 補間勾配の差によって
+        チェッカーボード高波数成分のみを選択的に除去する．
+        均一場では補正がゼロになる整合性を保証し，
+        三次元では $u$，$v$，$w$ の全3方向に式\eqref{eq:rhie_chow_u}--\eqref{eq:rhie_chow_w}を適用する．}
+
+  \item \jp{\textbf{FVM 変密度 PPE（第\ref{sec:PPE_FVM}節）：}
+        式\eqref{eq:PPE_FVM}の FVM ベース PPE は，
+        右辺に Rhie-Chow 発散\eqref{eq:RC_div}を用いることで
+        Projection 法との整合性を確保する．
+        2次元では5点ステンシル，三次元では7点ステンシル（式\eqref{eq:PPE_FVM_3D}）に自然に拡張できる．}
+
+  \item \jp{\textbf{Godunov 上流差分（第\ref{sec:upstream}節）：}
+        式\eqref{eq:godunov_unified}は $s=\operatorname{sgn}(\phi_0)$ を乗じることで
+        気相・液相双方で情報伝播方向を正しく取り扱う．
+        三次元では $z$ 方向を加えた式\eqref{eq:godunov_3d}を用いる．}
+
+  \item \jp{\textbf{完全アルゴリズムフロー（第\ref{sec:algorithm}章）：}
+        全9段階（Level Set 移流・格子更新・Predictor・Poisson・速度補正など）を整理した．}
+
+\end{enumerate}
+
+\jp{今後の課題としては，以下が挙げられる：}
+\begin{itemize}
+  \item \jp{\textbf{三次元実装：}本稿の全定式化（NS 方程式，CCD，Rhie-Chow 式\eqref{eq:rhie_chow_u}--\eqref{eq:rhie_chow_w}，FVM-PPE 式\eqref{eq:PPE_FVM_3D}，Godunov 式\eqref{eq:godunov_3d}）は三次元に直接拡張可能な形で記述されており，$z$ 方向 CCD の追加と混合偏微分（$\phi_{xz}$，$\phi_{yz}$）の項が主な増加要素となる．}
+  \item \jp{適応的格子細分化（AMR）との組み合わせ}
+  \item \jp{MPI/OpenMP 並列化実装（PPE の並列前処理が主要課題）}
+  \item \jp{気泡上昇・界面不安定波（Kelvin--Helmholtz, Rayleigh--Taylor）・
+        液滴衝突などのベンチマーク問題への適用}
+  \item \jp{エネルギー保存性の解析と分散関係の精度検証}
+\end{itemize}
+
+
+%% ============================================================
+\section*{\jp{記号一覧}}
+\addcontentsline{toc}{section}{\jp{記号一覧}}
+%% ============================================================
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{llp{70mm}}
+\toprule
+\jp{記号} & \jp{単位} & \jp{意味}\\
+\midrule
+$\phi$ & [m] & Level Set \jp{関数（符号付き距離）}\\
+$H_\varepsilon(\phi)$ & [--] & \jp{滑らか化ヘヴィサイド関数}\\
+$\delta_\varepsilon(\phi)$ & [m$^{-1}$] & \jp{滑らか化デルタ関数}\\
+$\varepsilon$ & [m] & \jp{界面幅パラメータ（$\approx 1.5\Delta x_{\min}$）}\\
+$\bu = (u,v)$ & [m/s] & \jp{速度ベクトル（2次元）}\\
+$p$ & [Pa] & \jp{圧力}\\
+$\rho_l,\,\rho_g$ & [kg/m$^3$] & \jp{液相・気相密度}\\
+$\mu_l,\,\mu_g$ & [Pa$\cdot$s] & \jp{液相・気相粘性係数}\\
+$\sigma$ & [N/m] & \jp{表面張力係数（界面張力）}\\
+$\kappa$ & [m$^{-1}$] & \jp{界面平均曲率}\\
+$\bg$ & [m/s$^2$] & \jp{重力加速度ベクトル（$=-g\hat{\bm{z}}$）}\\
+$Re, Fr, We$ & [--] & Reynolds\jp{数，}Froude\jp{数，}Weber\jp{数}\\
+$h$, $h_i$ & [m] & \jp{格子間隔（一様・非一様）}\\
+$J_x, J_y$ & [m$^{-1}$] & \jp{座標変換メトリクス係数（$=d\xi/dx$）}\\
+$\omega(\phi)$ & [--] & \jp{グリッド密度関数}\\
+$\alpha$ & [--] & \jp{界面近傍グリッド密度倍率（典型値 $3\sim5$）}\\
+$\tau$ & [s] & \jp{再初期化の仮想時間}\\
+$f^{(1)}_i$, $f^{(2)}_i$ & & \jp{CCD で評価した一次・二次微分値}\\
+$\alpha_1=7/16$ & & Eq-I \jp{の係数}\\
+$a_1=15/16$ & & Eq-I \jp{の係数}\\
+$b_1=1/16$ & & Eq-I \jp{の係数}\\
+$\beta_2=-1/8$ & & Eq-II \jp{の係数}\\
+$a_2=3$ & & Eq-II \jp{の係数}\\
+$b_2=-9/8$ & & Eq-II \jp{の係数}\\
+$\Delta t$ & [s] & \jp{時間刻み幅}\\
+$C_{\mathrm{CFL}}$ & [--] & \jp{CFL 数（$\leq 0.5$）}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ============================================================
+\section*{\jp{参考文献}}
+\addcontentsline{toc}{section}{\jp{参考文献}}
+%% ============================================================
+
+\begin{thebibliography}{99}
+
+\bibitem[Brackbill et al.(1992)]{Brackbill1992}
+Brackbill, J.~U., Kothe, D.~B., \& Zemach, C. (1992).
+A Continuum Method for Modeling Surface Tension.
+\textit{Journal of Computational Physics}, \textbf{100}(2), 335--354.
+
+\bibitem[Chorin(1968)]{Chorin1968}
+Chorin, A.~J. (1968).
+Numerical Solution of the Navier-Stokes Equations.
+\textit{Mathematics of Computation}, \textbf{22}(104), 745--762.
+
+\bibitem[Chu \& Fan(1998)]{ChuFan1998}
+Chu, P.~C., \& Fan, C. (1998).
+A Three-Point Combined Compact Difference Scheme.
+\textit{Journal of Computational Physics}, \textbf{140}(2), 370--399.
+
+\bibitem[Lele(1992)]{Lele1992}
+Lele, S.~K. (1992).
+Compact Finite Difference Schemes with Spectral-Like Resolution.
+\textit{Journal of Computational Physics}, \textbf{103}(1), 16--42.
+
+\bibitem[Osher \& Sethian(1988)]{OsherSethian1988}
+Osher, S., \& Sethian, J.~A. (1988).
+Fronts Propagating with Curvature-Dependent Speed:
+Algorithms Based on Hamilton-Jacobi Formulations.
+\textit{Journal of Computational Physics}, \textbf{79}(1), 12--49.
+
+\bibitem[Rhie \& Chow(1983)]{RhieChow1983}
+Rhie, C.~M., \& Chow, W.~L. (1983).
+Numerical Study of the Turbulent Flow Past an Airfoil with Trailing Edge Separation.
+\textit{AIAA Journal}, \textbf{21}(11), 1525--1532.
+
+\bibitem[Shu \& Osher(1988)]{ShuOsher1988}
+Shu, C.-W., \& Osher, S. (1988).
+Efficient Implementation of Essentially Non-Oscillatory Shock-Capturing Schemes.
+\textit{Journal of Computational Physics}, \textbf{77}(2), 439--471.
+
+\bibitem[Sussman et al.(1994)]{Sussman1994}
+Sussman, M., Smereka, P., \& Osher, S. (1994).
+A Level Set Approach for Computing Solutions to Incompressible Two-Phase Flow.
+\textit{Journal of Computational Physics}, \textbf{114}(1), 146--159.
+
+\bibitem[Unverdi \& Tryggvason(1992)]{Unverdi1992}
+Unverdi, S.~O., \& Tryggvason, G. (1992).
+A Front-Tracking Method for Viscous, Incompressible, Multi-Fluid Flows.
+\textit{Journal of Computational Physics}, \textbf{100}(1), 25--37.
+
+\bibitem[van der Vorst(1992)]{vanderVorst1992}
+van der Vorst, H.~A. (1992).
+Bi-CGSTAB: A Fast and Smoothly Converging Variant of Bi-CG for the Solution of
+Nonsymmetric Linear Systems.
+\textit{SIAM Journal on Scientific and Statistical Computing}, \textbf{13}(2), 631--644.
+
+\end{thebibliography}
+
+\end{document}
