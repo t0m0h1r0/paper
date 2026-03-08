@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twophase"
+version = "0.1.0"
+description = "Two-phase CFD solver with Level Set and CCD Poisson solver"
+authors = [
+    {name = "Tomohiro Kawaguchi"}
+]
+requires-python = ">=3.9"
+
+dependencies = [
+    "numpy",
+    "matplotlib"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
