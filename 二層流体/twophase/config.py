@@ -32,6 +32,7 @@ class SimulationConfig:
     # --- 時間積分 ---
     cfl_number: float = 0.3
     t_end: float = 1.0
+    cn_viscous: bool = False           # True: Crank-Nicolson半陰的, False: 全項陽的
 
     # --- ソルバー ---
     bicgstab_tol: float = 1e-10
