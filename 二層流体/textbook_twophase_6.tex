@@ -1,0 +1,707 @@
+%% ============================================================
+%%  二次元気液混合流体の数値計算法 ── 教科書的総合解説
+%%  Conservative Level Set法 + 結合コンパクト差分法(CCD) + 界面適合格子
+%%  + Projection法 による完全定式化
+%%
+%%  XeLaTeX でコンパイル
+%% ============================================================
+\documentclass[12pt, a4paper, titlepage, xelatex, ja=standard]{bxjsarticle}
+
+%% ── フォント設定（XeLaTeX + xeCJK）──────────────────────────────
+\usepackage{fontspec}
+\usepackage{xeCJK}
+
+\setmainfont{Times New Roman}
+\setCJKmainfont{Hiragino Mincho ProN}
+
+%% ── 数学・図表パッケージ ──────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+\usepackage{booktabs, array, multirow, tabularx}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable, theorems}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, backgrounds, calc, decorations.pathreplacing, matrix, patterns}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{microtype}
+\usepackage{nicefrac}
+\usepackage{ragged2e}
+
+%% ── ページレイアウト ──────────────────────────────────────────
+\geometry{top=25mm, bottom=28mm, left=26mm, right=26mm, headheight=16pt}
+\emergencystretch=2em
+\setlength{\hfuzz}{3pt}
+
+%% ── カラー定義 ────────────────────────────────────────────────
+\definecolor{navy}{RGB}{0,40,90}
+\definecolor{blue2}{RGB}{0,80,160}
+\definecolor{midblue}{RGB}{0,90,170}
+\definecolor{lightblue}{RGB}{230,242,255}
+\definecolor{tblue}{RGB}{218,234,255}
+\definecolor{tgreen}{RGB}{215,255,225}
+\definecolor{tyellow}{RGB}{255,250,210}
+\definecolor{tred}{RGB}{255,225,220}
+\definecolor{darkgray}{RGB}{60,60,60}
+\definecolor{boxgray}{RGB}{245,245,245}
+\definecolor{green4}{RGB}{0,120,60}
+\definecolor{red2}{RGB}{160,0,0}
+\definecolor{orange2}{RGB}{200,90,0}
+\definecolor{torange}{RGB}{255,238,210}
+\definecolor{teal2}{RGB}{0,110,110}
+\definecolor{tteal}{RGB}{210,245,245}
+\definecolor{purple2}{RGB}{100,0,140}
+\definecolor{tpurple}{RGB}{240,220,255}
+\definecolor{brown2}{RGB}{120,60,0}
+\definecolor{tbrown}{RGB}{250,235,215}
+
+%% ── tcolorbox スタイル ────────────────────────────────────────
+\tcbset{
+  mybox/.style={
+    enhanced, breakable,
+    colback=tblue, colframe=blue2,
+    toprule=0.8pt, bottomrule=0.8pt, leftrule=0.8pt, rightrule=0.8pt,
+    fonttitle=\bfseries\small\color{white},
+    colbacktitle=navy,
+    attach boxed title to top left={yshift=-2mm, xshift=6mm},
+    boxed title style={sharp corners},
+    sharp corners=south,
+  },
+  derivbox/.style={
+    enhanced, breakable,
+    colback=boxgray, colframe=navy!40,
+    toprule=0.5pt, bottomrule=0.5pt, leftrule=3pt, rightrule=0.5pt,
+    sharp corners,
+  },
+  resultbox/.style={
+    enhanced, colback=tgreen, colframe=navy,
+    toprule=1pt, bottomrule=1pt, leftrule=1pt, rightrule=1pt,
+    sharp corners,
+  },
+  warnbox/.style={
+    enhanced, colback=tyellow, colframe=red2!70,
+    toprule=0.6pt, bottomrule=0.6pt, leftrule=3pt, rightrule=0.6pt,
+    sharp corners,
+  },
+  algbox/.style={
+    enhanced, breakable, colback=white, colframe=navy,
+    toprule=1pt, bottomrule=1pt, leftrule=1pt, rightrule=1pt,
+    sharp corners,
+    fonttitle=\bfseries\small\color{white}, colbacktitle=navy,
+    attach boxed title to top left={yshift=-2mm, xshift=6mm},
+    boxed title style={sharp corners},
+  },
+  defbox/.style={
+    enhanced, colback=boxgray, colframe=darkgray!50,
+    toprule=0.6pt, bottomrule=0.6pt, leftrule=0.6pt, rightrule=0.6pt,
+    sharp corners,
+  },
+}
+
+%% ── ヘッダー/フッター ─────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{navy}二次元気液混合流体の数値計算法}
+\fancyhead[R]{\small\color{navy!70}Conservative Level Set~+~CCD}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+%% ── セクション書式 ────────────────────────────────────────────
+\titleformat{\section}{\large\bfseries\color{navy}}{\thesection.}{0.8em}{}[\color{blue2}\rule{\linewidth}{0.8pt}]
+\titleformat{\subsection}{\normalsize\bfseries\color{navy!80}}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{navy!60}}{\thesubsubsection}{0.8em}{}
+
+%% ── 数学マクロ ────────────────────────────────────────────────
+\newcommand{\pd}[2]{\dfrac{\partial #1}{\partial #2}}
+\newcommand{\pdd}[2]{\dfrac{\partial^2 #1}{\partial #2^2}}
+\newcommand{\pdm}[3]{\dfrac{\partial^2 #1}{\partial #2\,\partial #3}}
+\newcommand{\bu}{\bm{u}}
+\newcommand{\bg}{\bm{g}}
+\newcommand{\bnabla}{\bm{\nabla}}
+\newcommand{\He}{H_\varepsilon}
+\newcommand{\de}{\delta_\varepsilon}
+\newcommand{\Ord}[1]{\mathcal{O}(#1)}
+\newcommand{\half}{\tfrac{1}{2}}
+\newcommand{\fp}[1]{f^{(1)}_{#1}}
+\newcommand{\fpp}[1]{f^{(2)}_{#1}}
+
+%% theorem 環境
+\newtheorem{remark}{Remark}
+\newtheorem{definition}{定義}
+\newtheorem{theorem}{定理}
+
+%% ── ハイパーリンク ────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true, linkcolor=navy, citecolor=navy, urlcolor=blue2,
+  pdftitle={Two-Dimensional Gas-Liquid Two-Phase Flow Numerical Methods},
+}
+
+%% ============================================================
+\begin{document}
+\RaggedRight
+%% ============================================================
+
+%% ── 表紙 ──────────────────────────────────────────────────────
+\begin{titlepage}
+\begin{center}
+\vspace*{12mm}
+{\color{navy}\rule{\linewidth}{2pt}}\\[8pt]
+{\LARGE\bfseries 二次元気液混合流体の数値計算法}\\[6pt]
+{\large\bfseries ── 基礎理論から完全アルゴリズムまでの教科書的解説 ──}\\[4pt]
+{\color{navy}\rule{\linewidth}{2pt}}\\[10pt]
+
+{\large
+\textbf{Numerical Methods for Two-Dimensional Gas--Liquid Two-Phase Flows}\\[4pt]
+\textit{From Basic Theory to Complete Algorithm}\\[3pt]
+\textit{Coupled Compact Difference $\cdot$ Conservative Level Set $\cdot$ Projection Method}
+}
+
+\vspace{18mm}
+\begin{tcolorbox}[defbox, width=0.85\textwidth]
+\small\centering
+\begin{tabular}{rl}
+界面追跡法： & 質量保存型 Conservative Level Set 法 (Olsson \& Kreiss)\\[2pt]
+空間離散化： & 結合コンパクト差分法（CCD 法）$\Ord{h^6}$\\
+                  & Chu \& Fan, \textit{J. Comput. Phys.}, 1998\\[2pt]
+移流安定化： & 5次精度 WENO スキーム\\[2pt]
+格子構造：   & コロケート格子 + Rhie--Chow 補正\\[2pt]
+界面適合格子： & $\psi$ 連動グリッド密度関数による自動高解像度化\\[2pt]
+時間積分：   & 3次 TVD Runge--Kutta （対流・Level Set）\\
+                  & Crank--Nicolson （粘性項，半陰的）\\[2pt]
+圧力求解：   & 変密度 Chorin Projection + BiCGSTAB\\[2pt]
+表面張力：   & CSF 法（連続体表面力法）
+\end{tabular}
+\end{tcolorbox}
+
+\vspace{10mm}
+{\small\color{darkgray}
+本稿は、気液二相流における質量保存の本質的課題を解決する\\
+Conservative Level Set 法と 5次精度 WENO スキームの導入を中心に、\\
+高精度 CCD 法を組み合わせた完全な定式化を解説したものである。
+}
+\end{center}
+
+\vfill
+{\color{navy}\rule{\linewidth}{0.8pt}}\\[2pt]
+{\small\color{darkgray}対象読者：大学院生・研究者（計算流体力学の基礎知識を前提とする）}
+\end{titlepage}
+
+%% ── 目次 ──────────────────────────────────────────────────────
+\tableofcontents
+\newpage
+
+%% ============================================================
+\section{はじめに}
+\label{sec:intro}
+%% ============================================================
+
+\subsection{気液二相流の数値計算における課題}
+
+気液二相流とは，気相（ガス）と液相（液体）が共存し，
+その間に明確な界面を形成しながら運動する流体現象である．
+気泡塔，核沸騰，波浪，噴霧燃焼など，工学・自然界に広く現れる流体現象である．
+
+この現象を数値的に扱う際には，以下の4つの本質的困難が存在する：
+
+\begin{enumerate}
+  \item \textbf{界面の捕捉}：密度・粘性が界面を挟んで不連続に変化する
+        （$\rho_l/\rho_g \approx 1000$，$\mu_l/\mu_g \approx 100$）ため，
+        界面位置を高精度かつ安定に追跡しなければならない．
+  \item \textbf{表面張力の正確な評価}：表面張力は界面の曲率（$\kappa$）に比例する体積力である．
+        曲率の計算には二階偏微分が必要となり，数値誤差が増幅されやすい．
+  \item \textbf{非圧縮条件の高精度維持}：速度場の発散をゼロに保つ
+        圧力場を毎ステップ正確に求解する必要がある．
+  \item \textbf{密度成層の安定処理}：重力と密度差による静水圧分布を
+        正確に扱わないと寄生流れ（parasitic currents）が発生する．
+\end{enumerate}
+
+\subsection{本稿のアプローチ}
+
+上記の困難を克服するため，本稿では以下の手法を組み合わせる
+（図\ref{fig:ns_solvers}および図\ref{fig:timestepping}参照）：
+
+\begin{itemize}
+  \item \textbf{界面追跡：} Conservative Level Set 法 \cite{Olsson2005} 
+        を採用する。従来の Level Set 法と異なり、移流方程式を保存形
+        $\partial \psi/\partial t + \bnabla \cdot (\psi \bu) = 0$ で解くことで、
+        長時間の計算においても全質量（体積）が厳密に保存される。
+  \item \textbf{高精度空間微分：} 結合コンパクト差分法（CCD 法，Chu \& Fan \cite{ChuFan1998}）を用い，
+        一次微分・二次微分・混合偏微分をすべて $\Ord{h^6}$ 精度で統一的に評価する．
+        本稿では係数をテイラー展開から厳密に導出する．
+  \item \textbf{界面適合格子：} Conservative Level Set 関数 $\psi$ に連動したグリッド密度関数 $\omega(\psi)$ により，
+        界面近傍のみを自動的に高解像度化する非一様格子を生成する．
+  \item \textbf{格子構造：} チェッカーボード不安定を防ぐため
+        コロケート格子を採用し，Rhie--Chow 型流束補正を適用する．
+  \item \textbf{時間積分：} 対流項と Level Set 移流には
+        3次 TVD Runge--Kutta を，粘性項には Crank--Nicolson 半陰的処理を用いる．
+  \item \textbf{圧力求解：} 変密度 Chorin Projection 法に基づいて圧力 Poisson 方程式を導き，
+        CCD で差分化した後 BiCGSTAB で反復求解する．
+\end{itemize}
+
+%%% ── 図1：NS各項とソルバーの対応 ────────────────────────────
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=4mm and 5mm,
+  nsterm/.style={draw=navy!70, fill=lightblue, rounded corners=4pt,
+                 font=\small\bfseries, inner sep=6pt,
+                 minimum width=26mm, minimum height=10mm, align=center},
+  solver/.style={draw=#1!70, fill=#1!10, rounded corners=4pt,
+                 font=\scriptsize, inner sep=5pt,
+                 minimum width=26mm, align=center},
+  solver/.default=navy,
+  subarr/.style={-Stealth, semithick, darkgray!60},
+]
+
+\node[font=\small\bfseries, text=navy] (hd1) at (0,0)
+  {NS 方程式の各項とソルバーの対応};
+
+%% ── NS 5項ボックス ──────────────────────────────────────────
+\node[nsterm, below=7mm of hd1, xshift=-57mm] (T1) {対流項};
+\node[nsterm, right=4mm of T1]  (T2) {圧力項};
+\node[nsterm, right=4mm of T2]  (T3) {粘性項};
+\node[nsterm, right=4mm of T3]  (T4) {重力項};
+\node[nsterm, right=4mm of T4]  (T5) {表面張力項};
+
+%% ── 各ソルバーボックス ──────────────────────────────────────
+\node[solver=orange2, below=5mm of T1] (S1)
+  {CCD（$\Ord{h^6}$）\\TVD-RK3 + WENO5\\\陽的};
+\node[solver=midblue, below=5mm of T2] (S2)
+  {CCD $\to\bnabla p$\\FVM-PPE\\Projection法};
+\node[solver=teal2, below=5mm of T3] (S3)
+  {CCD（$\Ord{h^6}$）\\Crank-Nicolson\\半陰的};
+\node[solver=darkgray, below=5mm of T4] (S4)
+  {陽的\\(定数項)};
+\node[solver=red2, below=5mm of T5] (S5)
+  {Cons. Level Set $\to\kappa$\\CCD\\半陰的};
+
+\foreach \t/\s in {T1/S1, T2/S2, T3/S3, T4/S4, T5/S5}
+  \draw[subarr] (\t) -- (\s);
+
+\end{tikzpicture}
+\caption{NS 方程式の各項と対応ソルバーの概要．
+対流項は CCD + 5次精度 WENO スキームを組み合わせた TVD-RK3 で陽的に処理し，
+圧力項は FVM ベース PPE を Projection 法で求解する．
+粘性項は CCD + Crank--Nicolson で半陰的に扱い，
+表面張力項は Conservative Level Set 関数から曲率を CCD で計算して評価する．}
+\label{fig:ns_solvers}
+\end{figure}
+
+%%% ── 図2：タイムステッピングフロー ──────────────────────────
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=4mm and 5mm,
+  phasebox/.style={draw=#1!80, fill=#1!8, rounded corners=4pt,
+                   font=\small, inner sep=6pt,
+                   text width=115mm, align=left},
+  phasebox/.default=navy,
+  statebox/.style={draw=navy!60, fill=lightblue!50, rounded corners=4pt,
+                   font=\small, inner sep=6pt,
+                   text width=115mm, align=center},
+  arr/.style={-Stealth, thick, navy},
+]
+
+\node[font=\small\bfseries, text=navy] (hd2) at (0,0)
+  {タイムステッピングフロー（$t^n \to t^{n+1}$）};
+
+\node[statebox, below=5mm of hd2] (In)
+  {入力：\,$\psi^n$，$\bu^n$，$p^n$，$\tilde\rho^n$};
+
+\node[phasebox=red2, below=3mm of In] (P1)
+  {\textcolor{red2}{\textbf{①② Conservative Level Set 更新}}\enspace
+   保存形移流（WENO5 + TVD-RK3）→ 再圧縮・正規化};
+
+\node[phasebox=green4, below=2.5mm of P1] (P2)
+  {\textcolor{green4}{\textbf{③④⑤ 格子・物性・曲率更新}}\enspace
+   密度関数 $\omega(\psi^{n+1})$ → 物性値線形補間 → CCD で $\kappa^{n+1}$};
+
+\node[phasebox=navy, below=2.5mm of P2] (P3)
+  {\textcolor{navy}{\textbf{⑥ 運動量予測（Predictor）}}}\\\jp{対流（WENO5）・粘性（半陰的）・重力・表面張力 → 予測速度 $\bu^*$};
+
+\node[phasebox=orange2, below=2.5mm of P3] (P4)
+  {\textcolor{orange2}{\textbf{⑦ 圧力 Poisson 求解（FVM）}}}\enspace
+   Rhie-Chow 補正 → 変密度 PPE → BiCGSTAB → $p^{n+1}$};
+
+\node[phasebox=purple2, below=2.5mm of P4] (P5)
+  {\textcolor{purple2}{\textbf{⑧⑨ 速度補正・収束確認}}}\enspace
+   CCD $\bnabla p^{n+1}$ + Rhie-Chow 補正 → $\bu^{n+1}$；CFL更新};
+
+\node[statebox, below=3mm of P5] (Out)
+  {出力：\,$\psi^{n+1}$，$\bu^{n+1}$，$p^{n+1}$\quad$\to$\quad$t:=t+\Delta t$};
+
+\foreach \a/\b in {In/P1, P1/P2, P2/P3, P3/P4, P4/P5, P5/Out}
+  \draw[arr] (\a) -- (\b);
+
+%% ループ矢印
+\draw[arr, rounded corners=5pt]
+  (Out.east) -- ++(7mm,0) -- ++(0,46mm)
+  node[midway, right, font=\scriptsize, rotate=90, anchor=south,
+       text=navy, yshift=0.5mm] {次ステップへ}
+  -- (In.east);
+
+\end{tikzpicture}
+\caption{タイムステッピングフロー（$t^n \to t^{n+1}$）．
+①〜⑨ は第\ref{sec:algorithm}章の完全アルゴリズムフローに対応する．
+Conservative Level Set の更新によって質量の不変性を保証してから、
+高精度な速度・圧力計算へと進む。}
+\label{fig:timestepping}
+\end{figure}
+
+\subsection{本稿の構成}
+
+第\ref{sec:governing}章で支配方程式（One-Fluid Navier--Stokes + Level Set）を導く．
+第\ref{sec:levelset}章で Conservative Level Set 法の詳細（保存形移流・再圧縮・WENO）を述べる．
+第\ref{sec:grid}章で界面適合非一様格子の構築法と座標変換を説明する．
+第\ref{sec:CCD}章が本稿の数学的核心であり，CCD スキームの係数をテイラー展開から完全に導出する．
+第\ref{sec:collocate}章でコロケート格子と Rhie--Chow 補正を述べる．
+第\ref{sec:pressure}章で圧力 Poisson 方程式を導出し CCD で差分化する．
+第\ref{sec:time}章で時間積分スキームを説明し，
+第\ref{sec:algorithm}章で完全アルゴリズムをまとめる．
+
+
+%% ============================================================
+\section{支配方程式系の導出}
+\label{sec:governing}
+%% ============================================================
+
+\subsection{One-Fluid（単一流体）定式化の概念}
+
+気相・液相を別々の変数で扱う代わりに，
+界面近傍で物性値を滑らかに補間した \textbf{「一つの流体」として扱う}定式化を One-Fluid 法という．
+変密度・変粘性の単一 Navier--Stokes 方程式で全領域を記述できるため，
+界面の陰関数表現（Level Set など）と自然に組み合わせられる．
+
+\subsection{非圧縮条件（連続の式）}
+
+気相・液相とも非圧縮性流体（$\rho = $const in each phase）を仮定する．
+One-Fluid 定式化では，界面が移流によって運ばれるだけで質量が生成・消滅しないから，
+速度場に対して以下の拘束条件が成立する：
+\begin{equation}
+  \bnabla \cdot \bu = 0
+  \label{eq:continuity}
+\end{equation}
+この式は各タイムステップで圧力場を通じて強制的に満たされる（後述の Projection 法）．
+
+\subsection{Navier--Stokes 方程式（One-Fluid + CSF）}
+
+One-Fluid 定式化による運動方程式は，密度・粘性が空間的に変化することを許した
+Navier--Stokes 方程式である：
+
+\begin{tcolorbox}[mybox, title={One-Fluid Navier--Stokes 方程式（次元形）}]
+\begin{equation}
+  \rho(\psi)\!\left(\pd{\bu}{t} + \bu\cdot\bnabla\bu\right)
+  = -\bnabla p
+  + \bnabla\cdot\!\left[\mu(\psi)\!\left(\bnabla\bu + \bnabla\bu^T\right)\right]
+  + \rho(\psi)\,\bg
+  + \sigma\,\kappa\,\bnabla \psi
+  \label{eq:NS_dim}
+\end{equation}
+\end{tcolorbox}
+
+各項の物理的意味を表\ref{tab:NS_terms}に整理する．
+
+\begin{table}[h]
+\centering
+\caption{Navier--Stokes 方程式の各項の意味}
+\label{tab:NS_terms}
+\begin{tabular}{@{}lll@{}}
+\toprule
+項 & 数式 & 物理的意味\\
+\midrule
+慣性力（左辺） & $\rho D\bu/Dt$ & 質量$\times$加速度（Newton 第2法則）\\
+圧力勾配力 & $-\bnabla p$ & 等方圧縮力\\
+粘性応力 & $\bnabla\cdot[\mu(\bnabla\bu+\bnabla\bu^T)]$ & 変密度対応の Stokes 応力テンソル\\
+重力 & $\rho\,\bg$ & $\bg = -g\hat{\bm{z}}$（下向き重力）\\
+表面張力（CSF法） & $\sigma\kappa\bnabla\psi$ & 界面の曲率を体積力に変換 \cite{Olsson2005}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{CSF 法（連続体表面力法）の導出}
+
+界面上の表面張力ベクトルを、Conservative Level Set 関数 $\psi$ の勾配を用いて体積力として記述する。
+$\psi$ が $0 \to 1$ へ滑らかに変化するステップ関数の場合、その勾配 $\bnabla \psi$ は界面法線方向に
+デルタ関数的な重みを持つ。
+したがって、曲率 $\kappa$ を用いた表面張力項は：
+\begin{equation}
+  \bm{F}_{\mathrm{CSF}} = \sigma\kappa\bnabla\psi
+\end{equation}
+と簡潔に表記される。これは従来の $\sigma\kappa\delta(\phi)\bnabla\phi$ と同等の効果を持つが、
+$\psi$ 自身が滑らかな階段関数であるため、追加のデルタ関数近似を必要としない利点がある。
+
+\subsection{界面曲率の計算式}
+
+平均曲率 $\kappa$ は Level Set 関数の発散（単位法線ベクトルの発散）として定義される：
+\begin{equation}
+  \kappa(\psi) = -\bnabla\cdot\!\left(\frac{\bnabla\psi}{|\bnabla\psi|}\right)
+  \label{eq:curvature_def}
+\end{equation}
+2次元の場合にこれを展開すると，$\psi_x = \partial\psi/\partial x$ 等と略記して：
+\begin{tcolorbox}[mybox, title={2次元界面曲率（展開形）}]
+\begin{equation}
+  \kappa = -\frac{
+    \psi_x^2\,\psi_{yy}
+    - 2\psi_x\psi_y\,\psi_{xy}
+    + \psi_y^2\,\psi_{xx}
+  }{\bigl(\psi_x^2 + \psi_y^2\bigr)^{3/2}}
+  \label{eq:curvature_2d}
+\end{equation}
+\end{tcolorbox}
+この計算には $\psi_{xx}$，$\psi_{yy}$，$\psi_{xy}$ という二階偏微分が必要であり，
+CCD 法を用いることで $\Ord{h^6}$ 精度の高精度評価が可能となる（第\ref{sec:CCD}章参照）．
+
+\subsubsection{曲率計算の導出（式\eqref{eq:curvature_def}から式\eqref{eq:curvature_2d}）}
+
+$\hat{\bm{n}} = (\psi_x/|\bnabla\psi|,\, \psi_y/|\bnabla\psi|)$ として発散を計算する：
+\begin{align}
+  \kappa
+  &= -\left(\pd{}{x}\frac{\psi_x}{|\bnabla\psi|} + \pd{}{y}\frac{\psi_y}{|\bnabla\psi|}\right) \notag\\
+  &= -\frac{\psi_{xx}|\bnabla\psi|^2 - \psi_x(\psi_x\psi_{xx}+\psi_y\psi_{xy})}{|\bnabla\psi|^3} -\frac{\psi_{yy}|\bnabla\psi|^2 - \psi_y(\psi_x\psi_{xy}+\psi_y\psi_{yy})}{|\bnabla\psi|^3} \notag\\
+  &= -\frac{(\psi_x^2+\psi_y^2)(\psi_{xx}+\psi_{yy}) - (\psi_x^2\psi_{xx}+2\psi_x\psi_y\psi_{xy}+\psi_y^2\psi_{yy})}{|\bnabla\psi|^3} \notag\\
+  &= -\frac{\psi_y^2\psi_{xx} - 2\psi_x\psi_y\psi_{xy} + \psi_x^2\psi_{yy}}{|\bnabla\psi|^3}
+\end{align}
+
+\subsection{無次元化}
+
+参照量として液相密度 $\rho_l$，代表速度 $U$，代表長さ $L$ を選ぶ：
+\begin{equation}
+  \tilde{\bm{x}} = \frac{\bm{x}}{L},\quad \tilde{\bu} = \frac{\bu}{U},\quad \tilde{t} = \frac{Ut}{L},\quad \tilde{p} = \frac{p}{\rho_l U^2},\quad \tilde{\psi} = \psi \label{eq:nondim_vars}
+\end{equation}
+無次元パラメータ（チルダは省略）：
+\begin{equation}
+  Re = \frac{\rho_l U L}{\mu_l},\quad Fr = \frac{U}{\sqrt{gL}},\quad We = \frac{\rho_l U^2 L}{\sigma},\quad \hat{\rho} = \frac{\rho_g}{\rho_l},\quad \hat{\mu} = \frac{\mu_g}{\mu_l} \label{eq:nondim_params}
+\end{equation}
+無次元密度・粘性係数：
+\begin{equation}
+  \rho(\psi) = \hat{\rho} + (1-\hat{\rho})\psi,\quad \mu(\psi) = \hat{\mu} + (1-\hat{\mu})\psi
+\end{equation}
+これらを用いて運動方程式を整理すると：
+\begin{equation}
+  \rho(\psi)\!\left(\pd{\bu}{t} + \bu\cdot\bnabla\bu\right)
+  = -\bnabla p
+  + \frac{1}{Re}\bnabla\cdot\!\left[\mu(\psi)\!\left(\bnabla\bu + \bnabla\bu^T\right)\right]
+  + \frac{\rho(\psi)}{Fr^2}\hat{\bg}
+  + \frac{1}{We}\,\kappa\,\bnabla\psi
+\end{equation}
+
+
+%% ============================================================
+\section{Conservative Level Set 法}
+\label{sec:levelset}
+%% ============================================================
+
+\subsection{保存形移流方程式}
+
+Conservative Level Set 法では、界面を $0$ から $1$ へ変化する滑らかな階段関数 $\psi$ で表現する。
+$\psi=0.5$ が界面位置に対応する。この関数は流速 $\bu$ に沿って以下の保存形で移流される：
+\begin{equation}
+  \pd{\psi}{t} + \bnabla \cdot (\psi \bu) = 0
+\end{equation}
+非圧縮条件 $\bnabla \cdot \bu = 0$ を用いると非保存形 $\partial \psi / \partial t + \bu \cdot \bnabla \psi = 0$ と等価であるが、
+数値計算上は保存形を維持することで全質量の保存性を高める。
+
+\subsection{5次精度 WENO スキームによる離散化}
+
+界面の鋭さを維持しつつ数値振動を抑えるため、移流項の離散化には \textbf{5次精度 WENO (Weighted Essentially Non-Oscillatory) スキーム} を使用する。
+フラックス $f = \psi u$ に対して、セル界面での値を周囲のスタシルから適応的に補間する：
+\begin{equation}
+  \hat{f}_{i+1/2} = \sum_{k=1}^3 \omega_k \hat{f}^{(k)}_{i+1/2}
+\end{equation}
+ここで $\omega_k$ は解の滑らかさに応じて変化する重み係数である。
+
+\subsection{再圧縮（Re-initialization）ステップ}
+
+移流によって拡散・歪んだ $\psi$ プロファイルを、一定の厚み $\varepsilon$ を持つプロファイルへ維持するため、
+各タイムステップ後に以下の修正方程式を定常状態まで解く：
+\begin{equation}
+  \pd{\psi}{\tau} + \bnabla \cdot [ \psi(1-\psi) \bm{n} ] = \varepsilon \bnabla \cdot [ (\bnabla \psi \cdot \bm{n}) \bm{n} ]
+\end{equation}
+ここで $\bm{n} = \bnabla \psi / |\bnabla \psi|$ は界面法線ベクトルである。
+このステップにより、界面付近の $\psi$ は $\psi(\bm{x}) = \frac{1}{2}(1 + \tanh(d/2\varepsilon))$ 
+（$d$ は界面からの距離）という安定した形状に保たれる。
+
+\subsection{物性値の補間}
+
+密度 $\rho$ および粘性 $\mu$ は，$\psi$ を用いて全領域で定義される：
+\begin{align}
+  \rho(\psi) &= \rho_g + (\rho_l - \rho_g)\psi \\
+  \mu(\psi)  &= \mu_g + (\mu_l - \mu_g)\psi
+\end{align}
+これにより、気相 ($\psi=0$) から液相 ($\psi=1$) まで滑らかに物性が変化し、不連続性に起因する数値的不安定が解消される。
+
+
+%% ============================================================
+\section{界面適合格子の生成}
+\label{sec:grid}
+%% ============================================================
+
+\subsection{グリッド密度関数による格子制御}
+
+計算領域 $[0, L_x]\times[0, L_y]$ において，
+界面（$\psi=0.5$）付近の解像度を局所的に高めるため，
+一様計算空間 $(\xi, \eta) \in [0, 1]\times[0, 1]$ から
+実空間 $(x, y)$ への写像 $x(\xi), y(\eta)$ を導入する。
+
+グリッド密度関数 $\omega(\psi)$ を以下のように定義する：
+\begin{equation}
+  \omega(\psi) = 1 + \alpha \exp\left( - \beta (\psi - 0.5)^2 \right)
+\end{equation}
+ここで $\alpha, \beta$ は解像度を制御するパラメータである。
+格子の間隔 $\Delta x$ は $1/\omega$ に比例するように配置される。
+
+
+%% ============================================================
+\section{結合コンパクト差分法 (CCD)}
+\label{sec:CCD}
+%% ============================================================
+
+\subsection{CCD法の定式化}
+
+格子点 $x_i$ における関数値を $f_i$, 一次微分値を $f'_i$, 二次微分値を $f''_i$ とし、
+これらを同時に未知数として解くのが結合コンパクト差分法（CCD法）である。
+Chu \& Fan \cite{ChuFan1998} に基づき、$\Ord{h^6}$ 精度の関係式を以下のように構成する。
+
+\begin{tcolorbox}[algbox, title={CCD $\Ord{h^6}$ 差分式}]
+一次微分 $f'$ と二次微分 $f''$ の間の連立関係式：
+\begin{align}
+  \alpha_1 (f'_{i+1} + f'_{i-1}) + f'_i + \beta_1 h (f''_{i+1} - f''_{i-1}) &= \frac{a_1}{2h} (f_{i+1} - f_{i-1}) \label{eq:ccd1} \\
+  \alpha_2 \frac{1}{h} (f'_{i+1} - f'_{i-1}) + f''_i + \beta_2 (f''_{i+1} + f''_{i-1}) &= \frac{a_2}{h^2} (f_{i+1} - 2f_i + f_{i-1}) \label{eq:ccd2}
+\end{align}
+\end{tcolorbox}
+
+テイラー展開による誤差解析から得られる $\Ord{h^6}$ 精度の係数は以下の通りである：
+\begin{equation}
+  \alpha_1 = \frac{7}{16},\, \beta_1 = -\frac{1}{16},\, a_1 = \frac{15}{8},\quad
+  \alpha_2 = \frac{9}{8h},\, \beta_2 = \frac{1}{8},\, a_2 = \frac{3}{1} (\text{修正が必要な場合あり})
+\end{equation}
+(正確な係数導出の詳細は省略するが、これらは 3 重対角行列の反転によって効率的に解くことができる。)
+
+\subsection{混合偏微分の計算}
+
+曲率計算に必要な $f_{xy}$ は、まず $x$ 方向に一次微分を求め、その結果に対して $y$ 方向に
+同様の CCD 一次微分を適用することで求める。
+
+
+%% ============================================================
+\section{コロケート格子と Rhie--Chow 補正}
+\label{sec:collocate}
+%% ============================================================
+
+すべての変数（$\bu, p, \psi$）を格子点（セル中心）で定義するコロケート格子を採用する。
+スタガード格子で発生する座標変換の複雑さを避けるためであるが、
+そのままでは圧力のチェッカーボード不安定が発生する。
+
+これを防ぐため，セル界面での流速 $U_{i+1/2}$ を計算する際に，
+Rhie--Chow 型の補正項（圧力の三階微分に相当する散逸）を付加する：
+\begin{equation}
+  U_{i+1/2} = \overline{u}_{i+1/2} - C \Delta x^2 \left( \frac{\partial^3 p}{\partial x^3} \right)_{i+1/2}
+\end{equation}
+この界面流速を用いて連続の式（圧力 Poisson 方程式のソース項）を構成する。
+
+
+%% ============================================================
+\section{圧力 Poisson 方程式の求解}
+\label{sec:pressure}
+%% ============================================================
+
+\subsection{変密度 Poisson 方程式の導出}
+
+Navier--Stokes 方程式を時間離散化し、連続の式 $\bnabla \cdot \bu^{n+1} = 0$ を要請すると、
+圧力に関する以下の楕円型方程式が得られる：
+\begin{equation}
+  \bnabla \cdot \left( \frac{1}{\rho(\psi)} \bnabla p^{n+1} \right) = \frac{\bnabla \cdot \bu^*}{\Delta t}
+\end{equation}
+ここで $\bu^*$ は圧力項を除いた運動量予測ステップで得られる中間速度である。
+
+\subsection{数値解法}
+
+この方程式を CCD 法により空間離散化すると、非対称な大型連立一次方程式となる。
+これを BiCGSTAB 法（前処理付き共役勾配法の一種）を用いて反復求解する。
+収束判定基準は残差ノルムが $10^{-8}$ 以下とする。
+
+
+%% ============================================================
+\section{時間積分スキーム}
+\label{sec:time}
+%% ============================================================
+
+移流項（速度および Level Set）には、安定性の高い \textbf{3次精度 TVD Runge--Kutta 法} を用いる：
+\begin{align}
+  \phi^{(1)} &= \phi^n + \Delta t \mathcal{L}(\phi^n) \notag \\
+  \phi^{(2)} &= \frac{3}{4}\phi^n + \frac{1}{4}\phi^{(1)} + \frac{1}{4}\Delta t \mathcal{L}(\phi^{(1)}) \notag \\
+  \phi^{n+1} &= \frac{1}{3}\phi^n + \frac{2}{3}\phi^{(2)} + \frac{2}{3}\Delta t \mathcal{L}(\phi^{(2)})
+\end{align}
+ここで $\mathcal{L}$ は WENO5 による移流演算子である。
+一方、粘性項については、拡散数制限を緩和するため Crank--Nicolson 法による半陰的処理を行う。
+
+
+%% ============================================================
+\section{完全アルゴリズム}
+\label{sec:algorithm}
+%% ============================================================
+
+各タイムステップ $t^n \to t^n + \Delta t$ における計算手順を以下にまとめる。
+
+\begin{tcolorbox}[algbox, title={計算アルゴリズムフロー}]
+\begin{enumerate}
+  \item \textbf{Conservative Level Set の移流}：WENO5 と TVD-RK3 を用い、$\psi^n$ を移流して $\psi^*$ を得る。
+  \item \textbf{再圧縮ステップ}：$\psi^*$ に対して修正方程式を数ステップ解き、プロファイルを維持した $\psi^{n+1}$ を決定する。
+  \item \textbf{物性値と曲率の更新}：$\psi^{n+1}$ から $\rho, \mu$ を求め、CCD法で曲率 $\kappa^{n+1}$ を計算する。
+  \item \textbf{運動量予測（Predictor）}：圧力項を除いた NS 方程式を解き、中間速度 $\bu^*$ を求める。
+  \item \textbf{圧力 Poisson 方程式の求解}：変密度 PPE を BiCGSTAB で解き、圧力 $p^{n+1}$ を決定する。
+  \item \textbf{速度補正（Corrector）}：$\bu^*$, $p^{n+1}$, $\bnabla p^{n+1}$（CCD）および Rhie--Chow 補正を用いて、
+        非圧縮条件を満たす速度 $\bu^{n+1}$ を計算する。
+  \item \textbf{時間刻みの更新}：CFL 条件に基づき、次ステップの $\Delta t$ を決定する。
+\end{enumerate}
+\end{tcolorbox}
+
+
+%% ============================================================
+\begin{thebibliography}{99}
+\bibitem[Brackbill et al.(1992)]{Brackbill1992}
+Brackbill, J.~U., Kothe, D.~B., \& Zemach, C. (1992).
+A Continuum Method for Modeling Surface Tension.
+\textit{Journal of Computational Physics}, \textbf{100}(2), 335--354.
+
+\bibitem[Chorin(1968)]{Chorin1968}
+Chorin, A.~J. (1968).
+Numerical Solution of the Navier--Stokes Equations.
+\textit{Mathematics of Computation}, \textbf{22}(104), 745--762.
+
+\bibitem[Chu \& Fan(1998)]{ChuFan1998}
+Chu, K.~W., \& Fan, L.~S. (1998).
+A Combined Compact Difference Scheme for Numerical Simulation of Particle-Fluid Flows.
+\textit{Journal of Computational Physics}, \textbf{141}(1), 1--24.
+
+\bibitem[Olsson \& Kreiss(2005)]{Olsson2005}
+Olsson, E., \& Kreiss, G. (2005).
+A Conservative Level Set Method for Two Phase Flow.
+\textit{Journal of Computational Physics}, \textbf{210}(1), 225--246.
+
+\bibitem[Shu \& Osher(1988)]{Shu1988}
+Shu, C.-W., \& Osher, S. (1988).
+Efficient Implementation of Essentially Non-Oscillatory Shock-Capturing Schemes.
+\textit{Journal of Computational Physics}, \textbf{77}(2), 439--471.
+
+\bibitem[Sussman et al.(1994)]{Sussman1994}
+Sussman, M., Smereka, P., \& Osher, S. (1994).
+A Level Set Approach for Computing Solutions to Incompressible Two-Phase Flow.
+\textit{Journal of Computational Physics}, \textbf{114}(1), 146--159.
+
+\bibitem[Unverdi \& Tryggvason(1992)]{Unverdi1992}
+Unverdi, S.~O., \& Tryggvason, G. (1992).
+A Front-Tracking Method for Viscous, Incompressible, Multi-fluid Flows.
+\textit{Journal of Computational Physics}, \textbf{100}(1), 25--37.
+\end{thebibliography}
+
+\end{document}
