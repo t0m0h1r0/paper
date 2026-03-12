@@ -1,0 +1,298 @@
+
+% ============================================================
+% 統合版：二次元気液混合流体の数値計算法（最終稿／XeLaTeX）
+% Compile: xelatex → xelatex
+% ============================================================
+\documentclass[12pt, a4paper, titlepage, xelatex, ja=standard]{bxjsarticle}
+% -- Fonts (XeLaTeX + xeCJK)
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\setmainfont{Times New Roman}
+\setCJKmainfont{Hiragino Mincho ProN}
+% -- Math / Figures / Tables
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+\usepackage{booktabs, array, multirow, tabularx}
+\usepackage{graphicx}
+\graphicspath{{figs/}}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable, theorems}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, backgrounds, calc, decorations.pathreplacing, matrix, patterns}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{microtype}
+\usepackage{nicefrac}
+\usepackage{ragged2e}
+% -- Page layout
+\geometry{top=25mm, bottom=28mm, left=26mm, right=26mm, headheight=16pt}
+\emergencystretch=2em
+\setlength{\hfuzz}{3pt}
+% -- Colors
+\definecolor{navy}{RGB}{0,40,90}
+\definecolor{blue2}{RGB}{0,80,160}
+\definecolor{midblue}{RGB}{0,90,170}
+\definecolor{lightblue}{RGB}{230,242,255}
+\definecolor{tblue}{RGB}{218,234,255}
+\definecolor{tgreen}{RGB}{215,255,225}
+\definecolor{tyellow}{RGB}{255,250,210}
+\definecolor{tred}{RGB}{255,225,220}
+\definecolor{darkgray}{RGB}{60,60,60}
+\definecolor{boxgray}{RGB}{245,245,245}
+\definecolor{green4}{RGB}{0,120,60}
+\definecolor{red2}{RGB}{160,0,0}
+\definecolor{orange2}{RGB}{200,90,0}
+\definecolor{teal2}{RGB}{0,110,110}
+\definecolor{purple2}{RGB}{100,0,140}
+% -- tcolorbox styles
+\tcbset{
+  mybox/.style={enhanced, breakable, colback=tblue, colframe=blue2,
+    toprule=0.8pt, bottomrule=0.8pt, leftrule=0.8pt, rightrule=0.8pt,
+    fonttitle=\bfseries\small\color{white}, colbacktitle=navy,
+    attach boxed title to top left={yshift=-2mm, xshift=6mm}, boxed title style={sharp corners}, sharp corners=south},
+  derivbox/.style={enhanced, breakable, colback=boxgray, colframe=navy!40,
+    toprule=0.5pt, bottomrule=0.5pt, leftrule=3pt, rightrule=0.5pt, sharp corners},
+  resultbox/.style={enhanced, colback=tgreen, colframe=navy,
+    toprule=1pt, bottomrule=1pt, leftrule=1pt, rightrule=1pt, sharp corners},
+  warnbox/.style={enhanced, colback=tyellow, colframe=red2!70,
+    toprule=0.6pt, bottomrule=0.6pt, leftrule=3pt, rightrule=0.6pt, sharp corners},
+  algbox/.style={enhanced, breakable, colback=white, colframe=navy,
+    toprule=1pt, bottomrule=1pt, leftrule=1pt, rightrule=1pt, sharp corners,
+    fonttitle=\bfseries\small\color{white}, colbacktitle=navy,
+    attach boxed title to top left={yshift=-2mm, xshift=6mm}, boxed title style={sharp corners}},
+  defbox/.style={enhanced, colback=boxgray, colframe=darkgray!50,
+    toprule=0.6pt, bottomrule=0.6pt, leftrule=0.6pt, rightrule=0.6pt, sharp corners}
+}
+% -- Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{navy}二次元気液混合流体の数値計算法（統合版）}
+\fancyhead[R]{\small\color{navy!70}CLS + CCD + RC + PPE}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+% -- Section headings
+\titleformat{\section}{\large\bfseries\color{navy}}{\thesection.}{0.8em}{}[\color{blue2}\rule{\linewidth}{0.8pt}]
+\titleformat{\subsection}{\normalsize\bfseries\color{navy!80}}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{navy!60}}{\thesubsubsection}{0.8em}{}
+% -- Math macros
+\newcommand{\pd}[2]{\dfrac{\partial #1}{\partial #2}}
+\newcommand{\pdd}[2]{\dfrac{\partial^2 #1}{\partial #2^2}}
+\newcommand{\pdm}[3]{\dfrac{\partial^2 #1}{\partial #2\,\partial #3}}
+\newcommand{\bu}{\bm{u}}
+\newcommand{\bg}{\bm{g}}
+\newcommand{\bnabla}{\bm{\nabla}}
+\newcommand{\Ord}[1]{\mathcal{O}(#1)}
+\newcommand{\half}{\tfrac{1}{2}}
+\newcommand{\fp}[1]{f^{(1)}_{#1}}
+\newcommand{\fpp}[1]{f^{(2)}_{#1}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+% theorem env
+\newtheorem{remark}{Remark}
+\newtheorem{definition}{定義}
+\newtheorem{theorem}{定理}
+% -- Hyperlinks
+\hypersetup{colorlinks=true, linkcolor=navy, citecolor=navy, urlcolor=blue2,
+  pdftitle={Two-Dimensional Gas-Liquid Two-Phase Flow Numerical Methods (Merged Final)}}
+% ============================================================
+\begin{document}
+\RaggedRight
+% ============================================================
+% Title page
+\begin{titlepage}
+\begin{center}
+\vspace*{12mm}
+{\color{navy}\rule{\linewidth}{2pt}}\\[8pt]
+{\LARGE\bfseries 二次元気液混合流体の数値計算法（統合最終版）}\\[6pt]
+{\large\bfseries —— Conservative Level Set + CCD + RC + 可変密度PPE ——}\\[4pt]
+{\color{navy}\rule{\linewidth}{2pt}}\\[10pt]
+{\large
+\textbf{Numerical Methods for Two-Dimensional Gas--Liquid Two-Phase Flows (Merged Final)}\\[4pt]
+\textit{Conservative Level Set · WENO5 · Coupled Compact Difference · Projection Method}
+}
+\vspace{14mm}
+\begin{tcolorbox}[defbox, width=0.88\textwidth]
+\small\centering
+\begin{tabular}{rl}
+界面追跡： & \textbf{Conservative Level Set 法}\,($\psi\equiv H_\varepsilon(\phi)$)\\
+空間離散： & CCD $\Ord{h^6}$（微分），WENO5（移流），非一様格子対応\\
+格子構造： & コロケート格子 + Rhie--Chow 補正（面速度）\\
+時間積分： & TVD-RK3（移流・CLS），Crank--Nicolson（粘性）\\
+圧力解法： & 変密度 Chorin Projection + FVM-PPE + BiCGSTAB\\
+表面張力： & CSF 法（$\kappa\,\bnabla\psi$ 形式；balanced-force）
+\end{tabular}
+\end{tcolorbox}
+\vspace{6mm}
+{\small\color{darkgray}本統合版は「教科書的総合解説」原稿（A）と，その後のアップデートを主題とする再構成稿（B）を完全統合し，XeLaTeX でのビルド安定性と参照一元化を図った。% TODO(Copilot): A/B の図番重複は将来，実ファイルを確認し調整}
+\end{center}
+\vfill
+{\color{navy}\rule{\linewidth}{0.8pt}}\\[2pt]
+{\small\color{darkgray}対象読者：大学院生・研究者（計算流体力学の基礎知識を前提）}
+\end{titlepage}
+\tableofcontents
+\newpage
+% ============================================================
+\section{はじめに}\label{sec:intro}
+気液二相流に固有の課題（界面の捕捉・表面張力評価・非圧縮条件・静水圧層の安定処理）を整理し，Conservative Level Set（CLS）+ CCD + WENO5 + Projection 法を組み合わせて定式化する全体像を示す。本稿の章立ては B に準拠し，A の内容は重複を解消しつつ対応する節に移植・増補した。% TODO(Copilot): 章立て変更の図表再配置は画像実体確認後に最終化
+
+% ============================================================
+\section{支配方程式系と表面張力項}\label{sec:governing}
+\subsection{One-Fluid 定式化と非圧縮条件}
+非圧縮条件は $\bnabla\cdot\bu=0$。物性は界面指標 $\psi\in[0,1]$ により連続補間する：
+\begin{align}
+ \rho(\psi)&=\rho_g+(\rho_l-\rho_g)\,\psi, & \mu(\psi)&=\mu_g+(\mu_l-\mu_g)\,\psi.
+\end{align}
+
+\subsection{無次元化 NS 方程式}
+\paragraph{無次元化の定義}は B に従う。代表長さ $L$，代表速度 $U$ などで規格化し，$Re,Fr,We$ を定義する。
+\begin{tcolorbox}[mybox, title={無次元 Navier--Stokes（CLS 版）}]
+\begin{equation}
+ \rho\!\left(\pd{\bu}{t}+\bu\cdot\bnabla\bu\right)
+ =-\bnabla p+\frac{1}{Re}\,\bnabla\cdot\!\left[\mu\,(\bnabla\bu+\bnabla\bu^T)\right]
+ -\frac{\rho}{Fr^2}\hat{\bm z}+\frac{\kappa\,\bnabla\psi}{We}.
+ \label{eq:NS_dimless_cls}
+\end{equation}
+\end{tcolorbox}
+\paragraph{CSF の正規化（要点）} Balanced-force の観点から $\kappa\,\bnabla\psi/We$ を圧力項と同一点・同重みで離散し，表面張力起因の寄生流れを抑制する。
+
+\subsection{曲率の計算}
+符号付き距離関数 $\phi$ から
+\begin{equation}
+ \kappa(\phi) = -\bnabla\cdot\!\left(\frac{\bnabla\phi}{\norm{\bnabla\phi}}\right)
+\end{equation}
+を用いる。CLS の物性・CSF は $\psi\equiv H_\varepsilon(\phi)$ を用い，幾何量（法線・曲率）は $\phi$ から評価する。
+
+% ============================================================
+\section{Conservative Level Set（CLS）による界面追跡}\label{sec:levelset}
+\subsection{保存形移流と再初期化}
+保存形移流：$\pd{\psi}{t}+\bnabla\cdot(\psi\,\bu)=0$。
+保存形再初期化（等方拡散形；安定な標準形）：
+\begin{equation}
+ \pd{\psi}{\tau}+\bnabla\cdot\bigl(\psi(1-\psi)\hat{\bm n}\bigr)=\bnabla\cdot\bigl(\varepsilon\,\bnabla\psi\bigr),
+ \label{eq:cls_reinit_iso}
+\end{equation}
+法線は $\hat{\bm n}= \bnabla \phi / \norm{\bnabla \phi}$，拡散幅は $\varepsilon = C_\varepsilon \, \Delta x_{\min}$（例：$C_\varepsilon\in[1,2]$）。% TODO(Copilot): A では $\varepsilon\approx1.5\Delta x_{\min}$ を推奨．最終値は共通化要検討
+
+\subsection{補足：$\psi$ と $\phi$ の関係}\label{sec:levelset_mapping}
+\begin{tcolorbox}[defbox]
+\textbf{対応付け：}$\psi\equiv H_\varepsilon(\phi)$，$\; \bnabla\psi=\delta_\varepsilon(\phi)\,\bnabla\phi$。物性補間 $\rho(\psi),\mu(\psi)$ の連続性を保証する。
+\end{tcolorbox}
+
+% ============================================================
+\section{界面適合非一様格子の構築}\label{sec:grid}
+\subsection{グリッド密度関数と座標変換}
+一様計算空間 $\xi$ への座標変換に対し，厳密形：
+\begin{tcolorbox}[resultbox]
+\begin{align}
+ \pd{f}{x}&=J_x\,\pd{f}{\xi}, & \pdd{f}{x}&=J_x^2\,\pdd{f}{\xi}+J_x\,\pd{J_x}{\xi}\,\pd{f}{\xi},
+ \label{eq:coord_transform_exact}
+\end{align}
+\end{tcolorbox}
+
+% ============================================================
+\section{結合コンパクト差分法（CCD）の導出}\label{sec:CCD}
+\subsection{基本二式}
+\begin{tcolorbox}[mybox, title={CCD ステンシルの二方程式}]
+\textbf{Eq-I（一次微分）}:\; $(\alpha_1\fp{i-1}+\fp{i}+\alpha_1\fp{i+1})=\dfrac{a_1}{h}(f_{i+1}-f_{i-1})+b_1 h(\fpp{i+1}-\fpp{i-1})$\\
+\textbf{Eq-II（二次微分）}:\; $(\beta_2\fpp{i-1}+\fpp{i}+\beta_2\fpp{i+1})=\dfrac{a_2}{h^2}(f_{i-1}-2f_i+f_{i+1})+\dfrac{b_2}{h}(\fp{i+1}-\fp{i-1})$
+\end{tcolorbox}
+テイラー展開から係数を導出し，
+\begin{equation}
+ \boxed{\alpha_1=\tfrac{7}{16},\; a_1=\tfrac{15}{16},\; b_1=\tfrac{1}{16}},\qquad
+ \boxed{\beta_2=-\tfrac{1}{8},\; a_2=3,\; b_2=-\tfrac{9}{8}}.
+\end{equation}
+ブロック行列定式化・片側スキーム・非一様格子拡張（\Cref{sec:grid}）は B の構成に従い，A の詳細導出を脚注・付録に移した。% TODO(Copilot): A の境界スキーム式番号の引き継ぎ要
+
+% ============================================================
+\section{コロケート格子と Rhie--Chow 補正}\label{sec:collocate}
+\paragraph{面速度の定義}
+フェイス速度はベース速度 $\bar u_f$ に圧力補正を与えて
+\begin{equation}\label{eq:rc-face}
+ u_f = \bar{u}_f - \Delta t\left( \frac{1}{\rho} \right)^{\mathrm{harm}}_f \left( \frac{p_N - p_P}{\delta x_f} \right) + \tilde\chi_f \left[ (\bnabla p)_f - \frac{p_N - p_P}{\delta x_f} \right],
+\end{equation}
+とする。
+\paragraph{Rhie--Chow 補正係数（修正版）}\label{para:rc-coeff}
+$D_f = \Delta t (1/\rho)^{\mathrm{harm}}_f/\delta x_f$ と定め，PPE の係数（face 上の調和平均）と整合させる。
+
+% ============================================================
+\section{圧力 Poisson 方程式（PPE）の導出と離散化}\label{sec:pressure}
+予測速度 $\bu^{\ast}$ に対し，変密度の PPE：
+\begin{equation}\label{eq:PPE_varrho}
+\bnabla\cdot\!\left( \frac{1}{\rho^{n+1}} \bnabla p^{n+1} \right) = \frac{1}{\Delta t}\, \bnabla\cdot \bu^{\ast}.
+\end{equation}
+代表的境界条件は B に従う（壁・流入・流出・圧力参照・全Neumann時の一意性拘束）。
+
+% ============================================================
+\section{時間積分・移流スキームの高精度化}\label{sec:time}
+TVD-RK3，WENO5，Crank–Nicolson の採用方針は B に従う。
+\subsection{補遺：再初期化の Godunov 型上流化（A 由来の詳細）}\label{sec:godunov}
+再初期化方程式の情報伝播方向に応じ，$s=\operatorname{sgn}(\phi_0)$ を用いた統一表現：
+\begin{equation}
+ \norm{\bnabla\phi}^{\mathrm{uw}}_{i,j}=
+ \sqrt{G_x^2+G_y^2},\qquad G_x^2=\max(s\,D_x^-,0)^2+\min(s\,D_x^+,0)^2,\; G_y^2=\max(s\,D_y^-,0)^2+\min(s\,D_y^+,0)^2,
+\end{equation}
+$D_x^+=(\phi_{i+1,j}-\phi_{i,j})/h_x,\;D_x^-=(\phi_{i,j}-\phi_{i-1,j})/h_x$（$y$ 方向も同様）。% TODO(Copilot): 3D の $G_z$ 追加可否は適用範囲に依存
+
+\subsection{安定性制約（表面張力 CFL 目安）}
+$\Delta t_\sigma = C_\sigma \sqrt{\rho_\mathrm{rep} \, \Delta x^3 / \sigma}$ を目安とし，問題依存で $C_\sigma$ を調整する。
+
+% ============================================================
+\section{完全アルゴリズムフロー}\label{sec:algorithm}
+9 段階（CLS 移流→再初期化→格子/物性/曲率更新→予測子→PPE→速度補正→CSF 更新→RC 面速度更新→計測・出力）。Balanced-force 指針は圧力と表面張力を同一点・同重みで離散する。
+
+% ============================================================
+\section{検証指標とベンチマーク}\label{sec:verification}
+CCD の格子収束（$\sin x$）・Eikonal 品質・体積保存・静水圧テスト・毛管波分散関係（FFT）などを用意し，許容誤差と再現条件（ハイパラ，乱数種）を表で明示する。% TODO(Copilot): 実験設定表の出典・乱数種の統一
+
+% ============================================================
+\section{まとめと今後の課題}\label{sec:conclusion}
+3D 拡張・AMR・並列前処理・界面不安定波・エネルギー保存性の解析などを展望し，CLS+WENO に最適化する観点を提案した。
+
+% ============================================================
+\section*{記号一覧（拡張版）}
+\noindent
+\begin{tabular}{llll}
+$\bm u$ & 速度（無次元） & $p$ & 圧力（無次元；$\rho_\mathrm{ref}U^2$ スケール） \\\\ 
+$\rho(\psi)$ & 密度（無次元） & $\mu(\psi)$ & 粘性（無次元） \\\\ 
+$\psi\in[0,1]$ & 界面指標 & $\phi$ & 符号付き距離（長さ） \\\\ 
+$\hat{\bm n}$ & 法線（気→液） & $\kappa$ & 曲率（1/長さ） \\\\ 
+$L,U$ & 代表長・速度 & $Re,Fr,We$ & 無次元数 \\\\ 
+$J_x$ & ヤコビアン $\partial\xi/\partial x$ & $\Delta t$ & 時間刻み \\\\ 
+$\delta x_f$ & face 間隔 & $(1/\rho)_f^{\mathrm{harm}}$ & face 調和平均の密度逆数 \\\\ 
+\end{tabular}
+
+% ================== Appendices ==================
+\appendix
+\section*{付録A：変密度 PPE の展開と境界条件（A 由来の補足）}
+連続形の展開：$\dfrac{1}{\tilde\rho}\,\bnabla^2 p-\dfrac{\bnabla\tilde\rho}{\tilde\rho^2}\cdot\bnabla p=\dfrac{\bnabla\cdot\bu^\ast}{\Delta t}$。FVM 離散・Rhie–Chow 整合については本文（\Cref{sec:pressure}）と同一の評価点・平均則で統合する。
+
+\section*{付録B：CCD 境界スキーム（$\Ord{h^5}$）の要点（A 由来）}
+左境界 $i=0$ の例：\(\fp{0} + \tfrac{3}{2}\fp{1} - \tfrac{3h}{2}\fpp{1} = \tfrac{1}{h}\bigl(-\tfrac{23}{6}f_0+\tfrac{21}{4}f_1-\tfrac{3}{2}f_2+\tfrac{1}{12}f_3\bigr)\)。右境界は $h\to-h$ で得る。% TODO(Copilot): 本文 Eq 番号との一貫性を最終校
+
+% 参考文献（BibTeX を使わない簡易版）
+\section*{参考文献}
+\begin{thebibliography}{99}
+\bibitem[Brackbill et al.(1992)]{Brackbill1992} Brackbill, J. U., Kothe, D. B., \& Zemach, C. (1992). A Continuum Method for Modeling Surface Tension. \textit{J. Comput. Phys.}, \textbf{100}(2), 335--354.
+\bibitem[Chorin(1968)]{Chorin1968} Chorin, A. J. (1968). Numerical Solution of the Navier--Stokes Equations. \textit{Math. Comput.}, \textbf{22}(104), 745--762.
+\bibitem[Chu \& Fan(1998)]{ChuFan1998} Chu, P. C., \& Fan, C. (1998). A Three-Point Combined Compact Difference Scheme. \textit{J. Comput. Phys.}, \textbf{140}(2), 370--399.
+\bibitem[Jiang \& Shu(1996)]{JiangShu1996} Jiang, G.-S., \& Shu, C.-W. (1996). Efficient Implementation of Weighted ENO Schemes. \textit{J. Comput. Phys.}, \textbf{126}(1), 202--228.
+\bibitem[Jiang \& Peng(2000)]{JiangPeng2000} Jiang, G.-S., \& Peng, D. (2000). Weighted ENO Schemes for Hamilton--Jacobi Equations. \textit{SIAM J. Sci. Comput.}, \textbf{21}(6), 2126--2143.
+\bibitem[Lele(1992)]{Lele1992} Lele, S. K. (1992). Compact Finite Difference Schemes with Spectral-Like Resolution. \textit{J. Comput. Phys.}, \textbf{103}(1), 16--42.
+\bibitem[Olsson \& Kreiss(2005)]{OlssonKreiss2005} Olsson, E., \& Kreiss, G. (2005). A Conservative Level Set Method for Two Phase Flow. \textit{J. Comput. Phys.}, \textbf{210}(1), 225--246.
+\bibitem[Osher \& Sethian(1988)]{OsherSethian1988} Osher, S., \& Sethian, J. A. (1988). Fronts Propagating with Curvature-Dependent Speed. \textit{J. Comput. Phys.}, \textbf{79}(1), 12--49.
+\bibitem[Rhie \& Chow(1983)]{RhieChow1983} Rhie, C. M., \& Chow, W. L. (1983). Numerical Study of the Turbulent Flow Past an Airfoil with Trailing Edge Separation. \textit{AIAA J.}, \textbf{21}(11), 1525--1532.
+\bibitem[Shu \& Osher(1988)]{ShuOsher1988} Shu, C.-W., \& Osher, S. (1988). Efficient Implementation of ENO Schemes. \textit{J. Comput. Phys.}, \textbf{77}(2), 439--471.
+\bibitem[Sussman et al.(1994)]{Sussman1994} Sussman, M., Smereka, P., \& Osher, S. (1994). A Level Set Approach for Incompressible Two-Phase Flow. \textit{J. Comput. Phys.}, \textbf{114}(1), 146--159.
+\bibitem[Sussman \& Fatemi(1999)]{Sussman1999} Sussman, M., \& Fatemi, E. (1999). An Efficient, Interface-Preserving Level Set Redistancing Algorithm. \textit{SIAM J. Sci. Comput.}, \textbf{20}(4), 1165--1191.
+\bibitem[Sussman \& Puckett(2000)]{Sussman2000} Sussman, M., \& Puckett, E. G. (2000). A Coupled Level Set and Volume-of-Fluid Method. \textit{J. Comput. Phys.}, \textbf{162}(2), 301--337.
+\bibitem[van der Vorst(1992)]{vanderVorst1992} van der Vorst, H. A. (1992). Bi-CGSTAB. \textit{SIAM J. Sci. Stat. Comput.}, \textbf{13}(2), 631--644.
+\bibitem[Unverdi \& Tryggvason(1992)]{Unverdi1992} Unverdi, S. O., \& Tryggvason, G. (1992). A Front-Tracking Method for Viscous, Incompressible, Multi-Fluid Flows. \textit{J. Comput. Phys.}, \textbf{100}(1), 25--37.
+\end{thebibliography}
+\end{document}
